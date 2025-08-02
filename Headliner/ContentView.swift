@@ -10,7 +10,7 @@ import SwiftUI
 struct ContentView: View {
     var body: some View {
         VStack(spacing: 20) {
-                    Text("🎤 Headliner is alive!")
+                    Text("🎤 Headliner is alive!!")
                         .font(.title)
                     Text("Ready to elevate your meetings.")
                         .foregroundColor(.secondary)
