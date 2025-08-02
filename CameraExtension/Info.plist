@@ -7,7 +7,7 @@
 	<key>CMIOExtension</key>
 	<dict>
 		<key>CMIOExtensionMachServiceName</key>
-		<string>$(TeamIdentifierPrefix)com.dannyfrancken.Headliner</string>
+        <string>group.378NGS49HA.com.dannyfrancken.Headliner</string>
 	</dict>
 </dict>
 </plist>
