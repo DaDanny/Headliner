@@ -35,6 +35,7 @@ class AppState: ObservableObject {
     
     private var cancellables = Set<AnyCancellable>()
     private let userDefaults = UserDefaults.standard
+    private var captureSessionManager: CaptureSessionManager?
     
     // MARK: - Constants
     
@@ -58,6 +59,7 @@ class AppState: ObservableObject {
         loadUserPreferences()
         checkExtensionStatus()
         loadAvailableCameras()
+        setupCaptureSession()
     }
     
     // MARK: - Public Methods
@@ -102,8 +104,11 @@ class AppState: ObservableObject {
         // Notify extension about camera device change
         if let appGroupDefaults = UserDefaults(suiteName: "378NGS49HA.com.dannyfrancken.Headliner") {
             appGroupDefaults.set(camera.id, forKey: "SelectedCameraID")
-            notificationManager.postNotification(named: "setCameraDevice")
+            notificationManager.postNotification(named: .setCameraDevice)
         }
+        
+        // Update capture session with new camera
+        updateCaptureSessionCamera(deviceID: camera.id)
         
         // If camera is running, restart with new device
         if cameraStatus == .running {
@@ -165,7 +170,68 @@ class AppState: ObservableObject {
         // Set default selection if none exists
         if selectedCameraID.isEmpty && !availableCameras.isEmpty {
             selectedCameraID = availableCameras.first?.id ?? ""
+            // Update the capture session with the default camera
+            if let firstCamera = availableCameras.first {
+                updateCaptureSessionCamera(deviceID: firstCamera.id)
+            }
         }
+    }
+    
+    private func setupCaptureSession() {
+        captureSessionManager = CaptureSessionManager(capturingHeadliner: false)
+        
+        if let manager = captureSessionManager, manager.configured {
+            // Set the output image manager as the video output delegate
+            manager.videoOutput?.setSampleBufferDelegate(
+                outputImageManager,
+                queue: manager.dataOutputQueue
+            )
+            
+            // Start the capture session for preview
+            if !manager.captureSession.isRunning {
+                manager.captureSession.startRunning()
+                logger.debug("Started preview capture session")
+            }
+        } else {
+            logger.error("Failed to configure capture session for preview")
+        }
+    }
+    
+    private func updateCaptureSessionCamera(deviceID: String) {
+        guard let manager = captureSessionManager else { return }
+        
+        // Find the camera device by ID
+        let discoverySession = AVCaptureDevice.DiscoverySession(
+            deviceTypes: [.builtInWideAngleCamera, .external, .continuityCamera, .deskViewCamera],
+            mediaType: .video,
+            position: .unspecified
+        )
+        
+        guard let device = discoverySession.devices.first(where: { $0.uniqueID == deviceID }) else {
+            logger.error("Camera device with ID \(deviceID) not found")
+            return
+        }
+        
+        // Update the capture session with the new camera
+        manager.captureSession.beginConfiguration()
+        
+        // Remove current inputs
+        for input in manager.captureSession.inputs {
+            manager.captureSession.removeInput(input)
+        }
+        
+        // Add new input
+        do {
+            let newInput = try AVCaptureDeviceInput(device: device)
+            if manager.captureSession.canAddInput(newInput) {
+                manager.captureSession.addInput(newInput)
+                logger.debug("Updated preview capture session with camera: \(device.localizedName)")
+            }
+        } catch {
+            logger.error("Failed to create camera input for preview: \(error)")
+        }
+        
+        manager.captureSession.commitConfiguration()
     }
     
     private func updateExtensionStatus(from logText: String) {

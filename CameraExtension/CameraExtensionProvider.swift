@@ -70,6 +70,9 @@ class CameraExtensionDeviceSource: NSObject, CMIOExtensionDeviceSource, AVCaptur
 		} catch let error {
 			fatalError("Failed to add stream: \(error.localizedDescription)")
 		}
+		
+		// Initialize capture session
+		setupCaptureSession()
 	}
 	
 	var availableProperties: Set<CMIOExtensionProperty> {
@@ -150,8 +153,61 @@ class CameraExtensionDeviceSource: NSObject, CMIOExtensionDeviceSource, AVCaptur
 		setupCameraInput()
 	}
 	
+	func setCameraDevice(_ deviceID: String) {
+		captureQueue.async { [weak self] in
+			guard let self = self else { return }
+			
+			// Find the camera device by ID
+			let discoverySession = AVCaptureDevice.DiscoverySession(
+				deviceTypes: [.builtInWideAngleCamera, .external, .continuityCamera, .deskViewCamera],
+				mediaType: .video,
+				position: .unspecified
+			)
+			
+			guard let device = discoverySession.devices.first(where: { $0.uniqueID == deviceID }) else {
+				logger.error("Camera device with ID \(deviceID) not found")
+				return
+			}
+			
+			// Remove current input if any
+			if let currentInput = self.currentInput {
+				self.captureSession?.removeInput(currentInput)
+				self.currentInput = nil
+			}
+			
+			// Add new input
+			do {
+				let newInput = try AVCaptureDeviceInput(device: device)
+				if self.captureSession?.canAddInput(newInput) == true {
+					self.captureSession?.addInput(newInput)
+					self.currentInput = newInput
+					self.selectedCameraDevice = device
+					logger.debug("Successfully set camera device to: \(device.localizedName)")
+				}
+			} catch {
+				logger.error("Failed to create camera input: \(error)")
+			}
+		}
+	}
+	
 	private func setupCameraInput() {
 		guard let captureSession = captureSession else { return }
+		
+		// Check if there's a selected camera device from UserDefaults
+		if let userDefaults = UserDefaults(suiteName: "378NGS49HA.com.dannyfrancken.Headliner"),
+		   let selectedDeviceID = userDefaults.string(forKey: "SelectedCameraID"),
+		   !selectedDeviceID.isEmpty {
+			// Find the selected device
+			let discoverySession = AVCaptureDevice.DiscoverySession(
+				deviceTypes: [.builtInWideAngleCamera, .external, .continuityCamera, .deskViewCamera],
+				mediaType: .video,
+				position: .unspecified
+			)
+			
+			if let device = discoverySession.devices.first(where: { $0.uniqueID == selectedDeviceID }) {
+				selectedCameraDevice = device
+			}
+		}
 		
 		// Remove existing input
 		if let currentInput = currentInput {
@@ -177,22 +233,6 @@ class CameraExtensionDeviceSource: NSObject, CMIOExtensionDeviceSource, AVCaptur
 			}
 		} catch {
 			logger.error("Failed to create camera input: \(error.localizedDescription)")
-		}
-	}
-	
-	func setCameraDevice(_ deviceID: String) {
-		// Find camera device by unique ID
-		let discoverySession = AVCaptureDevice.DiscoverySession(
-			deviceTypes: [.builtInWideAngleCamera, .external, .continuityCamera, .deskViewCamera],
-			mediaType: .video,
-			position: .unspecified
-		)
-		
-		selectedCameraDevice = discoverySession.devices.first { $0.uniqueID == deviceID }
-		
-		// Reconfigure input if streaming
-		if _streamingCounter > 0 {
-			setupCameraInput()
 		}
 	}
 	
