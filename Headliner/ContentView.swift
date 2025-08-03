@@ -7,12 +7,31 @@
 
 import SwiftUI
 import SystemExtensions
+import OSLog
+
+// MARK: - ContentView
+
+let logger = Logger(
+    subsystem: "com.dannyfrancken.headliner",
+    category: "Application"
+)
+
+// MARK: - ContentView
 
 struct ContentView: View {
     @ObservedObject var systemExtensionRequestManager: SystemExtensionRequestManager
     
     var body: some View {
         VStack(spacing: 20) {
+                    Button(action: {
+                        systemExtensionRequestManager
+                            .postNotification(
+                                named: NotificationName.changeImage
+                            )
+                    }) {
+                        Text("Change Image")
+                    }
+                    .padding()
                     Text("🎤 Headliner is alive!!")
                         .font(.title)
                     Text("Ready to elevate your meetings.")
@@ -30,14 +49,37 @@ struct ContentView: View {
     }
 }
 
+struct ContentView_Previews: PreviewProvider {
+    static var previews: some View {
+        ContentView(systemExtensionRequestManager: SystemExtensionRequestManager(logText: ""))
+    }
+}
+
 class SystemExtensionRequestManager: NSObject, ObservableObject {
-    @Published var logText: String = "Installation results here"
+    // MARK: Lifecycle
 
     init(logText: String) {
         super.init()
         self.logText = logText
     }
+    
+    @Published var logText: String = "Installation results here"
 
+    func postNotification(named notificationName: NotificationName) {
+        logger
+            .debug(
+                "Posting notification \(notificationName.rawValue) from container app"
+            )
+
+        CFNotificationCenterPostNotification(
+            CFNotificationCenterGetDarwinNotifyCenter(),
+            CFNotificationName(notificationName.rawValue as NSString),
+            nil,
+            nil,
+            true
+        )
+    }
+    
     func install() {
         guard let extensionIdentifier = _extensionBundle().bundleIdentifier else { return }
         let activationRequest = OSSystemExtensionRequest.activationRequest(forExtensionWithIdentifier: extensionIdentifier, queue: .main)
@@ -128,8 +170,4 @@ extension SystemExtensionRequestManager: OSSystemExtensionRequestDelegate {
     }
 }
 
-struct ContentView_Previews: PreviewProvider {
-    static var previews: some View {
-        ContentView(systemExtensionRequestManager: SystemExtensionRequestManager(logText: ""))
-    }
-}
+

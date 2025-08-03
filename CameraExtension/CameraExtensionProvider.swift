@@ -13,6 +13,12 @@ import os.log
 let kWhiteStripeHeight: Int = 10
 let kFrameRate: Int = 60
 
+
+let logger = Logger(subsystem: "com.dannyfrancken.headliner",
+                    category: "Extension")
+
+// MARK: - ExtensionDeviceSourceDelegate
+
 // MARK: -
 
 class CameraExtensionDeviceSource: NSObject, CMIOExtensionDeviceSource {
@@ -261,13 +267,17 @@ class CameraExtensionProviderSource: NSObject, CMIOExtensionProviderSource {
 	private(set) var provider: CMIOExtensionProvider!
 	
 	private var deviceSource: CameraExtensionDeviceSource!
+    
+    private let notificationCenter = CFNotificationCenterGetDarwinNotifyCenter()
+    private var notificationListenerStarted = false
 	
 	// CMIOExtensionProviderSource protocol methods (all are required)
 	
 	init(clientQueue: DispatchQueue?) {
 		
 		super.init()
-		
+        startNotificationListeners()
+        
 		provider = CMIOExtensionProvider(source: self, clientQueue: clientQueue)
 		deviceSource = CameraExtensionDeviceSource(localizedName: "Headliner")
 		
@@ -277,7 +287,13 @@ class CameraExtensionProviderSource: NSObject, CMIOExtensionProviderSource {
 			fatalError("Failed to add device: \(error.localizedDescription)")
 		}
 	}
+    
+    deinit {
+        stopNotificationListeners()
+    }
 	
+    // MARK: Internal
+    
 	func connect(to client: CMIOExtensionClient) throws {
 		
 		// Handle client connect
@@ -307,4 +323,44 @@ class CameraExtensionProviderSource: NSObject, CMIOExtensionProviderSource {
 		
 		// Handle settable properties here.
 	}
+    
+    // MARK: Private
+    
+    private func notificationReceived(notificationName: String) {
+        guard let name = NotificationName(rawValue: notificationName) else {
+            return
+        }
+
+        switch name {
+        case .changeImage:
+            //self.deviceSource.imageIsClean.toggle()
+            logger.debug("The camera extension has received a notification")
+            logger.debug("The notification is: \(name.rawValue)")
+//            self.deviceSource.stopStreaming()
+//            self.deviceSource.startStreaming()
+        }
+    }
+
+    private func startNotificationListeners() {
+        for notificationName in NotificationName.allCases {
+            let observer = UnsafeRawPointer(Unmanaged.passUnretained(self).toOpaque())
+
+            CFNotificationCenterAddObserver(CFNotificationCenterGetDarwinNotifyCenter(), observer, { _, observer, name, _, _ in
+                if let observer = observer, let name = name {
+                    let extensionProviderSourceSelf = Unmanaged<CameraExtensionProviderSource>.fromOpaque(observer).takeUnretainedValue()
+                    extensionProviderSourceSelf.notificationReceived(notificationName: name.rawValue as String)
+                }
+            },
+            notificationName.rawValue as CFString, nil, .deliverImmediately)
+        }
+    }
+
+    private func stopNotificationListeners() {
+        if notificationListenerStarted {
+            CFNotificationCenterRemoveEveryObserver(notificationCenter,
+                                                    Unmanaged.passRetained(self)
+                                                        .toOpaque())
+            notificationListenerStarted = false
+        }
+    }
 }

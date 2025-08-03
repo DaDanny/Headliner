@@ -8,6 +8,8 @@
 
 /* Begin PBXBuildFile section */
 		C91B53AF2E3EA3AD006F3D44 /* com.dannyfrancken.Headliner.CameraExtension.systemextension in Embed System Extensions */ = {isa = PBXBuildFile; fileRef = C91B53A52E3EA3AD006F3D44 /* com.dannyfrancken.Headliner.CameraExtension.systemextension */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		C91B53C32E3ED4AF006F3D44 /* NotificationName.swift in Sources */ = {isa = PBXBuildFile; fileRef = C91B53C22E3ED4AF006F3D44 /* NotificationName.swift */; };
+		C91B53C42E3ED4AF006F3D44 /* NotificationName.swift in Sources */ = {isa = PBXBuildFile; fileRef = C91B53C22E3ED4AF006F3D44 /* NotificationName.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -50,6 +52,7 @@
 
 /* Begin PBXFileReference section */
 		C91B53A52E3EA3AD006F3D44 /* com.dannyfrancken.Headliner.CameraExtension.systemextension */ = {isa = PBXFileReference; explicitFileType = "wrapper.system-extension"; includeInIndex = 0; path = com.dannyfrancken.Headliner.CameraExtension.systemextension; sourceTree = BUILT_PRODUCTS_DIR; };
+		C91B53C22E3ED4AF006F3D44 /* NotificationName.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = NotificationName.swift; path = CameraExtension/NotificationName.swift; sourceTree = "<group>"; };
 		C9F9CC422E3E873F00A24466 /* Headliner.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Headliner.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		C9F9CC502E3E874000A24466 /* HeadlinerTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = HeadlinerTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		C9F9CC5A2E3E874000A24466 /* HeadlinerUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = HeadlinerUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -136,6 +139,7 @@
 		C9F9CC392E3E873F00A24466 = {
 			isa = PBXGroup;
 			children = (
+				C91B53C22E3ED4AF006F3D44 /* NotificationName.swift */,
 				C9F9CC442E3E873F00A24466 /* Headliner */,
 				C9F9CC532E3E874000A24466 /* HeadlinerTests */,
 				C9F9CC5D2E3E874000A24466 /* HeadlinerUITests */,
@@ -334,6 +338,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				C91B53C32E3ED4AF006F3D44 /* NotificationName.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -341,6 +346,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				C91B53C42E3ED4AF006F3D44 /* NotificationName.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
