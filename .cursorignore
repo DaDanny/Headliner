@@ -1,0 +1,6 @@
+*.xcodeproj
+*.entitlements
+Info.plist
+*.plist
+SystemExtensionTargets/*
+HeadlinerEndToEnd/*
