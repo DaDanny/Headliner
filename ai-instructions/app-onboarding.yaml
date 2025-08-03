@@ -1,0 +1,22 @@
+instructions:
+  context:
+    - This is a macOS app called Headliner that installs a virtual camera using Apple's CoreMediaIO System Camera Extension APIs.
+    - The container app is in the Headliner directory. This is what the user interacts with directly.
+    - The CameraExtension directory contains the System Extension which enables the virtual camera to be used in apps like Google Meet and Zoom.
+    - The System Extension setup is already working and should not be modified. This includes Info.plist files, entitlements, and any xcodeproj configuration. These files are excluded via .cursorignore.
+
+  tasks:
+    - Review the Headliner directory. Understand how the current SwiftUI views, logic, and installation buttons are structured.
+    - Review the CameraExtension directory to understand how the virtual camera is implemented, but do not modify this code.
+    - Update the root README.md file to reflect the current project structure. Include a brief explanation of the container app and the extension. Mention the install/uninstall flow and basic usage.
+    - Modify Headliner/ContentView.swift and supporting files to improve the onboarding flow:
+        - If the system extension is not installed, show a setup screen with a message and a button to install the extension.
+        - If the extension is installed, show the main app UI.
+    - Build out the main app UI with the following functionality:
+        - If the virtual camera is not currently running, show a button to start it.
+        - If the virtual camera is running, show a live preview of the selected webcam device and a button to stop the camera.
+        - Include a dropdown (Picker) to select from available webcam devices using AVCaptureDevice.
+        - Store the selected camera device persistently so the app remembers it between launches.
+        - Ensure any new SwiftUI views are structured cleanly and can be previewed.
+    - Do not modify any Info.plist, entitlements, or system extension files.
+    - Focus only on Swift code in the Headliner app that controls onboarding, previewing, and user interaction with the camera.
