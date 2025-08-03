@@ -11,20 +11,25 @@ import IOKit.audio
 import os.log
 
 let kWhiteStripeHeight: Int = 10
-let kFrameRate: Int = 60
+let kFrameRate: Int = 1
 
 
 let logger = Logger(subsystem: "com.dannyfrancken.headliner",
                     category: "Extension")
 
-// MARK: - ExtensionDeviceSourceDelegate
+// MARK: - CameraExtensionDeviceSourceDelegate
 
+protocol CameraExtensionDeviceSourceDelegate: NSObject {
+    func bufferReceived(_ buffer: CMSampleBuffer)
+}
 // MARK: -
 
 class CameraExtensionDeviceSource: NSObject, CMIOExtensionDeviceSource {
 	
 	private(set) var device: CMIOExtensionDevice!
-	
+    
+    private var _isExtension: Bool = true
+
 	private var _streamSource: CameraExtensionStreamSource!
 	
 	private var _streamingCounter: UInt32 = 0
@@ -43,13 +48,21 @@ class CameraExtensionDeviceSource: NSObject, CMIOExtensionDeviceSource {
 	
 	private var _whiteStripeIsAscending: Bool = false
 	
+    public weak var cameraExtensionDeviceSourceDelegate: CameraExtensionDeviceSourceDelegate?
+    
+    var imageIsClean = true
+    
 	init(localizedName: String) {
 		
 		super.init()
+        guard let bundleID = Bundle.main.bundleIdentifier else { return }
+        if bundleID.contains("EndToEnd") {
+            _isExtension = false
+        }
 		let deviceID = UUID() // replace this with your device UUID
 		self.device = CMIOExtensionDevice(localizedName: localizedName, deviceID: deviceID, legacyDeviceID: nil, source: self)
 		
-		let dims = CMVideoDimensions(width: 1920, height: 1080)
+		let dims = CMVideoDimensions(width: 1080, height: 720)
 		CMVideoFormatDescriptionCreate(allocator: kCFAllocatorDefault, codecType: kCVPixelFormatType_32BGRA, width: dims.width, height: dims.height, extensions: nil, formatDescriptionOut: &_videoDescription)
 		
 		let pixelBufferAttributes: NSDictionary = [
@@ -95,74 +108,154 @@ class CameraExtensionDeviceSource: NSObject, CMIOExtensionDeviceSource {
 		// Handle settable properties here.
 	}
 	
-	func startStreaming() {
-		
-		guard let _ = _bufferPool else {
-			return
-		}
-		
-		_streamingCounter += 1
-		
-		_timer = DispatchSource.makeTimerSource(flags: .strict, queue: _timerQueue)
-		_timer!.schedule(deadline: .now(), repeating: 1.0 / Double(kFrameRate), leeway: .seconds(0))
-		
-		_timer!.setEventHandler {
-			
-			var err: OSStatus = 0
-			let now = CMClockGetTime(CMClockGetHostTimeClock())
-			
-			var pixelBuffer: CVPixelBuffer?
-			err = CVPixelBufferPoolCreatePixelBufferWithAuxAttributes(kCFAllocatorDefault, self._bufferPool, self._bufferAuxAttributes, &pixelBuffer)
-			if err != 0 {
-				os_log(.error, "out of pixel buffers \(err)")
-			}
-			
-			if let pixelBuffer = pixelBuffer {
-				
-				CVPixelBufferLockBaseAddress(pixelBuffer, [])
-				
-				var bufferPtr = CVPixelBufferGetBaseAddress(pixelBuffer)!
-				let width = CVPixelBufferGetWidth(pixelBuffer)
-				let height = CVPixelBufferGetHeight(pixelBuffer)
-				let rowBytes = CVPixelBufferGetBytesPerRow(pixelBuffer)
-				memset(bufferPtr, 0, rowBytes * height)
-				
-				let whiteStripeStartRow = self._whiteStripeStartRow
-				if self._whiteStripeIsAscending {
-					self._whiteStripeStartRow = whiteStripeStartRow - 1
-					self._whiteStripeIsAscending = self._whiteStripeStartRow > 0
-				}
-				else {
-					self._whiteStripeStartRow = whiteStripeStartRow + 1
-					self._whiteStripeIsAscending = self._whiteStripeStartRow >= (height - kWhiteStripeHeight)
-				}
-				bufferPtr += rowBytes * Int(whiteStripeStartRow)
-				for _ in 0..<kWhiteStripeHeight {
-					for _ in 0..<width {
-						var white: UInt32 = 0xFFFFFFFF
-						memcpy(bufferPtr, &white, MemoryLayout.size(ofValue: white))
-						bufferPtr += MemoryLayout.size(ofValue: white)
-					}
-				}
-				
-				CVPixelBufferUnlockBaseAddress(pixelBuffer, [])
-				
-				var sbuf: CMSampleBuffer!
-				var timingInfo = CMSampleTimingInfo()
-				timingInfo.presentationTimeStamp = CMClockGetTime(CMClockGetHostTimeClock())
-				err = CMSampleBufferCreateForImageBuffer(allocator: kCFAllocatorDefault, imageBuffer: pixelBuffer, dataReady: true, makeDataReadyCallback: nil, refcon: nil, formatDescription: self._videoDescription, sampleTiming: &timingInfo, sampleBufferOut: &sbuf)
-				if err == 0 {
-					self._streamSource.stream.send(sbuf, discontinuity: [], hostTimeInNanoseconds: UInt64(timingInfo.presentationTimeStamp.seconds * Double(NSEC_PER_SEC)))
-				}
-				os_log(.info, "video time \(timingInfo.presentationTimeStamp.seconds) now \(now.seconds) err \(err)")
-			}
-		}
-		
-		_timer!.setCancelHandler {
-		}
-		
-		_timer!.resume()
-	}
+    func startStreaming() {
+        guard let _ = _bufferPool else {
+            return
+        }
+
+        let Filename = imageIsClean ? "Clean" : "Dirty"
+
+        guard let bundleURL = Bundle.main.url(forResource: Filename, withExtension: "jpg") else {
+            logger.debug("Clean.jpg wasn't found in bundle, returning.")
+            return
+        }
+
+        guard let imageData = NSData(contentsOf: bundleURL) else {
+            logger.debug("Couldn't get data from image at URL, returning.")
+            return
+        }
+
+        guard let dataProvider = CGDataProvider(data: imageData) else {
+            logger.debug("Couldn't get dataProvider of URL, returning")
+            return
+        }
+
+        guard let techDiffCGImage =
+            CGImage(jpegDataProviderSource: dataProvider,
+                    decode: nil,
+                    shouldInterpolate: false,
+                    intent: .defaultIntent) else {
+            logger.debug("Couldn't get CG image from dataProvider, returning")
+            return
+        }
+
+        guard let techDiffBuffer = pixelBufferFromImage(techDiffCGImage) else {
+            logger
+                .debug("It wasn't possible to get pixelBuffer from the techDiffCGImage, exiting.")
+            return
+        }
+
+        _streamingCounter += 1
+
+        _timer = DispatchSource.makeTimerSource(flags: .strict,
+                                                queue: _timerQueue)
+        _timer!.schedule(deadline: .now(), repeating: Double(1 / kFrameRate),
+                         leeway: .seconds(0))
+
+        _timer!.setEventHandler {
+            var err: OSStatus = 0
+            let now = CMClockGetTime(CMClockGetHostTimeClock())
+
+            var sbuf: CMSampleBuffer!
+            var timingInfo = CMSampleTimingInfo()
+            timingInfo
+                .presentationTimeStamp =
+                CMClockGetTime(CMClockGetHostTimeClock())
+
+            var formatDescription: CMFormatDescription?
+
+            let status =
+                CMVideoFormatDescriptionCreateForImageBuffer(allocator: kCFAllocatorDefault,
+                                                             imageBuffer: techDiffBuffer,
+                                                             formatDescriptionOut: &formatDescription)
+            if status != 0 {
+                logger
+                    .debug("Couldn't make video format description from techDiffBuffer, exiting.")
+            }
+            if let formatDescription = formatDescription {
+                err =
+                    CMSampleBufferCreateReadyWithImageBuffer(allocator: kCFAllocatorDefault,
+                                                             imageBuffer: techDiffBuffer,
+                                                             formatDescription: formatDescription,
+                                                             sampleTiming: &timingInfo,
+                                                             sampleBufferOut: &sbuf)
+            } else {
+                logger
+                    .debug("Couldn't create sample buffer from techDiffBuffer, exiting.")
+            }
+
+            if err == 0 {
+                if self._isExtension {
+                    // If I'm the extension, send to output stream
+                    self._streamSource.stream.send(sbuf, discontinuity: [],
+                                                   hostTimeInNanoseconds: UInt64(timingInfo
+                                                       .presentationTimeStamp
+                                                       .seconds *
+                                                       Double(NSEC_PER_SEC)))
+                } else {
+                    self.cameraExtensionDeviceSourceDelegate?
+                        .bufferReceived(sbuf) // If I'm the end to end testing app, send to delegate method.
+                }
+            } else {
+                os_log(.info, "video time \(timingInfo.presentationTimeStamp.seconds) now \(now.seconds) err \(err)")
+            }
+        }
+
+        _timer!.setCancelHandler {}
+        _timer!.resume()
+    }
+    
+    func pixelBufferFromImage(_ image: CGImage) -> CVPixelBuffer? {
+        let width = image.width
+        let height = image.height
+        let region = CGRect(x: 0, y: 0, width: width, height: height)
+     
+        let pixelBufferAttributes: NSDictionary = [
+            kCVPixelBufferWidthKey: width,
+            kCVPixelBufferHeightKey: height,
+            kCVPixelBufferPixelFormatTypeKey: _videoDescription.mediaSubType,
+            kCVPixelBufferIOSurfacePropertiesKey: [:],
+        ]
+     
+        var pixelBuffer: CVPixelBuffer?
+        let result = CVPixelBufferCreate(kCFAllocatorDefault,
+                                         width,
+                                         height,
+                                         kCVPixelFormatType_32ARGB,
+                                         pixelBufferAttributes as CFDictionary,
+                                         &pixelBuffer)
+     
+        guard result == kCVReturnSuccess, let pixelBuffer = pixelBuffer,
+              let colorspace = image.colorSpace else {
+            return nil
+        }
+     
+        CVPixelBufferLockBaseAddress(pixelBuffer,
+                                     CVPixelBufferLockFlags(rawValue: 0))
+        guard let context =
+            CGContext(data: CVPixelBufferGetBaseAddress(pixelBuffer),
+                      width: width,
+                      height: height,
+                      bitsPerComponent: image.bitsPerComponent,
+                      bytesPerRow: image.bytesPerRow,
+                      space: colorspace,
+                      bitmapInfo: CGImageAlphaInfo.noneSkipFirst
+                          .rawValue)
+        else {
+            return nil
+        }
+     
+        var transform = CGAffineTransform(scaleX: -1, y: 1) // Flip on vertical axis
+        transform = transform.translatedBy(x: -CGFloat(image.width), y: 0)
+        context.concatenate(transform)
+            
+        context.draw(image, in: region)
+     
+        CVPixelBufferUnlockBaseAddress(pixelBuffer,
+                                       CVPixelBufferLockFlags(rawValue: 0))
+     
+        return pixelBuffer
+    }
 	
 	func stopStreaming() {
 		
@@ -266,7 +359,7 @@ class CameraExtensionProviderSource: NSObject, CMIOExtensionProviderSource {
 	
 	private(set) var provider: CMIOExtensionProvider!
 	
-	private var deviceSource: CameraExtensionDeviceSource!
+	var deviceSource: CameraExtensionDeviceSource!
     
     private let notificationCenter = CFNotificationCenterGetDarwinNotifyCenter()
     private var notificationListenerStarted = false
@@ -333,11 +426,11 @@ class CameraExtensionProviderSource: NSObject, CMIOExtensionProviderSource {
 
         switch name {
         case .changeImage:
-            //self.deviceSource.imageIsClean.toggle()
+            self.deviceSource.imageIsClean.toggle()
             logger.debug("The camera extension has received a notification")
             logger.debug("The notification is: \(name.rawValue)")
-//            self.deviceSource.stopStreaming()
-//            self.deviceSource.startStreaming()
+            self.deviceSource.stopStreaming()
+            self.deviceSource.startStreaming()
         }
     }
 

@@ -84,6 +84,7 @@
       allowLocationSimulation = "YES">
       <PathRunnable
          runnableDebuggingMode = "0"
+         BundleIdentifier = "com.dannyfrancken.Headliner"
          FilePath = "/Applications/Headliner.app">
       </PathRunnable>
       <MacroExpansion>
