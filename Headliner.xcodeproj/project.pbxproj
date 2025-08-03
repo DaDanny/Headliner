@@ -124,16 +124,6 @@
 			path = Headliner;
 			sourceTree = "<group>";
 		};
-		C9F9CC532E3E874000A24466 /* HeadlinerTests */ = {
-			isa = PBXFileSystemSynchronizedRootGroup;
-			path = HeadlinerTests;
-			sourceTree = "<group>";
-		};
-		C9F9CC5D2E3E874000A24466 /* HeadlinerUITests */ = {
-			isa = PBXFileSystemSynchronizedRootGroup;
-			path = HeadlinerUITests;
-			sourceTree = "<group>";
-		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -180,8 +170,6 @@
 			children = (
 				C91B53C22E3ED4AF006F3D44 /* Shared.swift */,
 				C9F9CC442E3E873F00A24466 /* Headliner */,
-				C9F9CC532E3E874000A24466 /* HeadlinerTests */,
-				C9F9CC5D2E3E874000A24466 /* HeadlinerUITests */,
 				C91B53A62E3EA3AD006F3D44 /* CameraExtension */,
 				C92FB7A52E3EF737001195E9 /* HeadlinerEndToEnd */,
 				C9F9CC432E3E873F00A24466 /* Products */,
@@ -284,9 +272,6 @@
 			dependencies = (
 				C9F9CC522E3E874000A24466 /* PBXTargetDependency */,
 			);
-			fileSystemSynchronizedGroups = (
-				C9F9CC532E3E874000A24466 /* HeadlinerTests */,
-			);
 			name = HeadlinerTests;
 			packageProductDependencies = (
 			);
@@ -306,9 +291,6 @@
 			);
 			dependencies = (
 				C9F9CC5C2E3E874000A24466 /* PBXTargetDependency */,
-			);
-			fileSystemSynchronizedGroups = (
-				C9F9CC5D2E3E874000A24466 /* HeadlinerUITests */,
 			);
 			name = HeadlinerUITests;
 			packageProductDependencies = (
