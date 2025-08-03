@@ -74,7 +74,8 @@ class CameraExtensionDeviceSource: NSObject, CMIOExtensionDeviceSource {
 		do {
 			try device.addStream(_streamSource.stream)
 		} catch let error {
-			fatalError("Failed to add stream: \(error.localizedDescription)")
+            logger.error("Failed to initialize stream source or add stream: \(error.localizedDescription)")
+            return
 		}
 	}
 	

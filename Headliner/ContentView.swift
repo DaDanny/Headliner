@@ -300,9 +300,11 @@ class CustomPropertyManager: NSObject {
         for deviceObjectID in cmioDevices {
             cmioObjectPropertyAddress.mSelector = CMIOObjectPropertySelector(kCMIODevicePropertyDeviceUID)
             CMIOObjectGetPropertyDataSize(deviceObjectID, &cmioObjectPropertyAddress, 0, nil, &propertyDataSize)
-            var deviceName: NSString = ""
-            CMIOObjectGetPropertyData(deviceObjectID, &cmioObjectPropertyAddress, 0, nil, propertyDataSize, &dataUsed, &deviceName)
-            if String(deviceName) == uuidString {
+            var deviceNameBuffer = [CChar](repeating: 0, count: Int(propertyDataSize))
+            CMIOObjectGetPropertyData(deviceObjectID, &cmioObjectPropertyAddress, 0, nil, propertyDataSize, &dataUsed, &deviceNameBuffer)
+
+            let deviceName = String(cString: deviceNameBuffer)
+            if deviceName == uuidString {
                 return deviceObjectID
             }
         }
@@ -320,10 +322,12 @@ class CustomPropertyManager: NSObject {
         if CMIOObjectHasProperty(deviceID, &propertyAddress) {
             var propertyDataSize: UInt32 = 0
             CMIOObjectGetPropertyDataSize(deviceID, &propertyAddress, 0, nil, &propertyDataSize)
-            var name: NSString = ""
+            
             var dataUsed: UInt32 = 0
-            CMIOObjectGetPropertyData(deviceID, &propertyAddress, 0, nil, propertyDataSize, &dataUsed, &name)
-            return name as String
+            var buffer = [CChar](repeating: 0, count: Int(propertyDataSize))
+            CMIOObjectGetPropertyData(deviceID, &propertyAddress, 0, nil, propertyDataSize, &dataUsed, &buffer)
+
+            return String(cString: buffer)
         }
         return nil
     }
@@ -340,8 +344,10 @@ class CustomPropertyManager: NSObject {
         }
         var dataSize: UInt32 = 0
         CMIOObjectGetPropertyDataSize(deviceID, &propertyAddress, 0, nil, &dataSize)
-        var changedValue: NSString = value as NSString
-        let result = CMIOObjectSetPropertyData(deviceID, &propertyAddress, 0, nil, dataSize, &changedValue)
+        let valueString: CFString = value as CFString
+        let result = withUnsafePointer(to: valueString) { ptr in
+            return CMIOObjectSetPropertyData(deviceID, &propertyAddress, 0, nil, UInt32(MemoryLayout<CFString>.size), ptr)
+        }
         if result != 0 {
             logger.debug("Not successful setting property data")
             return false
