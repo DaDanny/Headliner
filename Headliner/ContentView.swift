@@ -8,50 +8,96 @@
 import SwiftUI
 import SystemExtensions
 import OSLog
+import AVFoundation
+import CoreMediaIO
 
 // MARK: - ContentView
 
 let logger = Logger(
-    subsystem: "com.dannyfrancken.headliner",
+    subsystem: Identifiers.orgIDAndProduct.rawValue.lowercased(),
     category: "Application"
 )
 
 // MARK: - ContentView
 
-struct ContentView: View {
-    @ObservedObject var systemExtensionRequestManager: SystemExtensionRequestManager
-    
-    var body: some View {
-        VStack(spacing: 20) {
-                    Button(action: {
-                        systemExtensionRequestManager
-                            .postNotification(
-                                named: NotificationName.changeImage
-                            )
-                    }) {
-                        Text("Change Image")
-                    }
-                    .padding()
-                    Text("🎤 Headliner is alive!!")
-                        .font(.title)
-                    Text("Ready to elevate your meetings.")
-                        .foregroundColor(.secondary)
-                    Button("Install", action: {
-                            systemExtensionRequestManager.install()
-                    })
-                    Button("Uninstall", action: {
-                        systemExtensionRequestManager.uninstall()
-                    })
-                    Text(systemExtensionRequestManager.logText)
-                }
-                .frame(minWidth: 400, minHeight: 300)
-                .padding()
+struct ContentView {
+    // MARK: Lifecycle
+    init(
+        systemExtensionRequestManager: SystemExtensionRequestManager,
+        propertyManager: CustomPropertyManager,
+        outputImageManager: OutputImageManager
+    ) {
+        self.propertyManager = propertyManager
+        self.systemExtensionRequestManager = systemExtensionRequestManager
+        self.outputImageManager = outputImageManager
+        effect = moods.firstIndex(of: propertyManager.effect) ?? 0
+        captureSessionManager = CaptureSessionManager(capturingHeadliner: true)
+
+        if captureSessionManager.configured == true, captureSessionManager.captureSession.isRunning == false {
+            captureSessionManager.captureSession.startRunning()
+            captureSessionManager.videoOutput?.setSampleBufferDelegate(
+                outputImageManager,
+                queue: captureSessionManager.dataOutputQueue
+            )
+        } else {
+            logger.error("Couldn't start capture session")
+        }
     }
+
+    // MARK: Internal
+
+    var captureSessionManager: CaptureSessionManager
+    var propertyManager: CustomPropertyManager
+    @ObservedObject var systemExtensionRequestManager: SystemExtensionRequestManager
+    @ObservedObject var outputImageManager: OutputImageManager
+
+
+    // MARK: Private
+
+    private var moods = MoodName.allCases
+    @State private var effect: Int
 }
 
+// MARK: View
+
+extension ContentView: View {
+    var body: some View {
+        VStack {
+            Image(
+                self.outputImageManager
+                    .videoExtensionStreamOutputImage ?? self.outputImageManager
+                    .noVideoImage,
+                scale: 1.0,
+                label: Text("Video Feed")
+            )
+            Button("Install", action: {
+                systemExtensionRequestManager.install()
+            })
+            Button("Uninstall", action: {
+                systemExtensionRequestManager.uninstall()
+            })
+
+            Picker(selection: $effect, label: Text("Effect")) {
+                ForEach(Array(moods.enumerated()), id: \.offset) { index, element in
+                    Text(element.rawValue).tag(index)
+                }
+            }
+            .pickerStyle(.segmented)
+
+            .onChange(of: effect) {
+                let result = propertyManager.setPropertyValue(withSelectorName: propertyManager.mood, to: moods[effect].rawValue)
+                logger.debug("Setting new property value (\"\(propertyManager.getPropertyValue(withSelectorName: propertyManager.mood) ?? "Unknown new string")\") was \(result ? "successful" : "unsuccessful")")
+            }
+            .disabled(propertyManager.deviceObjectID == nil)
+            Text(systemExtensionRequestManager.logText)
+        }
+        .frame(alignment: .top)
+        Spacer()
+    }
+}
 struct ContentView_Previews: PreviewProvider {
     static var previews: some View {
-        ContentView(systemExtensionRequestManager: SystemExtensionRequestManager(logText: ""))
+        ContentView(systemExtensionRequestManager: SystemExtensionRequestManager(logText: ""), propertyManager: CustomPropertyManager(), outputImageManager: OutputImageManager())
     }
 }
 
@@ -170,4 +216,136 @@ extension SystemExtensionRequestManager: OSSystemExtensionRequestDelegate {
     }
 }
 
+// MARK: - OutputImageManager
 
+class OutputImageManager: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate, ObservableObject {
+    @Published var videoExtensionStreamOutputImage: CGImage?
+    let noVideoImage: CGImage = NSImage(
+        systemSymbolName: "video.slash",
+        accessibilityDescription: "Image to indicate no video feed available"
+    )!.cgImage(forProposedRect: nil, context: nil, hints: nil)! // OK to fail if this isn't available.
+
+    func captureOutput(_: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer, from _: AVCaptureConnection) {
+        autoreleasepool {
+            guard let cvImageBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) else {
+                logger.debug("Couldn't get image buffer, returning.")
+                return
+            }
+
+            guard let ioSurface = CVPixelBufferGetIOSurface(cvImageBuffer) else {
+                logger.debug("Pixel buffer had no IOSurface") // The camera uses IOSurface so we want image to break if there is none.
+                return
+            }
+
+            let ciImage = CIImage(ioSurface: ioSurface.takeUnretainedValue())
+                .oriented(.upMirrored) // Cameras show the user a mirrored image, the other end of the conversation an unmirrored image.
+
+            let context = CIContext(options: nil)
+
+            guard let cgImage = context
+                .createCGImage(ciImage, from: ciImage.extent) else { return }
+
+            DispatchQueue.main.async {
+                self.videoExtensionStreamOutputImage = cgImage
+            }
+        }
+    }
+}
+
+// MARK: - CustomPropertyManager
+ 
+class CustomPropertyManager: NSObject {
+    // MARK: Lifecycle
+    
+    override init() {
+        super.init()
+        effect = MoodName(rawValue: getPropertyValue(withSelectorName: mood) ?? MoodName.bypass.rawValue) ?? MoodName.bypass
+    }
+    
+    // MARK: Internal
+    
+    let mood = PropertyName.mood.rawValue.convertedToCMIOObjectPropertySelectorName()
+    var effect: MoodName = .bypass
+    
+    lazy var deviceObjectID: CMIOObjectID? = {
+        let device = getExtensionDevice(name: "Headliner")
+        if let device = device, let deviceObjectId = getCMIODeviceID(fromUUIDString: device.uniqueID) {
+            return deviceObjectId
+        }
+        return nil
+        
+    }()
+    
+    func getExtensionDevice(name: String) -> AVCaptureDevice? {
+        let discoverySession = AVCaptureDevice.DiscoverySession(deviceTypes: [.builtInWideAngleCamera, .external, .continuityCamera],
+                                                                mediaType: .video,
+                                                                position: .unspecified)
+        return discoverySession.devices.first { $0.localizedName == name }
+    }
+    
+    func propertyExists(inDeviceAtID deviceID: CMIODeviceID, withSelectorName selectorName: CMIOObjectPropertySelector) -> CMIOObjectPropertyAddress? {
+        var address = CMIOObjectPropertyAddress(mSelector: CMIOObjectPropertySelector(selectorName), mScope: CMIOObjectPropertyScope(kCMIOObjectPropertyScopeGlobal), mElement: CMIOObjectPropertyElement(kCMIOObjectPropertyElementMain))
+        let exists = CMIOObjectHasProperty(deviceID, &address)
+        return exists ? address : nil
+    }
+    
+    func getCMIODeviceID(fromUUIDString uuidString: String) -> CMIOObjectID? {
+        var propertyDataSize: UInt32 = 0
+        var dataUsed: UInt32 = 0
+        var cmioObjectPropertyAddress = CMIOObjectPropertyAddress(mSelector: CMIOObjectPropertySelector(kCMIOHardwarePropertyDevices), mScope: CMIOObjectPropertyScope(kCMIOObjectPropertyScopeGlobal), mElement: CMIOObjectPropertyElement(kCMIOObjectPropertyElementMain))
+        CMIOObjectGetPropertyDataSize(CMIOObjectPropertySelector(kCMIOObjectSystemObject), &cmioObjectPropertyAddress, 0, nil, &propertyDataSize)
+        let count = Int(propertyDataSize) / MemoryLayout<CMIOObjectID>.size
+        var cmioDevices = [CMIOObjectID](repeating: 0, count: count)
+        CMIOObjectGetPropertyData(CMIOObjectPropertySelector(kCMIOObjectSystemObject), &cmioObjectPropertyAddress, 0, nil, propertyDataSize, &dataUsed, &cmioDevices)
+        for deviceObjectID in cmioDevices {
+            cmioObjectPropertyAddress.mSelector = CMIOObjectPropertySelector(kCMIODevicePropertyDeviceUID)
+            CMIOObjectGetPropertyDataSize(deviceObjectID, &cmioObjectPropertyAddress, 0, nil, &propertyDataSize)
+            var deviceName: NSString = ""
+            CMIOObjectGetPropertyData(deviceObjectID, &cmioObjectPropertyAddress, 0, nil, propertyDataSize, &dataUsed, &deviceName)
+            if String(deviceName) == uuidString {
+                return deviceObjectID
+            }
+        }
+        return nil
+    }
+    
+    func getPropertyValue(withSelectorName selectorName: CMIOObjectPropertySelector) -> String? {
+        var propertyAddress = CMIOObjectPropertyAddress(mSelector: CMIOObjectPropertySelector(selectorName), mScope: CMIOObjectPropertyScope(kCMIOObjectPropertyScopeGlobal), mElement: CMIOObjectPropertyElement(kCMIOObjectPropertyElementMain))
+        
+        guard let deviceID = deviceObjectID else {
+            logger.error("Couldn't get object ID, returning")
+            return nil
+        }
+        
+        if CMIOObjectHasProperty(deviceID, &propertyAddress) {
+            var propertyDataSize: UInt32 = 0
+            CMIOObjectGetPropertyDataSize(deviceID, &propertyAddress, 0, nil, &propertyDataSize)
+            var name: NSString = ""
+            var dataUsed: UInt32 = 0
+            CMIOObjectGetPropertyData(deviceID, &propertyAddress, 0, nil, propertyDataSize, &dataUsed, &name)
+            return name as String
+        }
+        return nil
+    }
+    func setPropertyValue(withSelectorName selectorName: CMIOObjectPropertySelector, to value: String) -> Bool {
+        guard let deviceID = deviceObjectID, var propertyAddress = propertyExists(inDeviceAtID: deviceID, withSelectorName: selectorName) else {
+            logger.debug("Property doesn't exist")
+            return false
+        }
+        var settable: DarwinBoolean = false
+        CMIOObjectIsPropertySettable(deviceID, &propertyAddress, &settable)
+        if settable == false {
+            logger.debug("Property can't be set")
+            return false
+        }
+        var dataSize: UInt32 = 0
+        CMIOObjectGetPropertyDataSize(deviceID, &propertyAddress, 0, nil, &dataSize)
+        var changedValue: NSString = value as NSString
+        let result = CMIOObjectSetPropertyData(deviceID, &propertyAddress, 0, nil, dataSize, &changedValue)
+        if result != 0 {
+            logger.debug("Not successful setting property data")
+            return false
+        }
+        return true
+    }
+}

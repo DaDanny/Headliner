@@ -7,11 +7,14 @@
 
 import CoreMediaIO
 import SwiftUI
+import AVFoundation
 
 // MARK: - ContentView
 
 struct ContentView {
     @ObservedObject var endToEndStreamProvider: EndToEndStreamProvider
+    @State var effect: Int
+    var moods = MoodName.allCases
 }
 
 extension ContentView: View {
@@ -24,7 +27,20 @@ extension ContentView: View {
                 scale: 1.0,
                 label: Text("Video Feed")
             )
+            Picker(selection: $effect, label: Text("Effect")) {
+                ForEach(Array(moods.enumerated()), id: \.offset) { index, element in
+                    Text(element.rawValue).tag(index)
+                }
+            }
+            .pickerStyle(.segmented)
+
+            .onChange(of: effect) {
+                logger.debug("Chosen effect: \(moods[effect].rawValue)")
+                NotificationManager.postNotification(named: moods[effect].rawValue)
+            }
         }
+        .frame(alignment: .top)
+        Spacer()
     }
 }
 
@@ -32,34 +48,48 @@ extension ContentView: View {
 
 struct ContentView_Previews: PreviewProvider {
     static var previews: some View {
-        ContentView(endToEndStreamProvider: EndToEndStreamProvider())
+        ContentView(endToEndStreamProvider: EndToEndStreamProvider(), effect: 0)
     }
 }
 
 // MARK: - EndToEndStreamProvider
 
-class EndToEndStreamProvider: NSObject, ObservableObject,
-    CameraExtensionDeviceSourceDelegate {
+class EndToEndStreamProvider: NSObject, ObservableObject, CameraExtensionDeviceSourceDelegate {
     // MARK: Lifecycle
 
     override init() {
-        providerSource = CameraExtensionProviderSource(clientQueue: nil)
+        print("Before Init")
         super.init()
-        providerSource
-            .deviceSource = CameraExtensionDeviceSource(localizedName: "Headliner")
-        providerSource.deviceSource.cameraExtensionDeviceSourceDelegate = self
-        providerSource.deviceSource.startStreaming()
+        print("After init")
+        AVCaptureDevice.requestAccess(for: .video) { granted in
+            if !granted {
+                print("❌ Camera access denied.")
+                return
+            }
+
+            DispatchQueue.main.async {
+                self.startCameraExtension()
+            }
+        }
+    }
+    
+    private func startCameraExtension() {
+        self.providerSource = CameraExtensionProviderSource(clientQueue: nil)
+        self.providerSource?.deviceSource = CameraExtensionDeviceSource(localizedName: "Headliner")
+        self.providerSource?.deviceSource.cameraExtensionDeviceSourceDelegate = self
+
+        NotificationManager.postNotification(named: NotificationName.startStream)
     }
 
     // MARK: Internal
 
     @Published var videoExtensionStreamOutputImage: CGImage?
-    let noVideoImage : CGImage = NSImage(
+    let noVideoImage: CGImage = NSImage(
         systemSymbolName: "video.slash",
         accessibilityDescription: "Image to indicate no video feed available"
-    )!.cgImage(forProposedRect: nil, context: nil, hints: nil)! // OK to fail if this isn't available.
-    
-    let providerSource: CameraExtensionProviderSource
+    )!.cgImage(forProposedRect: nil, context: nil, hints: nil)!
+
+    var providerSource: CameraExtensionProviderSource?
 
     func bufferReceived(_ buffer: CMSampleBuffer) {
         guard let cvImageBuffer = CMSampleBufferGetImageBuffer(buffer) else {

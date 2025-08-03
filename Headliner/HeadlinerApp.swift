@@ -11,8 +11,8 @@ import SwiftUI
 struct HeadlinerApp: App {
     var body: some Scene {
         WindowGroup {
-            ContentView(systemExtensionRequestManager: SystemExtensionRequestManager(logText: ""))
-                .frame(minWidth: 300, minHeight: 180)
+            ContentView(systemExtensionRequestManager: SystemExtensionRequestManager(logText: ""), propertyManager: CustomPropertyManager(), outputImageManager: OutputImageManager())
+                .frame(minWidth: 1280, maxWidth: 1360, minHeight: 900, maxHeight: 940)
         }
     }
 }

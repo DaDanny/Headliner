@@ -11,7 +11,8 @@ import SwiftUI
 struct HeadlinerEndToEndApp: App {
     var body: some Scene {
         WindowGroup {
-            ContentView(endToEndStreamProvider: EndToEndStreamProvider())
+            ContentView(endToEndStreamProvider: EndToEndStreamProvider(), effect: 0)
+                .frame(minWidth: 1280, maxWidth: 1360, minHeight: 900, maxHeight: 940)
         }
     }
 }

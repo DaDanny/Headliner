@@ -5,16 +5,21 @@
 //  Created by Danny Francken on 8/2/25.
 //
 
+import Accelerate
+import AppKit
+import AVFoundation
 import Foundation
 import CoreMediaIO
 import IOKit.audio
 import os.log
 
+let outputWidth = 1280
+let outputHeight = 720
 let kWhiteStripeHeight: Int = 10
-let kFrameRate: Int = 1
+let kFrameRate: Int = 24
+let pixelBufferSize = vImage.Size(width: outputWidth, height: outputHeight)
 
-
-let logger = Logger(subsystem: "com.dannyfrancken.headliner",
+let logger = Logger(subsystem: Identifiers.orgIDAndProduct.rawValue.lowercased(),
                     category: "Extension")
 
 // MARK: - CameraExtensionDeviceSourceDelegate
@@ -28,29 +33,17 @@ class CameraExtensionDeviceSource: NSObject, CMIOExtensionDeviceSource {
 	
 	private(set) var device: CMIOExtensionDevice!
     
-    private var _isExtension: Bool = true
-
-	private var _streamSource: CameraExtensionStreamSource!
-	
-	private var _streamingCounter: UInt32 = 0
-	
-	private var _timer: DispatchSourceTimer?
-	
-	private let _timerQueue = DispatchQueue(label: "timerQueue", qos: .userInteractive, attributes: [], autoreleaseFrequency: .workItem, target: .global(qos: .userInteractive))
-	
-	private var _videoDescription: CMFormatDescription!
-	
+    var _isExtension: Bool = true
+    var _videoDescription: CMFormatDescription!
+    var mood = MoodName.bypass
+    var _streamSource: CameraExtensionStreamSource!
+			
 	private var _bufferPool: CVPixelBufferPool!
 	
 	private var _bufferAuxAttributes: NSDictionary!
 	
-	private var _whiteStripeStartRow: UInt32 = 0
-	
-	private var _whiteStripeIsAscending: Bool = false
-	
     public weak var cameraExtensionDeviceSourceDelegate: CameraExtensionDeviceSourceDelegate?
     
-    var imageIsClean = true
     
 	init(localizedName: String) {
 		
@@ -85,208 +78,128 @@ class CameraExtensionDeviceSource: NSObject, CMIOExtensionDeviceSource {
 		}
 	}
 	
-	var availableProperties: Set<CMIOExtensionProperty> {
-		
-		return [.deviceTransportType, .deviceModel]
-	}
-	
-	func deviceProperties(forProperties properties: Set<CMIOExtensionProperty>) throws -> CMIOExtensionDeviceProperties {
-		
-		let deviceProperties = CMIOExtensionDeviceProperties(dictionary: [:])
-		if properties.contains(.deviceTransportType) {
-			deviceProperties.transportType = kIOAudioDeviceTransportTypeVirtual
-		}
-		if properties.contains(.deviceModel) {
-			deviceProperties.model = "Headliner Model"
-		}
-		
-		return deviceProperties
-	}
-	
-	func setDeviceProperties(_ deviceProperties: CMIOExtensionDeviceProperties) throws {
-		
-		// Handle settable properties here.
-	}
-	
-    func startStreaming() {
-        guard let _ = _bufferPool else {
-            return
+    var availableProperties: Set<CMIOExtensionProperty> {
+            [.deviceTransportType, .deviceModel, customEffectExtensionProperty]
         }
-
-        let Filename = imageIsClean ? "Clean" : "Dirty"
-
-        guard let bundleURL = Bundle.main.url(forResource: Filename, withExtension: "jpg") else {
-            logger.debug("Clean.jpg wasn't found in bundle, returning.")
-            return
+     
+    func deviceProperties(forProperties properties: Set<CMIOExtensionProperty>) throws
+        -> CMIOExtensionDeviceProperties
+    {
+        let deviceProperties = CMIOExtensionDeviceProperties(dictionary: [:])
+        if properties.contains(.deviceTransportType) {
+            deviceProperties.transportType = kIOAudioDeviceTransportTypeVirtual
         }
-
-        guard let imageData = NSData(contentsOf: bundleURL) else {
-            logger.debug("Couldn't get data from image at URL, returning.")
-            return
+        if properties.contains(.deviceModel) {
+            deviceProperties.model = "Headliner Model"
         }
-
-        guard let dataProvider = CGDataProvider(data: imageData) else {
-            logger.debug("Couldn't get dataProvider of URL, returning")
-            return
-        }
-
-        guard let techDiffCGImage =
-            CGImage(jpegDataProviderSource: dataProvider,
-                    decode: nil,
-                    shouldInterpolate: false,
-                    intent: .defaultIntent) else {
-            logger.debug("Couldn't get CG image from dataProvider, returning")
-            return
-        }
-
-        guard let techDiffBuffer = pixelBufferFromImage(techDiffCGImage) else {
-            logger
-                .debug("It wasn't possible to get pixelBuffer from the techDiffCGImage, exiting.")
-            return
-        }
-
-        _streamingCounter += 1
-
-        _timer = DispatchSource.makeTimerSource(flags: .strict,
-                                                queue: _timerQueue)
-        _timer!.schedule(deadline: .now(), repeating: Double(1 / kFrameRate),
-                         leeway: .seconds(0))
-
-        _timer!.setEventHandler {
-            var err: OSStatus = 0
-            let now = CMClockGetTime(CMClockGetHostTimeClock())
-
-            var sbuf: CMSampleBuffer!
-            var timingInfo = CMSampleTimingInfo()
-            timingInfo
-                .presentationTimeStamp =
-                CMClockGetTime(CMClockGetHostTimeClock())
-
-            var formatDescription: CMFormatDescription?
-
-            let status =
-                CMVideoFormatDescriptionCreateForImageBuffer(allocator: kCFAllocatorDefault,
-                                                             imageBuffer: techDiffBuffer,
-                                                             formatDescriptionOut: &formatDescription)
-            if status != 0 {
-                logger
-                    .debug("Couldn't make video format description from techDiffBuffer, exiting.")
+ 
+        // If I get there and there is a key for my effect, that means that we've run before.
+        // We are backing the custom property with the extension's UserDefaults.
+        let userDefaultsPropertyKey = PropertyName.mood.rawValue
+        if userDefaults?.object(forKey: userDefaultsPropertyKey) != nil, let propertyMood = userDefaults?.string(forKey: userDefaultsPropertyKey) { // Not first run
+            deviceProperties.setPropertyState(CMIOExtensionPropertyState(value: propertyMood as NSString),
+                                              forProperty: customEffectExtensionProperty)
+ 
+            if let moodName = MoodName(rawValue: propertyMood) {
+                mood = moodName
             }
-            if let formatDescription = formatDescription {
-                err =
-                    CMSampleBufferCreateReadyWithImageBuffer(allocator: kCFAllocatorDefault,
-                                                             imageBuffer: techDiffBuffer,
-                                                             formatDescription: formatDescription,
-                                                             sampleTiming: &timingInfo,
-                                                             sampleBufferOut: &sbuf)
-            } else {
-                logger
-                    .debug("Couldn't create sample buffer from techDiffBuffer, exiting.")
-            }
-
-            if err == 0 {
-                if self._isExtension {
-                    // If I'm the extension, send to output stream
-                    self._streamSource.stream.send(sbuf, discontinuity: [],
-                                                   hostTimeInNanoseconds: UInt64(timingInfo
-                                                       .presentationTimeStamp
-                                                       .seconds *
-                                                       Double(NSEC_PER_SEC)))
-                } else {
-                    self.cameraExtensionDeviceSourceDelegate?
-                        .bufferReceived(sbuf) // If I'm the end to end testing app, send to delegate method.
-                }
-            } else {
-                os_log(.info, "video time \(timingInfo.presentationTimeStamp.seconds) now \(now.seconds) err \(err)")
+        } else { // We have never run before, so set property and the backing UserDefaults to default setting
+            deviceProperties.setPropertyState(CMIOExtensionPropertyState(value: MoodName.bypass.rawValue as NSString),
+                                              forProperty: customEffectExtensionProperty)
+            userDefaults?.set(MoodName.bypass.rawValue, forKey: userDefaultsPropertyKey)
+            logger.debug("Did initial set of effects value to \(MoodName.bypass.rawValue)")
+            mood = MoodName.bypass
+        }
+ 
+        return deviceProperties
+    }
+ 
+    func setDeviceProperties(_ deviceProperties: CMIOExtensionDeviceProperties) throws {
+        let userDefaultsPropertyKey = PropertyName.mood.rawValue
+        if let customEffectValueFromPropertiesDictionary = dictionaryValueForEffectProperty(in: deviceProperties) {
+            logger.debug("New setting in device properties for custom effect property: \(customEffectValueFromPropertiesDictionary)")
+            userDefaults?.set(customEffectValueFromPropertiesDictionary, forKey: userDefaultsPropertyKey)
+            if let moodName = MoodName(rawValue: customEffectValueFromPropertiesDictionary) {
+                mood = moodName
             }
         }
-
-        _timer!.setCancelHandler {}
-        _timer!.resume()
     }
     
-    func pixelBufferFromImage(_ image: CGImage) -> CVPixelBuffer? {
-        let width = image.width
-        let height = image.height
-        let region = CGRect(x: 0, y: 0, width: width, height: height)
-     
-        let pixelBufferAttributes: NSDictionary = [
-            kCVPixelBufferWidthKey: width,
-            kCVPixelBufferHeightKey: height,
-            kCVPixelBufferPixelFormatTypeKey: _videoDescription.mediaSubType,
-            kCVPixelBufferIOSurfacePropertiesKey: [:],
-        ]
-     
-        var pixelBuffer: CVPixelBuffer?
-        let result = CVPixelBufferCreate(kCFAllocatorDefault,
-                                         width,
-                                         height,
-                                         kCVPixelFormatType_32ARGB,
-                                         pixelBufferAttributes as CFDictionary,
-                                         &pixelBuffer)
-     
-        guard result == kCVReturnSuccess, let pixelBuffer = pixelBuffer,
-              let colorspace = image.colorSpace else {
+    private let customEffectExtensionProperty: CMIOExtensionProperty = .init(rawValue: "4cc_" + PropertyName.mood.rawValue + "_glob_0000") // Custom 'effect' property
+ 
+    private let userDefaults = UserDefaults(suiteName: Identifiers.appGroup.rawValue)
+ 
+    private func dictionaryValueForEffectProperty(in deviceProperties: CMIOExtensionDeviceProperties) -> String? {
+        guard let customEffectValueFromPropertiesDictionary = deviceProperties.propertiesDictionary[customEffectExtensionProperty]?.value as? String else {
+            logger.debug("Was not able to get the value of the custom effect property from the properties dictionary of the device, returning.")
             return nil
         }
-     
-        CVPixelBufferLockBaseAddress(pixelBuffer,
-                                     CVPixelBufferLockFlags(rawValue: 0))
-        guard let context =
-            CGContext(data: CVPixelBufferGetBaseAddress(pixelBuffer),
-                      width: width,
-                      height: height,
-                      bitsPerComponent: image.bitsPerComponent,
-                      bytesPerRow: image.bytesPerRow,
-                      space: colorspace,
-                      bitmapInfo: CGImageAlphaInfo.noneSkipFirst
-                          .rawValue)
-        else {
-            return nil
-        }
-     
-        var transform = CGAffineTransform(scaleX: -1, y: 1) // Flip on vertical axis
-        transform = transform.translatedBy(x: -CGFloat(image.width), y: 0)
-        context.concatenate(transform)
-            
-        context.draw(image, in: region)
-     
-        CVPixelBufferUnlockBaseAddress(pixelBuffer,
-                                       CVPixelBufferLockFlags(rawValue: 0))
-     
-        return pixelBuffer
+        return customEffectValueFromPropertiesDictionary
     }
-	
-	func stopStreaming() {
-		
-		if _streamingCounter > 1 {
-			_streamingCounter -= 1
-		}
-		else {
-			_streamingCounter = 0
-			if let timer = _timer {
-				timer.cancel()
-				_timer = nil
-			}
-		}
-	}
 }
 
 // MARK: -
 
-class CameraExtensionStreamSource: NSObject, CMIOExtensionStreamSource {
+class CameraExtensionStreamSource: NSObject, CMIOExtensionStreamSource, AVCaptureVideoDataOutputSampleBufferDelegate {
 	
 	private(set) var stream: CMIOExtensionStream!
 	
 	let device: CMIOExtensionDevice
-	
+    private var captureSessionManager: CaptureSessionManager?
 	private let _streamFormat: CMIOExtensionStreamFormat
+    
+    var destinationCVPixelBuffer: CVPixelBuffer?
+    var deviceSource: CameraExtensionDeviceSource?
+
+    let effects = Effects() // vImage Buffer effects
 	
 	init(localizedName: String, streamID: UUID, streamFormat: CMIOExtensionStreamFormat, device: CMIOExtensionDevice) {
 		
 		self.device = device
 		self._streamFormat = streamFormat
 		super.init()
+        self.deviceSource = device.source as? CameraExtensionDeviceSource
+
+        guard let deviceSource = deviceSource else {
+            logger.error("No device source, returning")
+            return
+        }
+
+        let pixelBufferAttributes: NSDictionary = [
+            kCVPixelBufferWidthKey: outputWidth,
+            kCVPixelBufferHeightKey: outputHeight,
+            kCVPixelBufferPixelFormatTypeKey: deviceSource._videoDescription.mediaSubType,
+            kCVPixelBufferIOSurfacePropertiesKey: [:],
+        ]
+
+        let result = CVPixelBufferCreate(kCFAllocatorDefault,
+                                         outputWidth,
+                                         outputHeight,
+                                         kCVPixelFormatType_422YpCbCr8,
+                                         pixelBufferAttributes as CFDictionary,
+                                         &destinationCVPixelBuffer)
+
+        if result != 0 {
+            logger.error("Couldn't create destination buffer, returning")
+            return
+        }
+        
+        captureSessionManager = CaptureSessionManager(capturingHeadliner: false)
+        guard let captureSessionManager = captureSessionManager else {
+            logger.error("Not able to get capture session, returning.")
+            return
+        }
+ 
+        guard captureSessionManager.configured == true else {
+            logger.error("CaptureSessionManager is not configured")
+            return
+        }
+        
+        guard let captureSessionManagerOutput = captureSessionManager.videoOutput else {
+            logger.error("CaptureSessionManager.videoOutput is nil")
+            return
+        }
+        captureSessionManagerOutput.setSampleBufferDelegate(self, queue: captureSessionManager.dataOutputQueue)
 		self.stream = CMIOExtensionStream(localizedName: localizedName, streamID: streamID, direction: .source, clockType: .hostTime, source: self)
 	}
 	
@@ -335,22 +248,93 @@ class CameraExtensionStreamSource: NSObject, CMIOExtensionStreamSource {
 		// An opportunity to inspect the client info and decide if it should be allowed to start the stream.
 		return true
 	}
+    
+    func captureOutput(_: AVCaptureOutput,
+                       // Callback for sampleBuffers of captured video, which we apply our effects to in realtime
+                       didOutput sampleBuffer: CMSampleBuffer,
+                       from _: AVCaptureConnection) {
+        guard let pixelBuffer = sampleBuffer.imageBuffer, let deviceSource = deviceSource,
+              let destinationCVPixelBuffer = destinationCVPixelBuffer else {
+            logger.debug("Nothing to do in sampleBuffer callback, returning.")
+            return
+        }
+
+        CVPixelBufferLockBaseAddress(
+            pixelBuffer,
+            CVPixelBufferLockFlags.readOnly)
+
+        effects.populateDestinationBuffer(pixelBuffer: pixelBuffer) // Set up vImage Pixel Buffer from callback buffer
+        if deviceSource.mood != .bypass {
+            effects.artFilm(forMood: deviceSource.mood) // Make pretty/weird
+        }
+
+        CVPixelBufferUnlockBaseAddress(
+            pixelBuffer,
+            CVPixelBufferLockFlags.readOnly)
+
+        var err: OSStatus = 0
+        var sbuf: CMSampleBuffer!
+        var timingInfo = CMSampleTimingInfo()
+        timingInfo.presentationTimeStamp = CMClockGetTime(CMClockGetHostTimeClock())
+
+        CVPixelBufferLockBaseAddress(destinationCVPixelBuffer,
+                                     CVPixelBufferLockFlags(rawValue: 0))
+
+        do {
+            try effects.destinationBuffer.copy(
+                to: destinationCVPixelBuffer,
+                cvImageFormat: effects.cvImageFormat,
+                cgImageFormat: effects.cgImageFormat) // destinationBuffer back to CVPixelBuffer
+        } catch {
+            logger.error("Copying to the destinationBuffer failed.")
+        }
+
+        CVPixelBufferUnlockBaseAddress(destinationCVPixelBuffer, CVPixelBufferLockFlags(rawValue: 0))
+
+        var formatDescription: CMFormatDescription?
+        CMVideoFormatDescriptionCreateForImageBuffer(
+            allocator: kCFAllocatorDefault,
+            imageBuffer: destinationCVPixelBuffer,
+            formatDescriptionOut: &formatDescription)
+        err = CMSampleBufferCreateReadyWithImageBuffer(
+            allocator: kCFAllocatorDefault,
+            imageBuffer: destinationCVPixelBuffer,
+            formatDescription: formatDescription!,
+            sampleTiming: &timingInfo,
+            sampleBufferOut: &sbuf) // CVPixelBuffer into CMSampleBuffer for streaming out
+
+        if err == 0 {
+            if deviceSource._isExtension { // If I'm the extension, send to output stream
+                stream.send(
+                    sbuf,
+                    discontinuity: [],
+                    hostTimeInNanoseconds: UInt64(timingInfo.presentationTimeStamp.seconds * Double(NSEC_PER_SEC)))
+            } else {
+                deviceSource.cameraExtensionDeviceSourceDelegate?
+                    .bufferReceived(sbuf) // If I'm the end to end testing app, send to delegate method.
+            }
+        } else {
+            logger.error("Error in stream: \(err)")
+        }
+    }
 	
-	func startStream() throws {
-		
-		guard let deviceSource = device.source as? CameraExtensionDeviceSource else {
-			fatalError("Unexpected source type \(String(describing: device.source))")
-		}
-		deviceSource.startStreaming()
-	}
-	
-	func stopStream() throws {
-		
-		guard let deviceSource = device.source as? CameraExtensionDeviceSource else {
-			fatalError("Unexpected source type \(String(describing: device.source))")
-		}
-		deviceSource.stopStreaming()
-	}
+    func startStream() throws {
+        guard let captureSessionManager = captureSessionManager, captureSessionManager.captureSession.isRunning == false else {
+            logger.error("Can't start capture session running, returning")
+            return
+        }
+        captureSessionManager.captureSession.startRunning()
+    }
+ 
+    func stopStream() throws {
+        guard let captureSessionManager = captureSessionManager, captureSessionManager.configured, captureSessionManager.captureSession.isRunning else {
+            logger.error("Can't stop AVCaptureSession where it is expected, returning")
+            return
+        }
+        if captureSessionManager.captureSession.isRunning {
+            captureSessionManager.captureSession.stopRunning()
+        }
+    }
 }
 
 // MARK: -
@@ -419,32 +403,52 @@ class CameraExtensionProviderSource: NSObject, CMIOExtensionProviderSource {
     
     // MARK: Private
     
-    private func notificationReceived(notificationName: String) {
-        guard let name = NotificationName(rawValue: notificationName) else {
-            return
-        }
+}
 
-        switch name {
-        case .changeImage:
-            self.deviceSource.imageIsClean.toggle()
-            logger.debug("The camera extension has received a notification")
-            logger.debug("The notification is: \(name.rawValue)")
-            self.deviceSource.stopStreaming()
-            self.deviceSource.startStreaming()
+extension CameraExtensionProviderSource {
+    private func notificationReceived(notificationName: String) {
+        if let name = NotificationName(rawValue: notificationName) {
+            switch name {
+            case .startStream:
+                do {
+                    try deviceSource._streamSource.startStream()
+                } catch {
+                    logger.debug("Couldn't start the stream")
+                }
+            case .stopStream:
+                do {
+                    try deviceSource._streamSource.stopStream()
+                } catch {
+                    logger.debug("Couldn't stop the stream")
+                }
+            }
+        } else {
+            if let mood = MoodName(rawValue: notificationName.replacingOccurrences(of: Identifiers.appGroup.rawValue + ".", with: "")) {
+                deviceSource.mood = mood
+            }
         }
     }
 
     private func startNotificationListeners() {
+        var allNotifications = [String]()
         for notificationName in NotificationName.allCases {
+            allNotifications.append(notificationName.rawValue)
+        }
+ 
+        for notificationName in MoodName.allCases {
+            allNotifications.append(Identifiers.appGroup.rawValue + "." + notificationName.rawValue)
+        }
+ 
+        for notificationName in allNotifications {
             let observer = UnsafeRawPointer(Unmanaged.passUnretained(self).toOpaque())
-
+ 
             CFNotificationCenterAddObserver(CFNotificationCenterGetDarwinNotifyCenter(), observer, { _, observer, name, _, _ in
                 if let observer = observer, let name = name {
                     let extensionProviderSourceSelf = Unmanaged<CameraExtensionProviderSource>.fromOpaque(observer).takeUnretainedValue()
                     extensionProviderSourceSelf.notificationReceived(notificationName: name.rawValue as String)
                 }
             },
-            notificationName.rawValue as CFString, nil, .deliverImmediately)
+            notificationName as CFString, nil, .deliverImmediately)
         }
     }
 
@@ -454,6 +458,281 @@ class CameraExtensionProviderSource: NSObject, CMIOExtensionProviderSource {
                                                     Unmanaged.passRetained(self)
                                                         .toOpaque())
             notificationListenerStarted = false
+        }
+    }
+}
+
+// MARK: - Effects
+
+class Effects: NSObject {
+    // MARK: Lifecycle
+
+    // Effect processing with vImage Pixel Buffers
+
+    override init() {
+        super.init()
+        if let image = NSImage(named: "1.jpg") { // Get histograms for all the chosen images in init
+            sourceImageHistogramNewWave = getHistogram(for: image)
+        }
+        if let image = NSImage(named: "2.jpg") {
+            sourceImageHistogramBerlin = getHistogram(for: image)
+        }
+        if let image = NSImage(named: "3.jpg") {
+            sourceImageHistogramOldFilm = getHistogram(for: image)
+        }
+        if let image = NSImage(named: "4.jpg") {
+            sourceImageHistogramSunset = getHistogram(for: image)
+        }
+        if let image = NSImage(named: "5.jpg") {
+            sourceImageHistogramBadEnergy = getHistogram(for: image)
+        }
+        if let image = NSImage(named: "6.jpg") {
+            sourceImageHistogramBeyondTheBeyond = getHistogram(for: image)
+        }
+        if let image = NSImage(named: "7.jpg") {
+            sourceImageHistogramDrama = getHistogram(for: image)
+        }
+
+        let randomNumberGenerator = BNNSCreateRandomGenerator(
+            BNNSRandomGeneratorMethodAES_CTR,
+            nil)!
+
+        for _ in 0 ..< maximumNoiseArrays { // Get random noise for all the noise buffers in init
+            let noiseBuffer = vImage.PixelBuffer(
+                size: pixelBufferSize,
+                pixelFormat: vImage.InterleavedFx3.self)
+
+            let shape = BNNS.Shape.tensor3DFirstMajor(
+                noiseBuffer.width,
+                noiseBuffer.height,
+                noiseBuffer.channelCount)
+
+            noiseBuffer.withUnsafeMutableBufferPointer { noisePtr in
+
+                if var descriptor = BNNSNDArrayDescriptor(
+                    data: noisePtr,
+                    shape: shape) {
+                    let mean: Float = 0.0125
+                    let stdDev: Float = 0.025
+
+                    BNNSRandomFillNormalFloat(randomNumberGenerator, &descriptor, mean, stdDev)
+                }
+            }
+            noiseBufferArray.append(noiseBuffer)
+        }
+    }
+
+    // MARK: Internal
+
+    let cvImageFormat = vImageCVImageFormat.make(
+        format: .format422YpCbCr8,
+        matrix: kvImage_ARGBToYpCbCrMatrix_ITU_R_601_4.pointee,
+        chromaSiting: .center,
+        colorSpace: CGColorSpaceCreateDeviceRGB(),
+        alphaIsOpaqueHint: true)!
+
+    var cgImageFormat = vImage_CGImageFormat(
+        bitsPerComponent: 32,
+        bitsPerPixel: 32 * 3,
+        colorSpace: CGColorSpaceCreateDeviceRGB(),
+        bitmapInfo: CGBitmapInfo(
+            rawValue: CGBitmapInfo.byteOrder32Little.rawValue |
+                CGBitmapInfo.floatComponents.rawValue |
+                CGImageAlphaInfo.none.rawValue),
+        renderingIntent: .defaultIntent)!
+
+    let destinationBuffer = vImage.PixelBuffer(
+        size: pixelBufferSize,
+        pixelFormat: vImage.InterleavedFx3.self)
+
+    func populateDestinationBuffer(pixelBuffer: CVPixelBuffer) { // Convert into destinationBuffer content
+        let sourceBuffer = vImage.PixelBuffer(
+            referencing: pixelBuffer,
+            converter: converter,
+            destinationPixelFormat: vImage.DynamicPixelFormat.self)
+
+        do {
+            try converter.convert(
+                from: sourceBuffer,
+                to: destinationBuffer)
+        } catch {
+            fatalError("Any-to-any conversion failure.")
+        }
+    }
+
+    func artFilm(forMood mood: MoodName) { // Apply mood to frame
+        tastefulNoise(destinationBuffer: destinationBuffer)
+        specifySavedHistogram(forMood: mood)
+        mildTemporalBlur()
+    }
+
+    // MARK: Private
+
+    private lazy var converter: vImageConverter = {
+        guard let converter = try? vImageConverter.make(
+            sourceFormat: cvImageFormat,
+            destinationFormat: cgImageFormat)
+        else {
+            fatalError("Unable to create converter")
+        }
+
+        return converter
+    }()
+
+    private lazy var temporalBuffer = vImage.PixelBuffer( // temporal blur storage
+        size: pixelBufferSize,
+        pixelFormat: vImage.InterleavedFx3.self)
+
+    private lazy var histogramBuffer = vImage.PixelBuffer( // Temp histogram storage
+        size: pixelBufferSize,
+        pixelFormat: vImage.PlanarFx3.self)
+
+    private var noiseBufferArray: [vImage.PixelBuffer<vImage.InterleavedFx3>] = .init()
+
+    private var sourceImageHistogramNewWave: vImage.PixelBuffer.HistogramFFF? // All set up before applying effect
+    private var sourceImageHistogramBerlin: vImage.PixelBuffer.HistogramFFF?
+    private var sourceImageHistogramOldFilm: vImage.PixelBuffer.HistogramFFF?
+    private var sourceImageHistogramSunset: vImage.PixelBuffer.HistogramFFF?
+    private var sourceImageHistogramBadEnergy: vImage.PixelBuffer.HistogramFFF?
+    private var sourceImageHistogramBeyondTheBeyond: vImage.PixelBuffer.HistogramFFF?
+    private var sourceImageHistogramDrama: vImage.PixelBuffer.HistogramFFF?
+
+    private let maximumNoiseArrays = kFrameRate /
+        2 // How many noise arrays we'll use for faking continuous random noise
+    private var noiseArrayCount = 0
+    private var noiseArrayCountAscending = true
+    private let histogramBinCount = 32
+
+    private func mildTemporalBlur() {
+        let interpolationConstant: Float = 0.4
+
+        destinationBuffer.linearInterpolate(
+            bufferB: temporalBuffer,
+            interpolationConstant: interpolationConstant,
+            destination: temporalBuffer)
+
+        temporalBuffer.copy(to: destinationBuffer)
+    }
+
+    private func tastefulNoise(destinationBuffer: vImage.PixelBuffer<vImage.InterleavedFx3>) {
+        guard noiseBufferArray.count == maximumNoiseArrays else {
+            return
+        }
+
+        destinationBuffer.withUnsafeMutableBufferPointer { mutableDestintationPtr in
+            vDSP.add(destinationBuffer, noiseBufferArray[noiseArrayCount],
+                     result: &mutableDestintationPtr)
+        }
+
+        if noiseArrayCount == maximumNoiseArrays - 1 {
+            noiseArrayCountAscending = false
+        } else if noiseArrayCount == 0 {
+            if noiseArrayCountAscending == false {
+                // the maximumNoiseArrays * 2 pass, we shuffle so the eyes don't start to notice patterns in the "noise dance"
+                noiseBufferArray = noiseBufferArray.shuffled()
+            }
+            noiseArrayCountAscending = true
+        }
+
+        if noiseArrayCountAscending {
+            noiseArrayCount += 1
+        } else {
+            noiseArrayCount -= 1
+        }
+    }
+
+    private func specifySavedHistogram(forMood mood: MoodName) {
+        var sourceHistogramToSpecify = sourceImageHistogramNewWave
+
+        switch mood { // Choose from among our pre-populated histograms
+        case .newWave:
+            sourceHistogramToSpecify = sourceImageHistogramNewWave
+        case .berlin:
+            sourceHistogramToSpecify = sourceImageHistogramBerlin
+        case .oldFilm:
+            sourceHistogramToSpecify = sourceImageHistogramOldFilm
+        case .sunset:
+            sourceHistogramToSpecify = sourceImageHistogramSunset
+        case .badEnergy:
+            sourceHistogramToSpecify = sourceImageHistogramBadEnergy
+        case .beyondTheBeyond:
+            sourceHistogramToSpecify = sourceImageHistogramBeyondTheBeyond
+        case .drama:
+            sourceHistogramToSpecify = sourceImageHistogramDrama
+        case .bypass:
+            return
+        }
+
+        if let sourceImageHistogram = sourceHistogramToSpecify {
+            destinationBuffer.deinterleave(
+                destination: histogramBuffer)
+
+            histogramBuffer.specifyHistogram(
+                sourceImageHistogram,
+                destination: histogramBuffer)
+
+            histogramBuffer.interleave(
+                destination: destinationBuffer)
+        }
+    }
+
+    private func getHistogram(for image: NSImage) -> vImage.PixelBuffer.HistogramFFF? { // Extract histogram from image
+        let sourceImageHistogramBuffer = vImage.PixelBuffer(
+            size: pixelBufferSize,
+            pixelFormat: vImage.PlanarFx3.self)
+
+        var proposedRect = NSRect(
+            origin: CGPoint(x: 0.0, y: 0.0),
+            size: CGSize(width: image.size.width, height: image.size.height))
+
+        guard let cgImage = image.cgImage(forProposedRect: &proposedRect, context: nil, hints: nil) else {
+            logger.error("Couldn't get cgImage from \(image), returning.")
+            return nil
+        }
+
+        let bytesPerPixel = cgImage.bitsPerPixel / cgImage.bitsPerComponent
+        let destBytesPerRow = outputWidth * bytesPerPixel
+
+        guard let colorSpace = cgImage.colorSpace, let context = CGContext(
+            data: nil,
+            width: outputWidth,
+            height: outputHeight,
+            bitsPerComponent: cgImage.bitsPerComponent,
+            bytesPerRow: destBytesPerRow,
+            space: colorSpace,
+            bitmapInfo: cgImage.alphaInfo.rawValue) else {
+            logger.error("Problem setting up cgImage resize, returning.")
+            return nil
+        }
+
+        context.interpolationQuality = .none
+        context.draw(cgImage, in: CGRect(x: 0, y: 0, width: outputWidth, height: outputHeight))
+
+        guard let resizedCGImage = context.makeImage() else {
+            logger.error("Couldn't resize cgImage for histogram, returning.")
+            return nil
+        }
+
+        let pixelFormat = vImage.InterleavedFx3.self
+
+        let sourceImageBuffer: vImage.PixelBuffer<vImage.InterleavedFx3>?
+
+        do {
+            sourceImageBuffer = try vImage.PixelBuffer(
+                cgImage: resizedCGImage,
+                cgImageFormat: &cgImageFormat,
+                pixelFormat: pixelFormat)
+
+            if let sourceImageBuffer = sourceImageBuffer {
+                sourceImageBuffer.deinterleave(destination: sourceImageHistogramBuffer)
+                return sourceImageHistogramBuffer.histogram(binCount: histogramBinCount)
+            } else {
+                logger.error("Source image buffer was nil, returning.")
+                return nil
+            }
+        } catch {
+            logger.error("Error creating source image buffer: \(error)")
+            return nil
         }
     }
 }

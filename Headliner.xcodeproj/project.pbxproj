@@ -8,8 +8,9 @@
 
 /* Begin PBXBuildFile section */
 		C91B53AF2E3EA3AD006F3D44 /* com.dannyfrancken.Headliner.CameraExtension.systemextension in Embed System Extensions */ = {isa = PBXBuildFile; fileRef = C91B53A52E3EA3AD006F3D44 /* com.dannyfrancken.Headliner.CameraExtension.systemextension */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
-		C91B53C32E3ED4AF006F3D44 /* NotificationName.swift in Sources */ = {isa = PBXBuildFile; fileRef = C91B53C22E3ED4AF006F3D44 /* NotificationName.swift */; };
-		C91B53C42E3ED4AF006F3D44 /* NotificationName.swift in Sources */ = {isa = PBXBuildFile; fileRef = C91B53C22E3ED4AF006F3D44 /* NotificationName.swift */; };
+		C91B53C32E3ED4AF006F3D44 /* Shared.swift in Sources */ = {isa = PBXBuildFile; fileRef = C91B53C22E3ED4AF006F3D44 /* Shared.swift */; };
+		C91B53C42E3ED4AF006F3D44 /* Shared.swift in Sources */ = {isa = PBXBuildFile; fileRef = C91B53C22E3ED4AF006F3D44 /* Shared.swift */; };
+		C9D55B292E3F07BE006BFCCA /* Shared.swift in Sources */ = {isa = PBXBuildFile; fileRef = C91B53C22E3ED4AF006F3D44 /* Shared.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -52,7 +53,7 @@
 
 /* Begin PBXFileReference section */
 		C91B53A52E3EA3AD006F3D44 /* com.dannyfrancken.Headliner.CameraExtension.systemextension */ = {isa = PBXFileReference; explicitFileType = "wrapper.system-extension"; includeInIndex = 0; path = com.dannyfrancken.Headliner.CameraExtension.systemextension; sourceTree = BUILT_PRODUCTS_DIR; };
-		C91B53C22E3ED4AF006F3D44 /* NotificationName.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = NotificationName.swift; path = CameraExtension/NotificationName.swift; sourceTree = "<group>"; };
+		C91B53C22E3ED4AF006F3D44 /* Shared.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = Shared.swift; path = CameraExtension/Shared.swift; sourceTree = "<group>"; };
 		C92FB7A42E3EF737001195E9 /* HeadlinerEndToEnd.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = HeadlinerEndToEnd.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		C9F9CC422E3E873F00A24466 /* Headliner.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Headliner.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		C9F9CC502E3E874000A24466 /* HeadlinerTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = HeadlinerTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -77,10 +78,21 @@
 		C92FB7B42E3EF922001195E9 /* Exceptions for "CameraExtension" folder in "HeadlinerEndToEnd" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
+				1.jpg,
+				2.jpg,
+				3.jpg,
+				4.jpg,
+				5.jpg,
+				6.jpg,
+				7.jpg,
 				CameraExtensionProvider.swift,
-				Clean.jpg,
-				Dirty.jpg,
-				NotificationName.swift,
+			);
+			target = C92FB7A32E3EF737001195E9 /* HeadlinerEndToEnd */;
+		};
+		C9D55B2B2E3F17E7006BFCCA /* Exceptions for "HeadlinerEndToEnd" folder in "HeadlinerEndToEnd" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
 			);
 			target = C92FB7A32E3EF737001195E9 /* HeadlinerEndToEnd */;
 		};
@@ -98,6 +110,9 @@
 		};
 		C92FB7A52E3EF737001195E9 /* HeadlinerEndToEnd */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				C9D55B2B2E3F17E7006BFCCA /* Exceptions for "HeadlinerEndToEnd" folder in "HeadlinerEndToEnd" target */,
+			);
 			path = HeadlinerEndToEnd;
 			sourceTree = "<group>";
 		};
@@ -163,7 +178,7 @@
 		C9F9CC392E3E873F00A24466 = {
 			isa = PBXGroup;
 			children = (
-				C91B53C22E3ED4AF006F3D44 /* NotificationName.swift */,
+				C91B53C22E3ED4AF006F3D44 /* Shared.swift */,
 				C9F9CC442E3E873F00A24466 /* Headliner */,
 				C9F9CC532E3E874000A24466 /* HeadlinerTests */,
 				C9F9CC5D2E3E874000A24466 /* HeadlinerUITests */,
@@ -397,7 +412,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				C91B53C32E3ED4AF006F3D44 /* NotificationName.swift in Sources */,
+				C91B53C32E3ED4AF006F3D44 /* Shared.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -405,6 +420,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				C9D55B292E3F07BE006BFCCA /* Shared.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -412,7 +428,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				C91B53C42E3ED4AF006F3D44 /* NotificationName.swift in Sources */,
+				C91B53C42E3ED4AF006F3D44 /* Shared.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -521,10 +537,15 @@
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 378NGS49HA;
-				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_HARDENED_RUNTIME = NO;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = HeadlinerEndToEnd/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = "";
+				INFOPLIST_KEY_LSApplicationCategoryType = "";
+				INFOPLIST_KEY_NSCameraUsageDescription = "Camera Extension";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				INFOPLIST_KEY_NSSystemExtensionUsageDescription = "Camera Extension";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
@@ -549,10 +570,15 @@
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 378NGS49HA;
-				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_HARDENED_RUNTIME = NO;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = HeadlinerEndToEnd/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = "";
+				INFOPLIST_KEY_LSApplicationCategoryType = "";
+				INFOPLIST_KEY_NSCameraUsageDescription = "Camera Extension";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				INFOPLIST_KEY_NSSystemExtensionUsageDescription = "Camera Extension";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
