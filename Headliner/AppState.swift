@@ -99,6 +99,12 @@ class AppState: ObservableObject {
         userDefaults.set(camera.id, forKey: UserDefaultsKeys.selectedCameraID)
         statusMessage = "Selected camera: \(camera.name)"
         
+        // Notify extension about camera device change
+        if let appGroupDefaults = UserDefaults(suiteName: "378NGS49HA.com.dannyfrancken.Headliner") {
+            appGroupDefaults.set(camera.id, forKey: "SelectedCameraID")
+            notificationManager.postNotification(named: "setCameraDevice")
+        }
+        
         // If camera is running, restart with new device
         if cameraStatus == .running {
             stopCamera()

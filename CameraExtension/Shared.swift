@@ -137,6 +137,7 @@ enum Identifiers: String {
 enum NotificationName: String, CaseIterable {
     case startStream = "378NGS49HA.com.dannyfrancken.Headliner.startStream"
     case stopStream = "378NGS49HA.com.dannyfrancken.Headliner.stopStream"
+    case setCameraDevice = "378NGS49HA.com.dannyfrancken.Headliner.setCameraDevice"
 }
 
 // MARK: - NotificationManager

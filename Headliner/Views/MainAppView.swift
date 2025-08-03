@@ -12,10 +12,7 @@ struct MainAppView: View {
     @ObservedObject var outputImageManager: OutputImageManager
     @ObservedObject var propertyManager: CustomPropertyManager
     
-    @State private var selectedEffect: Int = 0
-    @State private var showingEffectsPanel: Bool = false
-    
-    private let effects = MoodName.allCases
+    @State private var showingCameraSettings: Bool = false
     
     var body: some View {
         VStack(spacing: 0) {
@@ -64,9 +61,9 @@ struct MainAppView: View {
                         CameraSelector(appState: appState)
                     }
                     
-                    // Effects Panel
+                    // Camera Settings
                     GlassmorphicCard {
-                        effectsPanelContent
+                        cameraSettingsContent
                     }
                     
                     Spacer()
@@ -91,7 +88,7 @@ struct MainAppView: View {
             }
         )
         .onAppear {
-            selectedEffect = effects.firstIndex(of: propertyManager.effect) ?? 0
+            // Basic setup
         }
     }
     
@@ -158,12 +155,12 @@ struct MainAppView: View {
             
             Spacer()
             
-            Button(action: { showingEffectsPanel.toggle() }) {
+            Button(action: { showingCameraSettings.toggle() }) {
                 HStack(spacing: 8) {
-                    Image(systemName: "camera.filters")
+                    Image(systemName: "gear")
                         .font(.system(size: 16, weight: .medium))
                     
-                    Text("Effects")
+                    Text("Settings")
                         .font(.system(size: 16, weight: .semibold))
                 }
                 .foregroundColor(.blue)
@@ -179,60 +176,40 @@ struct MainAppView: View {
         }
     }
     
-    // MARK: - Effects Panel
+    // MARK: - Camera Settings Panel
     
-    private var effectsPanelContent: some View {
+    private var cameraSettingsContent: some View {
         VStack(alignment: .leading, spacing: 16) {
             HStack {
-                Text("Video Effects")
+                Text("Camera Settings")
                     .font(.system(size: 16, weight: .semibold))
                     .foregroundColor(.primary)
                 
                 Spacer()
                 
-                Button(action: { showingEffectsPanel.toggle() }) {
-                    Image(systemName: showingEffectsPanel ? "chevron.up" : "chevron.down")
+                Button(action: { showingCameraSettings.toggle() }) {
+                    Image(systemName: showingCameraSettings ? "chevron.up" : "chevron.down")
                         .font(.system(size: 12, weight: .medium))
                         .foregroundColor(.secondary)
                 }
                 .buttonStyle(PlainButtonStyle())
             }
             
-            if showingEffectsPanel {
-                VStack(spacing: 8) {
-                    ForEach(Array(effects.enumerated()), id: \.offset) { index, effect in
-                        EffectRow(
-                            name: effect.rawValue,
-                            isSelected: selectedEffect == index,
-                            isEnabled: propertyManager.deviceObjectID != nil
-                        ) {
-                            selectEffect(index)
-                        }
-                    }
+            if showingCameraSettings {
+                VStack(spacing: 12) {
+                    Text("Basic camera streaming without effects")
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundColor(.secondary)
+                        .multilineTextAlignment(.center)
+                    
+                    Text("Select your camera source above and use Start/Stop Camera to control the stream.")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundColor(.secondary)
+                        .multilineTextAlignment(.center)
                 }
             }
         }
         .padding(16)
-        .background(
-            RoundedRectangle(cornerRadius: 12)
-                .fill(.background)
-                .stroke(.separator, lineWidth: 1)
-        )
-    }
-    
-    // MARK: - Helper Methods
-    
-    private func selectEffect(_ index: Int) {
-        selectedEffect = index
-        let effect = effects[index]
-        let result = propertyManager.setPropertyValue(
-            withSelectorName: propertyManager.mood,
-            to: effect.rawValue
-        )
-        
-        if result {
-            propertyManager.effect = effect
-        }
     }
     
     private func statusIcon(for status: ExtensionStatus) -> String {
@@ -275,38 +252,7 @@ struct MainAppView: View {
     }
 }
 
-struct EffectRow: View {
-    let name: String
-    let isSelected: Bool
-    let isEnabled: Bool
-    let action: () -> Void
-    
-    var body: some View {
-        Button(action: action) {
-            HStack {
-                Text(name)
-                    .font(.system(size: 14, weight: .medium))
-                    .foregroundColor(isEnabled ? .primary : .secondary)
-                
-                Spacer()
-                
-                if isSelected {
-                    Image(systemName: "checkmark")
-                        .font(.system(size: 12, weight: .bold))
-                        .foregroundColor(.blue)
-                }
-            }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 8)
-            .background(
-                RoundedRectangle(cornerRadius: 8)
-                    .fill(isSelected ? .blue.opacity(0.1) : .clear)
-            )
-        }
-        .buttonStyle(PlainButtonStyle())
-        .disabled(!isEnabled)
-    }
-}
+
 
 // MARK: - Preview
 

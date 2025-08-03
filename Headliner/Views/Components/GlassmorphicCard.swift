@@ -18,10 +18,23 @@ struct GlassmorphicCard<Content: View>: View {
         content
             .background(
                 ZStack {
-                    // Background blur effect
-                    Rectangle()
-                        .fill(.ultraThinMaterial)
-                        .cornerRadius(16)
+                    // Background blur effect (simplified to avoid Metal issues)
+                    RoundedRectangle(cornerRadius: 16)
+                        .fill(
+                            LinearGradient(
+                                colors: [
+                                    Color.white.opacity(0.2),
+                                    Color.white.opacity(0.1),
+                                    Color.black.opacity(0.1)
+                                ],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .background(
+                            RoundedRectangle(cornerRadius: 16)
+                                .fill(Color.black.opacity(0.3))
+                        )
                     
                     // Subtle border
                     RoundedRectangle(cornerRadius: 16)
