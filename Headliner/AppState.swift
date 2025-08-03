@@ -55,11 +55,15 @@ class AppState: ObservableObject {
         self.propertyManager = propertyManager
         self.outputImageManager = outputImageManager
         
+        logger.debug("Initializing AppState...")
+        
         setupBindings()
         loadUserPreferences()
         checkExtensionStatus()
         loadAvailableCameras()
         setupCaptureSession()
+        
+        logger.debug("AppState initialization complete")
     }
     
     // MARK: - Public Methods
@@ -71,8 +75,12 @@ class AppState: ObservableObject {
     }
     
     func startCamera() {
-        guard extensionStatus == .installed else { return }
+        guard extensionStatus == .installed else { 
+            logger.debug("Cannot start camera - extension not installed")
+            return 
+        }
         
+        logger.debug("Starting camera...")
         cameraStatus = .starting
         statusMessage = "Starting camera..."
         notificationManager.postNotification(named: .startStream)
@@ -81,6 +89,7 @@ class AppState: ObservableObject {
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
             self.cameraStatus = .running
             self.statusMessage = "Camera is running"
+            logger.debug("Camera status updated to running")
         }
     }
     
@@ -121,6 +130,8 @@ class AppState: ObservableObject {
     
     func refreshCameras() {
         loadAvailableCameras()
+        // Also refresh extension status when refreshing cameras
+        checkExtensionStatus()
     }
     
     // MARK: - Private Methods
@@ -140,14 +151,23 @@ class AppState: ObservableObject {
     }
     
     private func checkExtensionStatus() {
+        logger.debug("Checking extension status...")
+        
+        // Refresh the property manager to check for newly installed extensions
+        propertyManager.refreshExtensionStatus()
+        
         // Check if extension device is available
         if let _ = propertyManager.deviceObjectID {
+            logger.debug("Extension detected - setting status to installed")
             extensionStatus = .installed
             statusMessage = "Extension is installed and ready"
         } else {
+            logger.debug("Extension not detected - setting status to not installed")
             extensionStatus = .notInstalled
             statusMessage = "Extension needs to be installed"
         }
+        
+        logger.debug("Final extension status: \(String(describing: self.extensionStatus))")
     }
     
     private func loadAvailableCameras() {
