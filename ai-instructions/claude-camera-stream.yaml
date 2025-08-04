@@ -1,0 +1,81 @@
+# CameraExtension Debug + App Integration Instructions
+
+goals:
+  - Ensure CameraExtension renders live video feed from selected camera device
+  - Add splash screen when video is not actively streaming
+  - Trigger camera start/stop from main app UI and have CameraExtension respond accordingly
+  - Ensure overlays (name/title) appear on top of video stream in both Google Meet and app preview
+
+context:
+  - Headliner app launches correctly and shows a working UI
+  - CameraExtension installs via System Settings and is detected after relaunching Headliner
+  - The virtual camera "Headliner" appears in Google Meet
+  - Currently the CameraExtension only outputs a black screen with a timer
+  - Video stream preview in app always shows video, regardless of camera state
+  - Overlay config is working and displays user name in preview
+  - NotificationManager is used for interprocess communication between app and extension
+  - Camera start/stop buttons do not trigger stream control logic
+
+tasks:
+
+  - name: Re-enable camera device capture in CameraExtension
+    description: >
+      Restore logic to capture and render video frames from the selected input camera device,
+      replacing the current black background with timer output.
+    files:
+      - CameraExtension/CameraExtensionProvider.swift
+    hints:
+      - Use AVFoundation to select and read from the camera device
+      - Render frames with overlay applied (e.g., name label)
+      - Ensure pixel buffer is sent to CMIO extension output
+
+  - name: Implement splash screen logic in CameraExtension
+    description: >
+      Show a default splash screen when the camera is not streaming,
+      both in Google Meet and in app preview.
+    conditions:
+      - Camera is not yet started
+      - CameraExtension is idle or uninitialized
+    files:
+      - CameraExtension/CameraExtensionProvider.swift
+
+  - name: Add camera control communication via NotificationManager
+    description: >
+      Use NotificationManager (Shared.swift) to listen for start/stop camera messages
+      from the main app and update state accordingly in the CameraExtension.
+    actions:
+      - On "StartCamera", begin video device capture
+      - On "StopCamera", stop stream and revert to splash screen
+    files:
+      - Shared.swift
+      - CameraExtension/CameraExtensionProvider.swift
+      - HeadlinerApp/VirtualCameraManager.swift (or equivalent controller)
+
+  - name: Update main app preview behavior based on camera state
+    description: >
+      Connect the Start/Stop buttons in the main UI to actually control the video stream,
+      and update the preview display depending on the camera state.
+    files:
+      - HeadlinerApp/CameraPreviewView.swift
+      - HeadlinerApp/CameraControlView.swift
+      - HeadlinerApp/VirtualCameraManager.swift
+    notes:
+      - If camera is not active, display splashscreen in preview container
+      - Preview should mirror what is visible in Google Meet
+
+  - name: Ensure overlays appear over live video stream
+    description: >
+      Add support in CameraExtension to render user-defined overlay elements
+      (e.g., name/title) on top of the video stream output to Google Meet and app preview.
+    sources:
+      - Current overlay rendering logic (likely working for timer)
+    todo:
+      - Combine live video feed and overlay into final rendered frame
+      - Ensure consistent rendering in both preview and virtual camera output
+
+  - name: (Optional polish) Automatically detect extension install state
+    description: >
+      Fix the logic in HeadlinerApp to detect CameraExtension install state without requiring a relaunch.
+      Consider polling or listening for system events if supported.
+    files:
+      - HeadlinerApp/SystemExtensionManager.swift (or equivalent)

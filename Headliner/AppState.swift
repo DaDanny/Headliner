@@ -23,6 +23,8 @@ class AppState: ObservableObject {
     @Published var selectedCameraID: String = ""
     @Published var statusMessage: String = ""
     @Published var isShowingSettings: Bool = false
+    @Published var overlaySettings: OverlaySettings = OverlaySettings()
+    @Published var isShowingOverlaySettings: Bool = false
     
     // MARK: - Dependencies
     
@@ -42,6 +44,7 @@ class AppState: ObservableObject {
     private enum UserDefaultsKeys {
         static let selectedCameraID = "SelectedCameraID"
         static let hasCompletedOnboarding = "HasCompletedOnboarding"
+        static let overlaySettings = "OverlaySettings"
     }
     
     // MARK: - Initialization
@@ -80,10 +83,56 @@ class AppState: ObservableObject {
             return 
         }
         
+        // Check camera permission before starting
+        let authStatus = AVCaptureDevice.authorizationStatus(for: .video)
+        switch authStatus {
+        case .authorized:
+            // Permission granted, proceed with starting camera
+            proceedWithCameraStart()
+        case .notDetermined:
+            // Request permission
+            logger.debug("Requesting camera permission...")
+            statusMessage = "Requesting camera permission..."
+            AVCaptureDevice.requestAccess(for: .video) { [weak self] granted in
+                DispatchQueue.main.async {
+                    if granted {
+                        logger.debug("Camera permission granted, retrying capture session setup...")
+                        // Retry capture session setup with new permissions
+                        self?.retryCaptureSession()
+                        self?.proceedWithCameraStart()
+                    } else {
+                        self?.cameraStatus = .error("Camera permission denied")
+                        self?.statusMessage = "Camera access denied - enable in System Preferences > Privacy & Security > Camera"
+                        logger.error("Camera permission denied by user")
+                    }
+                }
+            }
+        case .denied:
+            cameraStatus = .error("Camera permission denied")
+            statusMessage = "Camera access denied - enable in System Preferences > Privacy & Security > Camera"
+            logger.error("Camera access denied - user needs to enable in System Preferences")
+        case .restricted:
+            cameraStatus = .error("Camera access restricted")
+            statusMessage = "Camera access restricted by system policy"
+            logger.error("Camera access restricted by system policy")
+        @unknown default:
+            cameraStatus = .error("Unknown camera permission status")
+            statusMessage = "Camera permission issue"
+            logger.error("Unknown camera authorization status")
+        }
+    }
+    
+    private func proceedWithCameraStart() {
         logger.debug("Starting camera...")
         cameraStatus = .starting
         statusMessage = "Starting camera..."
         notificationManager.postNotification(named: .startStream)
+        
+        // Start the capture session for preview
+        if let manager = captureSessionManager, !manager.captureSession.isRunning {
+            manager.captureSession.startRunning()
+            logger.debug("Started preview capture session")
+        }
         
         // Simulate camera start completion
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
@@ -97,6 +146,15 @@ class AppState: ObservableObject {
         cameraStatus = .stopping
         statusMessage = "Stopping camera..."
         notificationManager.postNotification(named: .stopStream)
+        
+        // Stop the capture session for preview
+        if let manager = captureSessionManager, manager.captureSession.isRunning {
+            manager.captureSession.stopRunning()
+            logger.debug("Stopped preview capture session")
+        }
+        
+        // Clear the preview image
+        outputImageManager.videoExtensionStreamOutputImage = nil
         
         // Simulate camera stop completion
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
@@ -134,6 +192,30 @@ class AppState: ObservableObject {
         checkExtensionStatus()
     }
     
+    func updateOverlaySettings(_ newSettings: OverlaySettings) {
+        overlaySettings = newSettings
+        saveOverlaySettings()
+        
+        // Notify extension about overlay settings change
+        notificationManager.postNotification(named: .updateOverlaySettings)
+    }
+    
+    private func saveOverlaySettings() {
+        // Save to app group defaults for extension access
+        guard let appGroupDefaults = UserDefaults(suiteName: "378NGS49HA.com.dannyfrancken.Headliner") else {
+            logger.error("Failed to access app group UserDefaults for saving overlay settings")
+            return
+        }
+        
+        do {
+            let overlayData = try JSONEncoder().encode(self.overlaySettings)
+            appGroupDefaults.set(overlayData, forKey: OverlayUserDefaultsKeys.overlaySettings)
+            logger.debug("Saved overlay settings: enabled=\(self.overlaySettings.isEnabled), userName='\(self.overlaySettings.userName)'")
+        } catch {
+            logger.error("Failed to encode overlay settings: \(error)")
+        }
+    }
+    
     // MARK: - Private Methods
     
     private func setupBindings() {
@@ -148,6 +230,25 @@ class AppState: ObservableObject {
     
     private func loadUserPreferences() {
         selectedCameraID = userDefaults.string(forKey: UserDefaultsKeys.selectedCameraID) ?? ""
+        loadOverlaySettings()
+    }
+    
+    private func loadOverlaySettings() {
+        // Load from app group defaults for extension access
+        guard let appGroupDefaults = UserDefaults(suiteName: "378NGS49HA.com.dannyfrancken.Headliner") else {
+            logger.debug("Failed to access app group UserDefaults for overlay settings")
+            return
+        }
+        
+        if let overlayData = appGroupDefaults.data(forKey: OverlayUserDefaultsKeys.overlaySettings),
+           let decodedSettings = try? JSONDecoder().decode(OverlaySettings.self, from: overlayData) {
+            self.overlaySettings = decodedSettings
+            logger.debug("Loaded overlay settings: enabled=\(self.overlaySettings.isEnabled)")
+        } else {
+            // Set default name from system if available
+            self.overlaySettings.userName = NSUserName()
+            logger.debug("Using default overlay settings with user name: \(self.overlaySettings.userName)")
+        }
     }
     
     private func checkExtensionStatus() {
@@ -198,9 +299,12 @@ class AppState: ObservableObject {
     }
     
     private func setupCaptureSession() {
+        logger.debug("Setting up capture session for camera preview...")
         captureSessionManager = CaptureSessionManager(capturingHeadliner: false)
         
         if let manager = captureSessionManager, manager.configured {
+            logger.debug("Capture session configured successfully")
+            
             // Set the output image manager as the video output delegate
             manager.videoOutput?.setSampleBufferDelegate(
                 outputImageManager,
@@ -213,8 +317,28 @@ class AppState: ObservableObject {
                 logger.debug("Started preview capture session")
             }
         } else {
-            logger.error("Failed to configure capture session for preview")
+            logger.warning("Failed to configure capture session - likely due to permissions or no camera found")
+            
+            // Check authorization status and provide user feedback
+            let authStatus = AVCaptureDevice.authorizationStatus(for: .video)
+            switch authStatus {
+            case .notDetermined:
+                statusMessage = "Camera permission needed for preview"
+            case .denied:
+                statusMessage = "Camera access denied - enable in System Preferences > Privacy & Security > Camera"
+            case .restricted:
+                statusMessage = "Camera access restricted"
+            case .authorized:
+                statusMessage = "No suitable camera found for preview"
+            @unknown default:
+                statusMessage = "Camera permission issue"
+            }
         }
+    }
+    
+    func retryCaptureSession() {
+        logger.debug("Retrying capture session setup...")
+        setupCaptureSession()
     }
     
     private func updateCaptureSessionCamera(deviceID: String) {

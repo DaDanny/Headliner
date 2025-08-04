@@ -66,6 +66,11 @@ struct MainAppView: View {
                         cameraSettingsContent
                     }
                     
+                    // Overlay Settings
+                    GlassmorphicCard {
+                        overlaySettingsContent
+                    }
+                    
                     Spacer()
                 }
                 .frame(width: 320)
@@ -87,6 +92,10 @@ struct MainAppView: View {
                     .opacity(0.03)
             }
         )
+        .sheet(isPresented: $appState.isShowingOverlaySettings) {
+            OverlaySettingsView(appState: appState)
+                .frame(width: 600, height: 700)
+        }
         .onAppear {
             // Basic setup
         }
@@ -207,6 +216,63 @@ struct MainAppView: View {
                         .foregroundColor(.secondary)
                         .multilineTextAlignment(.center)
                 }
+            }
+        }
+        .padding(16)
+    }
+    
+    // MARK: - Overlay Settings Panel
+    
+    private var overlaySettingsContent: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Overlay Settings")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundColor(.primary)
+                    
+                    if appState.overlaySettings.isEnabled && !appState.overlaySettings.userName.isEmpty {
+                        Text("Name: \(appState.overlaySettings.userName)")
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundColor(.secondary)
+                    }
+                }
+                
+                Spacer()
+                
+                Button(action: { appState.isShowingOverlaySettings = true }) {
+                    Image(systemName: "gear")
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundColor(.secondary)
+                }
+                .buttonStyle(PlainButtonStyle())
+            }
+            
+            HStack {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(appState.overlaySettings.isEnabled ? "Overlays Enabled" : "Overlays Disabled")
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundColor(appState.overlaySettings.isEnabled ? .green : .secondary)
+                    
+                    if appState.overlaySettings.isEnabled && appState.overlaySettings.showUserName {
+                        Text("Position: \(appState.overlaySettings.namePosition.displayName)")
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundColor(.secondary)
+                    }
+                }
+                
+                Spacer()
+                
+                Button(action: { appState.isShowingOverlaySettings = true }) {
+                    Text("Configure")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .background(Color.blue)
+                        .cornerRadius(6)
+                }
+                .buttonStyle(PlainButtonStyle())
             }
         }
         .padding(16)
