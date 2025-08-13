@@ -40,11 +40,11 @@ class OutputImageManager: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate
                 return 
             }
 
-            logger.debug("Successfully captured frame - \(cgImage.width)x\(cgImage.height)")
+            //logger.debug("Successfully captured frame - \(cgImage.width)x\(cgImage.height)")
 
             DispatchQueue.main.async {
                 self.videoExtensionStreamOutputImage = cgImage
-                logger.debug("Updated videoExtensionStreamOutputImage on main thread")
+                //logger.debug("Updated videoExtensionStreamOutputImage on main thread")
             }
         }
     }

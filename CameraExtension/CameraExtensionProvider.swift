@@ -824,6 +824,13 @@ class CameraExtensionProviderSource: NSObject, CMIOExtensionProviderSource {
 		} catch let error {
 			fatalError("Failed to add device: \(error.localizedDescription)")
 		}
+
+		// Signal readiness to the container app via shared defaults
+		if let sharedDefaults = UserDefaults(suiteName: "378NGS49HA.com.dannyfrancken.Headliner") {
+			sharedDefaults.set(true, forKey: "ExtensionProviderReady")
+			sharedDefaults.synchronize()
+			logger.debug("✅ Marked ExtensionProviderReady in shared defaults")
+		}
 	}
     
     deinit {

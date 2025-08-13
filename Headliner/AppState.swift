@@ -38,6 +38,9 @@ class AppState: ObservableObject {
     private var cancellables = Set<AnyCancellable>()
     private let userDefaults = UserDefaults.standard
     private var captureSessionManager: CaptureSessionManager?
+    private var devicePollTimer: Timer?
+    private let devicePollWindow: TimeInterval = 60   // seconds
+    private let devicePollInterval: TimeInterval = 0.5
     
     // MARK: - Constants
     
@@ -69,12 +72,19 @@ class AppState: ObservableObject {
         logger.debug("AppState initialization complete")
     }
     
+    // MARK: Deinitialization
+    deinit {
+        devicePollTimer?.invalidate()
+    }
+    
     // MARK: - Public Methods
     
     func installExtension() {
         extensionStatus = .installing
         statusMessage = "Installing system extension..."
         systemExtensionManager.install()
+        // start watching for the device to appear
+        waitForExtensionDeviceAppear()
     }
     
     func startCamera() {
@@ -232,13 +242,49 @@ class AppState: ObservableObject {
     // MARK: - Private Methods
     
     private func setupBindings() {
-        // Monitor system extension status changes
         systemExtensionManager.$logText
             .receive(on: DispatchQueue.main)
             .sink { [weak self] logText in
-                self?.updateExtensionStatus(from: logText)
+                Task { @MainActor in
+                    self?.updateExtensionStatus(from: logText)
+                }
             }
             .store(in: &cancellables)
+
+        systemExtensionManager.$phase
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] phase in
+                Task { @MainActor in
+                    guard let self else { return }
+                    switch phase {
+                    case .needsApproval:
+                        self.extensionStatus = .installing
+                        self.statusMessage = "Approve the extension in System Settings…"
+                    case .installed:
+                        self.extensionStatus = .installed
+                        self.statusMessage = "Extension installed. Finalizing…"
+                        self.waitForExtensionDeviceAppear()
+                    default:
+                        break
+                    }
+                }
+            }
+            .store(in: &cancellables)
+
+        // Recheck when app comes to foreground (user just approved in Settings)
+        NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSApplication.didBecomeActiveNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor in
+                guard let self else { return }
+                self.checkExtensionStatus()
+                if self.extensionStatus != .installed {
+                    self.waitForExtensionDeviceAppear()
+                }
+            }
+        }
     }
     
     private func loadUserPreferences() {
@@ -271,7 +317,8 @@ class AppState: ObservableObject {
         propertyManager.refreshExtensionStatus()
         
         // Check if extension device is available
-        if let _ = propertyManager.deviceObjectID {
+        let providerReady = UserDefaults(suiteName: Identifiers.appGroup.rawValue)?.bool(forKey: "ExtensionProviderReady") ?? false
+        if propertyManager.deviceObjectID != nil || providerReady {
             logger.debug("Extension detected - setting status to installed")
             extensionStatus = .installed
             statusMessage = "Extension is installed and ready"
@@ -403,6 +450,36 @@ class AppState: ObservableObject {
         } else if logText.contains("fail") || logText.contains("error") {
             extensionStatus = .notInstalled
         }
+    }
+    
+    private func waitForExtensionDeviceAppear() {
+        devicePollTimer?.invalidate()
+
+        let deadline = Date().addingTimeInterval(devicePollWindow)
+
+        // ensure timer is created on the main run loop
+        devicePollTimer = Timer.scheduledTimer(withTimeInterval: devicePollInterval, repeats: true) { [weak self] _ in
+            Task { @MainActor in
+                guard let self else { return }
+
+                self.propertyManager.refreshExtensionStatus()
+
+                let providerReady = UserDefaults(suiteName: Identifiers.appGroup.rawValue)?.bool(forKey: "ExtensionProviderReady") ?? false
+                if self.propertyManager.deviceObjectID != nil || providerReady {
+                    self.devicePollTimer?.invalidate()
+                    self.extensionStatus = .installed
+                    self.statusMessage = "Extension installed and ready"
+                    logger.debug("✅ Virtual camera detected after activation")
+                } else if Date() > deadline {
+                    self.devicePollTimer?.invalidate()
+                    logger.debug("⌛ Timed out waiting for device; user may still be approving or camera is in-use")
+                }
+            }
+        }
+
+        // keep firing while UI is interacting (scroll/menus)
+        devicePollTimer?.tolerance = 0.1
+        RunLoop.main.add(devicePollTimer!, forMode: .common)
     }
 }
 

@@ -26,11 +26,12 @@ class CustomPropertyManager: NSObject, ObservableObject {
     
     // MARK: Internal
     
-    lazy var deviceObjectID: CMIOObjectID? = {
+    var deviceObjectID: CMIOObjectID? {
         let device = getExtensionDevice(name: "Headliner")
         propertyLogger.debug("Extension device detection result: \(device?.localizedName ?? "nil")")
-        return device != nil ? 1 : nil // Simplified check - just return a placeholder ID if device exists
-    }()
+        // Simplified check - just return a placeholder ID if device exists
+        return device != nil ? 1 : nil
+    }
     
     func getExtensionDevice(name: String) -> AVCaptureDevice? {
         // Check for both standard devices and virtual cameras
@@ -61,10 +62,6 @@ class CustomPropertyManager: NSObject, ObservableObject {
     }
     
     func refreshExtensionStatus() {
-        // Clear the lazy property cache and re-check
-        _deviceObjectID = nil
-        _ = deviceObjectID // This will trigger re-evaluation
+        // No-op: deviceObjectID is computed each time now.
     }
-    
-    private var _deviceObjectID: CMIOObjectID?
 }
