@@ -11,8 +11,15 @@ import SwiftUI
 struct HeadlinerApp: App {
     var body: some Scene {
         WindowGroup {
-            ContentView(systemExtensionRequestManager: SystemExtensionRequestManager(logText: ""), propertyManager: CustomPropertyManager(), outputImageManager: OutputImageManager())
+            let mgr = SystemExtensionRequestManager(logText: "")
+            ContentView(systemExtensionRequestManager: mgr, propertyManager: CustomPropertyManager(), outputImageManager: OutputImageManager())
                 .frame(minWidth: 1280, maxWidth: 1360, minHeight: 900, maxHeight: 940)
+                .onAppear {
+                    #if DEBUG
+                    // DEV only: always ask to activate the bundled extension (no-op if same build)
+                    mgr.activateLatest()
+                    #endif
+                }
         }
     }
 }

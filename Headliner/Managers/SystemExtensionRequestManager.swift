@@ -9,6 +9,10 @@ import SwiftUI
 import SystemExtensions
 import OSLog
 
+enum ExtensionInstallPhase: String {
+    case idle, requesting, needsApproval, installing, installed, willCompleteAfterReboot, failed
+}
+
 class SystemExtensionRequestManager: NSObject, ObservableObject {
     // MARK: Lifecycle
 
@@ -18,6 +22,7 @@ class SystemExtensionRequestManager: NSObject, ObservableObject {
     }
     
     @Published var logText: String = "Installation results here"
+    @Published var phase: ExtensionInstallPhase = .idle
 
     func postNotification(named notificationName: NotificationName) {
         logger
@@ -64,62 +69,46 @@ class SystemExtensionRequestManager: NSObject, ObservableObject {
         }
         return extensionBundle
     }
+    
+    // Call this on app launch in DEBUG (or behind a user-facing "Reload Extension" button)
+    func activateLatest() {
+        guard let id = _extensionBundle().bundleIdentifier else { return }
+        phase = .requesting
+        let req = OSSystemExtensionRequest.activationRequest(forExtensionWithIdentifier: id, queue: .main)
+        req.delegate = self
+        OSSystemExtensionManager.shared.submitRequest(req)
+    }
 }
 
 extension SystemExtensionRequestManager: OSSystemExtensionRequestDelegate {
     public func request(_ request: OSSystemExtensionRequest, actionForReplacingExtension existing: OSSystemExtensionProperties, withExtension ext: OSSystemExtensionProperties) -> OSSystemExtensionRequest.ReplacementAction {
         logText = "Replacing extension version \(existing.bundleShortVersion) with \(ext.bundleShortVersion)"
+        phase = .installing
         return .replace
     }
 
     public func requestNeedsUserApproval(_ request: OSSystemExtensionRequest) {
         logText = "Extension needs user approval"
+        phase = .needsApproval
     }
 
     public func request(_ request: OSSystemExtensionRequest, didFinishWithResult result: OSSystemExtensionRequest.Result) {
-        switch result.rawValue {
-        case 0:
-            logText = "\(request) did finish with success"
-        case 1:
-            logText = "\(request) Extension did finish with result success but requires reboot"
-        default:
-            logText = "\(request) Extension did finish with result \(result)"
+        switch result {
+        case .completed:
+            logText = "Extension activation completed"
+            phase = .installed
+        case .willCompleteAfterReboot:
+            logText = "Extension will complete after reboot"
+            phase = .willCompleteAfterReboot
+        @unknown default:
+            logText = "Extension finished with result \(result.rawValue)"
+            phase = .installing
         }
     }
 
     public func request(_ request: OSSystemExtensionRequest, didFailWithError error: Error) {
-        let errorCode = (error as NSError).code
-        var errorString = ""
-        switch errorCode {
-        case 1:
-            errorString = "unknown error"
-        case 2:
-            errorString = "missing entitlement"
-        case 3:
-            errorString = "Container App for Extension has to be in /Applications to install Extension."
-        case 4:
-            errorString = "extension not found"
-        case 5:
-            errorString = "extension missing identifier"
-        case 6:
-            errorString = "duplicate extension identifer"
-        case 7:
-            errorString = "unknown extension category"
-        case 8:
-            errorString = "code signature invalid"
-        case 9:
-            errorString = "validation failed"
-        case 10:
-            errorString = "forbidden by system policy"
-        case 11:
-            errorString = "request canceled"
-        case 12:
-            errorString = "request superseded"
-        case 13:
-            errorString = "authorization required"
-        default:
-            errorString = "unknown code"
-        }
-        logText = "Extension did fail with error: \(errorString)"
+        let ns = error as NSError
+        logText = "Extension failed: \(ns.code) \(ns.localizedDescription)"
+        phase = .failed
     }
 }

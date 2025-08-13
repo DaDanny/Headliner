@@ -101,6 +101,12 @@ struct MainAppView: View {
         }
     }
     
+    private var appVersionText: String {
+        let shortVersion = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "?"
+        let buildNumber = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "?"
+        return "v\(shortVersion) (\(buildNumber))"
+    }
+    
     // MARK: - Header View
     
     private var headerView: some View {
@@ -117,15 +123,21 @@ struct MainAppView: View {
             
             Spacer()
             
-            Button(action: { appState.isShowingSettings.toggle() }) {
-                Image(systemName: "gear")
-                    .font(.system(size: 18, weight: .medium))
+            HStack(spacing: 12) {
+                Text(appVersionText)
+                    .font(.system(size: 12, weight: .regular))
                     .foregroundColor(.secondary)
-                    .frame(width: 32, height: 32)
-                    .background(Circle().fill(.background))
-                    .overlay(Circle().stroke(.separator, lineWidth: 1))
+                
+                Button(action: { appState.isShowingSettings.toggle() }) {
+                    Image(systemName: "gear")
+                        .font(.system(size: 18, weight: .medium))
+                        .foregroundColor(.secondary)
+                        .frame(width: 32, height: 32)
+                        .background(Circle().fill(.background))
+                        .overlay(Circle().stroke(.separator, lineWidth: 1))
+                }
+                .buttonStyle(ScaleButtonStyle())
             }
-            .buttonStyle(ScaleButtonStyle())
         }
         .padding(.horizontal, 24)
         .padding(.vertical, 20)

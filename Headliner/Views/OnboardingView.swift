@@ -40,6 +40,10 @@ struct OnboardingView: View {
                     Text("Professional virtual camera for macOS")
                         .font(.system(size: 18, weight: .medium))
                         .foregroundColor(.secondary)
+                    
+                    Text(appVersionText)
+                        .font(.system(size: 12, weight: .regular))
+                        .foregroundColor(.secondary)
                 }
             }
             .padding(.top, 60)
@@ -122,6 +126,12 @@ struct OnboardingView: View {
                     .opacity(0.3)
             }
         )
+    }
+
+    private var appVersionText: String {
+        let shortVersion = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "?"
+        let buildNumber = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "?"
+        return "v\(shortVersion) (\(buildNumber))"
     }
 }
 

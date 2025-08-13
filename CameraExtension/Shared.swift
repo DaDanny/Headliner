@@ -278,6 +278,11 @@ struct OverlaySettings: Codable {
     var cornerRadius: CGFloat = 8
     var padding: CGFloat = 12
     var margin: CGFloat = 20
+    var showVersion: Bool = true
+    var versionPosition: OverlayPosition = .bottomRight
+    var versionBackgroundColor: OverlayColor = .blackTransparent
+    var versionTextColor: OverlayColor = .white
+    var versionFontSize: CGFloat = 16
 }
 
 enum OverlayPosition: String, Codable, CaseIterable {

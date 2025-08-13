@@ -477,6 +477,11 @@ class CameraExtensionDeviceSource: NSObject, CMIOExtensionDeviceSource, AVCaptur
 			drawUserNameOverlay(settings: settings, in: rect)
 		}
 		
+		// Draw version overlay if enabled
+		if settings.showVersion {
+			drawVersionOverlay(settings: settings, in: rect)
+		}
+		
 		NSGraphicsContext.restoreGraphicsState()
 	}
 	
@@ -519,6 +524,44 @@ class CameraExtensionDeviceSource: NSObject, CMIOExtensionDeviceSource, AVCaptur
 			height: textSize.height
 		)
 		
+		attributedString.draw(in: textRect)
+	}
+	
+	private func drawVersionOverlay(settings: OverlaySettings, in rect: CGRect) {
+		// Resolve version text from bundle
+		let bundle = Bundle.main
+		let shortVersion = bundle.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "?"
+		let buildNumber = bundle.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "?"
+		let versionText = "Headliner v\(shortVersion) (\(buildNumber))"
+		
+		let font = NSFont.systemFont(ofSize: settings.versionFontSize, weight: .regular)
+		let attributes: [NSAttributedString.Key: Any] = [
+			.font: font,
+			.foregroundColor: settings.versionTextColor.nsColor
+		]
+		let attributedString = NSAttributedString(string: versionText, attributes: attributes)
+		let textSize = attributedString.size()
+		
+		let backgroundWidth = textSize.width + (settings.padding * 2)
+		let backgroundHeight = textSize.height + (settings.padding * 2)
+		
+		let overlayRect = calculateOverlayRect(
+			size: CGSize(width: backgroundWidth, height: backgroundHeight),
+			position: settings.versionPosition,
+			containerRect: rect,
+			margin: settings.margin
+		)
+		
+		let backgroundPath = NSBezierPath(roundedRect: overlayRect, xRadius: settings.cornerRadius, yRadius: settings.cornerRadius)
+		settings.versionBackgroundColor.nsColor.setFill()
+		backgroundPath.fill()
+		
+		let textRect = CGRect(
+			x: overlayRect.origin.x + settings.padding,
+			y: overlayRect.origin.y + settings.padding,
+			width: textSize.width,
+			height: textSize.height
+		)
 		attributedString.draw(in: textRect)
 	}
 	
