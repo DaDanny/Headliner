@@ -561,29 +561,43 @@ class CameraExtensionDeviceSource: NSObject, CMIOExtensionDeviceSource, AVCaptur
 	
 	// MARK: Overlay Settings Management
 	
-	private func loadOverlaySettings() {
-		guard let userDefaults = UserDefaults(suiteName: "378NGS49HA.com.dannyfrancken.Headliner") else {
-			logger.error("Failed to access app group UserDefaults for overlay settings")
-			return
-		}
-		
-		self.overlaySettingsLock.lock()
-		defer { self.overlaySettingsLock.unlock() }
-		
-		// Load overlay settings from UserDefaults
-		if let overlayData = userDefaults.data(forKey: OverlayUserDefaultsKeys.overlaySettings),
-		   let decodedSettings = try? JSONDecoder().decode(OverlaySettings.self, from: overlayData) {
-			self.overlaySettings = decodedSettings
-			logger.debug("Loaded overlay settings: enabled=\(self.overlaySettings.isEnabled), userName='\(self.overlaySettings.userName)'")
-		} else {
-			// Use default settings with system username
-			self.overlaySettings = OverlaySettings()
-			self.overlaySettings.userName = NSUserName()
-			self.overlaySettings.isEnabled = true
-			self.overlaySettings.showUserName = true
-			logger.debug("Using default overlay settings with user name: \(self.overlaySettings.userName)")
-		}
-	}
+	    private func loadOverlaySettings() {
+        self.overlaySettingsLock.lock()
+        defer { self.overlaySettingsLock.unlock() }
+        
+        // First try to load from temp file (sent via notification)
+        if let sharedDefaults = UserDefaults(suiteName: "378NGS49HA.com.dannyfrancken.Headliner"),
+           let tempFilePath = sharedDefaults.string(forKey: "OverlaySettingsFilePath") {
+            
+            let tempFileURL = URL(fileURLWithPath: tempFilePath)
+            
+            do {
+                let overlayData = try Data(contentsOf: tempFileURL)
+                let decodedSettings = try JSONDecoder().decode(OverlaySettings.self, from: overlayData)
+                self.overlaySettings = decodedSettings
+                
+                logger.debug("✅ Loaded overlay settings from temp file: enabled=\(self.overlaySettings.isEnabled), userName='\(self.overlaySettings.userName)', position=\(self.overlaySettings.namePosition.rawValue), fontSize=\(self.overlaySettings.fontSize)")
+                
+                // Clean up the temp file
+                try? FileManager.default.removeItem(at: tempFileURL)
+                sharedDefaults.removeObject(forKey: "OverlaySettingsFilePath")
+                
+                return
+            } catch {
+                logger.error("❌ Failed to load overlay settings from temp file: \(error)")
+                // Clean up invalid temp file reference
+                sharedDefaults.removeObject(forKey: "OverlaySettingsFilePath")
+            }
+        }
+        
+        // Fallback: Use default settings with system username
+        logger.debug("📝 Using default overlay settings as fallback")
+        self.overlaySettings = OverlaySettings()
+        self.overlaySettings.userName = NSUserName()
+        self.overlaySettings.isEnabled = true
+        self.overlaySettings.showUserName = true
+        logger.debug("Using default overlay settings with user name: \(self.overlaySettings.userName)")
+    }
 	
 	func updateOverlaySettings() {
 		loadOverlaySettings()
@@ -808,7 +822,10 @@ class CameraExtensionProviderSource: NSObject, CMIOExtensionProviderSource {
     // MARK: Private
     
     private func notificationReceived(notificationName: String) {
+        logger.debug("📡 Received notification: \(notificationName)")
+        
         guard let name = NotificationName(rawValue: notificationName) else {
+            logger.debug("❌ Unknown notification name: \(notificationName)")
             return
         }
 
@@ -823,7 +840,7 @@ class CameraExtensionProviderSource: NSObject, CMIOExtensionProviderSource {
             logger.debug("Camera device selection changed")
             handleCameraDeviceChange()
         case .updateOverlaySettings:
-            logger.debug("Overlay settings changed")
+            logger.debug("🎨 Overlay settings changed - updating now")
             deviceSource.updateOverlaySettings()
         }
     }

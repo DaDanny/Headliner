@@ -128,6 +128,9 @@ class AppState: ObservableObject {
         statusMessage = "Starting camera..."
         notificationManager.postNotification(named: .startStream)
         
+        // Send current overlay settings to extension when camera starts
+        notificationManager.postNotification(named: .updateOverlaySettings, overlaySettings: overlaySettings)
+        
         // Start the capture session for preview
         if let manager = captureSessionManager, !manager.captureSession.isRunning {
             manager.captureSession.startRunning()
@@ -196,8 +199,8 @@ class AppState: ObservableObject {
         overlaySettings = newSettings
         saveOverlaySettings()
         
-        // Notify extension about overlay settings change
-        notificationManager.postNotification(named: .updateOverlaySettings)
+        // Notify extension about overlay settings change with the actual settings data
+        notificationManager.postNotification(named: .updateOverlaySettings, overlaySettings: newSettings)
     }
     
     private func saveOverlaySettings() {
@@ -210,7 +213,17 @@ class AppState: ObservableObject {
         do {
             let overlayData = try JSONEncoder().encode(self.overlaySettings)
             appGroupDefaults.set(overlayData, forKey: OverlayUserDefaultsKeys.overlaySettings)
-            logger.debug("Saved overlay settings: enabled=\(self.overlaySettings.isEnabled), userName='\(self.overlaySettings.userName)'")
+            appGroupDefaults.synchronize() // Force immediate sync
+            
+            logger.debug("✅ Saved overlay settings: enabled=\(self.overlaySettings.isEnabled), userName='\(self.overlaySettings.userName)', position=\(self.overlaySettings.namePosition.rawValue), fontSize=\(self.overlaySettings.fontSize)")
+            
+            // Verify the save worked by reading it back
+            if let savedData = appGroupDefaults.data(forKey: OverlayUserDefaultsKeys.overlaySettings),
+               let verificationSettings = try? JSONDecoder().decode(OverlaySettings.self, from: savedData) {
+                logger.debug("✅ Verified saved settings: userName='\(verificationSettings.userName)', position=\(verificationSettings.namePosition.rawValue)")
+            } else {
+                logger.error("❌ Failed to verify saved overlay settings")
+            }
         } catch {
             logger.error("Failed to encode overlay settings: \(error)")
         }
