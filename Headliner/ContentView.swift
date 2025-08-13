@@ -45,20 +45,6 @@ struct ContentView {
     private let outputImageManager: OutputImageManager
     
     // MARK: Private
-    
-    private func setupCaptureSession() {
-        let captureSessionManager = CaptureSessionManager(capturingHeadliner: true)
-        
-        if captureSessionManager.configured == true, captureSessionManager.captureSession.isRunning == false {
-            captureSessionManager.captureSession.startRunning()
-            captureSessionManager.videoOutput?.setSampleBufferDelegate(
-                outputImageManager,
-                queue: captureSessionManager.dataOutputQueue
-            )
-        } else {
-            logger.error("Couldn't start capture session")
-        }
-    }
 }
 
 // MARK: View
@@ -77,9 +63,6 @@ extension ContentView: View {
             }
         }
         .animation(.easeInOut(duration: 0.3), value: appState.extensionStatus.isInstalled)
-        .onAppear {
-            setupCaptureSession()
-        }
     }
 }
 
