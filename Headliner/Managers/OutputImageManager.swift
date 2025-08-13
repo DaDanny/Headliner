@@ -35,10 +35,16 @@ class OutputImageManager: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate
             let context = CIContext(options: nil)
 
             guard let cgImage = context
-                .createCGImage(ciImage, from: ciImage.extent) else { return }
+                .createCGImage(ciImage, from: ciImage.extent) else { 
+                logger.debug("Failed to create CGImage from CIImage")
+                return 
+            }
+
+            logger.debug("Successfully captured frame - \(cgImage.width)x\(cgImage.height)")
 
             DispatchQueue.main.async {
                 self.videoExtensionStreamOutputImage = cgImage
+                logger.debug("Updated videoExtensionStreamOutputImage on main thread")
             }
         }
     }

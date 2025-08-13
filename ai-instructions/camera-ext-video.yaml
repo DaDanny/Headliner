@@ -1,0 +1,20 @@
+instructions:
+  context:
+    - This is the Headliner app, which uses a CoreMediaIO System Extension to implement a virtual camera.
+    - The user-facing container app lives in the Headliner directory and communicates with the system extension in CameraExtension.
+    - The CameraExtension has been reverted to a previously working version. It uses a basic CMIO extension that does not stream video yet but is selectable as a virtual camera in Google Meet and Zoom.
+    - The file CameraExtension/CameraExtensionProvider.swift contains the core logic of the extension and should be the starting point for any changes.
+    - Shared communication between the main app and the camera extension uses NotificationManager defined in CameraExtension/Shared.swift via app group UserDefaults or other IPC-safe methods.
+    - Previously, the extension experimented with some custom effects logic. Please ignore that and remove or bypass any effect-related code in both the main app and extension.
+    - The goal now is to implement a clean, working video stream from a selected camera device.
+
+  tasks:
+    - Review the file CameraExtension/CameraExtensionProvider.swift to understand how the current device and stream are created.
+    - Modify the camera extension to create a live video stream instead of cycling or displaying static images.
+    - Implement a basic AVCaptureSession or pixel buffer pipeline that provides real-time video to the virtual camera output.
+    - Update Shared.swift and the NotificationManager to allow the main app to set or change the selected camera device by unique ID or name.
+    - Ensure the camera extension reads this camera selection and updates its capture session to use the appropriate AVCaptureDevice.
+    - Remove or disable any custom effects code that was previously used or stubbed in the extension or the main app.
+    - Ensure the virtual camera continues to appear correctly in external apps like Google Meet or Zoom.
+    - Do not change Info.plist, entitlements, or any xcodeproj settings.
+    - Keep all changes focused in Swift files only, and prioritize a clean, minimal, and stable video streaming experience.
