@@ -10,18 +10,30 @@ import Combine
 import SwiftUI
 import SystemExtensions
 
-/// Main app state manager that coordinates between UI, system extension, and camera management
+/// Main application state.
+///
+/// Coordinates UI state with the system extension lifecycle and a local AVCaptureSession
+/// used for on-device preview. Owns user selections (camera, overlay settings), persists
+/// them, and communicates updates to the extension via Darwin notifications.
 @MainActor
 class AppState: ObservableObject {
   // MARK: - Published Properties
 
+  /// Current install/run status of the system extension.
   @Published var extensionStatus: ExtensionStatus = .unknown
+  /// Current run state of the local preview/virtual camera.
   @Published var cameraStatus: CameraStatus = .stopped
+  /// List of selectable physical cameras (excludes the Headliner virtual camera).
   @Published var availableCameras: [CameraDevice] = []
+  /// Unique ID of the selected camera (persisted in UserDefaults and shared with extension).
   @Published var selectedCameraID: String = ""
+  /// Status text surfaced in onboarding or header.
   @Published var statusMessage: String = ""
+  /// Controls presentation of the general settings UI.
   @Published var isShowingSettings: Bool = false
+  /// Overlay configuration shared with the extension.
   @Published var overlaySettings: OverlaySettings = .init()
+  /// Controls presentation of the overlay settings sheet.
   @Published var isShowingOverlaySettings: Bool = false
 
   // MARK: - Dependencies
@@ -48,6 +60,11 @@ class AppState: ObservableObject {
 
   // MARK: - Initialization
 
+  /// Create a new `AppState` instance.
+  /// - Parameters:
+  ///   - systemExtensionManager: Handles install/uninstall and activation of the system extension.
+  ///   - propertyManager: Assists with device/extension detection.
+  ///   - outputImageManager: Receives preview frames from the local capture session.
   init(
     systemExtensionManager: SystemExtensionRequestManager,
     propertyManager: CustomPropertyManager,
@@ -76,6 +93,7 @@ class AppState: ObservableObject {
 
   // MARK: - Public Methods
 
+  /// Begin installation flow for the system extension and start device detection polling.
   func installExtension() {
     extensionStatus = .installing
     statusMessage = "Installing system extension..."
@@ -84,6 +102,10 @@ class AppState: ObservableObject {
     waitForExtensionDeviceAppear()
   }
 
+  /// Start the virtual camera and local preview.
+  ///
+  /// Requests camera permission if needed, propagates settings to the extension,
+  /// and starts the local `AVCaptureSession` when ready.
   func startCamera() {
     guard extensionStatus == .installed else {
       logger.debug("Cannot start camera - extension not installed")
@@ -129,6 +151,7 @@ class AppState: ObservableObject {
     }
   }
 
+  /// Complete startup once permissions are satisfied; idempotent if already running.
   private func proceedWithCameraStart() {
     logger.debug("Starting camera...")
     cameraStatus = .starting
@@ -152,6 +175,7 @@ class AppState: ObservableObject {
     }
   }
 
+  /// Stop the virtual camera and local preview.
   func stopCamera() {
     cameraStatus = .stopping
     statusMessage = "Stopping camera..."
@@ -173,6 +197,8 @@ class AppState: ObservableObject {
     }
   }
 
+  /// Persist and apply a newly selected camera.
+  /// - Parameter camera: The selected physical camera device.
   func selectCamera(_ camera: CameraDevice) {
     selectedCameraID = camera.id
     userDefaults.set(camera.id, forKey: UserDefaultsKeys.selectedCameraID)
@@ -196,12 +222,14 @@ class AppState: ObservableObject {
     }
   }
 
+  /// Refresh the available camera list and recheck extension status.
   func refreshCameras() {
     loadAvailableCameras()
     // Also refresh extension status when refreshing cameras
     checkExtensionStatus()
   }
 
+  /// Update and persist overlay settings, then notify the extension.
   func updateOverlaySettings(_ newSettings: OverlaySettings) {
     overlaySettings = newSettings
     saveOverlaySettings()
@@ -210,6 +238,7 @@ class AppState: ObservableObject {
     notificationManager.postNotification(named: .updateOverlaySettings, overlaySettings: newSettings)
   }
 
+  /// Persist `overlaySettings` to the shared app group so the extension can load them.
   private func saveOverlaySettings() {
     // Save to app group defaults for extension access
     guard let appGroupDefaults = UserDefaults(suiteName: Identifiers.appGroup.rawValue) else {
@@ -245,6 +274,7 @@ class AppState: ObservableObject {
 
   // MARK: - Private Methods
 
+  /// Wire up Combine bindings and app lifecycle observers.
   private func setupBindings() {
     systemExtensionManager.$logText
       .receive(on: DispatchQueue.main)
@@ -291,11 +321,13 @@ class AppState: ObservableObject {
     }
   }
 
+  /// Load persisted selections (camera ID, overlays) into memory.
   private func loadUserPreferences() {
     selectedCameraID = userDefaults.string(forKey: UserDefaultsKeys.selectedCameraID) ?? ""
     loadOverlaySettings()
   }
 
+  /// Load overlay settings from the shared app group, or set sensible defaults.
   private func loadOverlaySettings() {
     // Load from app group defaults for extension access
     guard let appGroupDefaults = UserDefaults(suiteName: Identifiers.appGroup.rawValue) else {
@@ -315,6 +347,7 @@ class AppState: ObservableObject {
     }
   }
 
+  /// Inspect extension readiness via a fast readiness flag, then fall back to device scan.
   private func checkExtensionStatus() {
     logger.debug("Checking extension status...")
 
@@ -344,6 +377,7 @@ class AppState: ObservableObject {
     logger.debug("Final extension status: \(String(describing: self.extensionStatus))")
   }
 
+  /// Discover all physical cameras (excluding the Headliner virtual camera) for selection.
   private func loadAvailableCameras() {
     let discoverySession = AVCaptureDevice.DiscoverySession(
       deviceTypes: [.builtInWideAngleCamera, .external, .continuityCamera, .deskViewCamera],
@@ -371,6 +405,7 @@ class AppState: ObservableObject {
     }
   }
 
+  /// Configure the local preview capture session and start it if possible.
   private func setupCaptureSession() {
     logger.debug("Setting up capture session for camera preview...")
     captureSessionManager = CaptureSessionManager(capturingHeadliner: false)
@@ -409,11 +444,13 @@ class AppState: ObservableObject {
     }
   }
 
+  /// Retry capture session configuration after permissions change.
   func retryCaptureSession() {
     logger.debug("Retrying capture session setup...")
     setupCaptureSession()
   }
 
+  /// Reconfigure the local preview capture input for a newly selected camera.
   private func updateCaptureSessionCamera(deviceID: String) {
     guard let manager = captureSessionManager else { return }
 
@@ -451,6 +488,7 @@ class AppState: ObservableObject {
     manager.captureSession.commitConfiguration()
   }
 
+  /// Update extension status heuristically from installer log messages.
   private func updateExtensionStatus(from logText: String) {
     statusMessage = logText
 
@@ -465,6 +503,7 @@ class AppState: ObservableObject {
     }
   }
 
+  /// Poll for extension device readiness with a time-bounded timer.
   private func waitForExtensionDeviceAppear() {
     devicePollTimer?.invalidate()
 
