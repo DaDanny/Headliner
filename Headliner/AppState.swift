@@ -49,14 +49,20 @@ class AppState: ObservableObject {
   private let userDefaults = UserDefaults.standard
   private var captureSessionManager: CaptureSessionManager?
   private var devicePollTimer: Timer?
+  private var didBecomeActiveObserver: NSObjectProtocol?
   private let devicePollWindow: TimeInterval = 60 // seconds
   private let devicePollInterval: TimeInterval = 0.5
 
-  // MARK: - Constants
+  // MARK: - App Group Keys
 
-  private enum UserDefaultsKeys {
+  private enum AppGroupKeys {
+    static let extensionProviderReady = "ExtensionProviderReady"
     static let selectedCameraID = "SelectedCameraID"
   }
+
+  // MARK: - Constants
+
+  private enum UserDefaultsKeys {}
 
   // MARK: - Initialization
 
@@ -89,6 +95,9 @@ class AppState: ObservableObject {
 
   deinit {
     devicePollTimer?.invalidate()
+    if let token = didBecomeActiveObserver {
+      NSWorkspace.shared.notificationCenter.removeObserver(token)
+    }
   }
 
   // MARK: - Public Methods
@@ -131,15 +140,15 @@ class AppState: ObservableObject {
             self?.proceedWithCameraStart()
           } else {
             self?.cameraStatus = .error("Camera permission denied")
-            self?.statusMessage = "Camera access denied - enable in System Preferences > Privacy & Security > Camera"
+            self?.statusMessage = "Camera access denied - enable in System Settings > Privacy & Security > Camera"
             logger.error("Camera permission denied by user")
           }
         }
       }
     case .denied:
       cameraStatus = .error("Camera permission denied")
-      statusMessage = "Camera access denied - enable in System Preferences > Privacy & Security > Camera"
-      logger.error("Camera access denied - user needs to enable in System Preferences")
+      statusMessage = "Camera access denied - enable in System Settings > Privacy & Security > Camera"
+      logger.error("Camera access denied - user needs to enable in System Settings")
     case .restricted:
       cameraStatus = .error("Camera access restricted")
       statusMessage = "Camera access restricted by system policy"
@@ -153,6 +162,7 @@ class AppState: ObservableObject {
 
   /// Complete startup once permissions are satisfied; idempotent if already running.
   private func proceedWithCameraStart() {
+    guard cameraStatus != .running && cameraStatus != .starting else { return }
     logger.debug("Starting camera...")
     cameraStatus = .starting
     statusMessage = "Starting camera..."
@@ -201,12 +211,12 @@ class AppState: ObservableObject {
   /// - Parameter camera: The selected physical camera device.
   func selectCamera(_ camera: CameraDevice) {
     selectedCameraID = camera.id
-    userDefaults.set(camera.id, forKey: UserDefaultsKeys.selectedCameraID)
+    userDefaults.set(camera.id, forKey: AppGroupKeys.selectedCameraID)
     statusMessage = "Selected camera: \(camera.name)"
 
     // Notify extension about camera device change
     if let appGroupDefaults = UserDefaults(suiteName: Identifiers.appGroup.rawValue) {
-      appGroupDefaults.set(camera.id, forKey: "SelectedCameraID")
+      appGroupDefaults.set(camera.id, forKey: AppGroupKeys.selectedCameraID)
       notificationManager.postNotification(named: .setCameraDevice)
     }
 
@@ -306,7 +316,7 @@ class AppState: ObservableObject {
       .store(in: &cancellables)
 
     // Recheck when app comes to foreground (user just approved in Settings)
-    NSWorkspace.shared.notificationCenter.addObserver(
+    didBecomeActiveObserver = NSWorkspace.shared.notificationCenter.addObserver(
       forName: NSApplication.didBecomeActiveNotification,
       object: nil,
       queue: .main
@@ -323,7 +333,7 @@ class AppState: ObservableObject {
 
   /// Load persisted selections (camera ID, overlays) into memory.
   private func loadUserPreferences() {
-    selectedCameraID = userDefaults.string(forKey: UserDefaultsKeys.selectedCameraID) ?? ""
+    selectedCameraID = userDefaults.string(forKey: AppGroupKeys.selectedCameraID) ?? ""
     loadOverlaySettings()
   }
 
@@ -433,7 +443,7 @@ class AppState: ObservableObject {
       case .notDetermined:
         statusMessage = "Camera permission needed for preview"
       case .denied:
-        statusMessage = "Camera access denied - enable in System Preferences > Privacy & Security > Camera"
+        statusMessage = "Camera access denied - enable in System Settings > Privacy & Security > Camera"
       case .restricted:
         statusMessage = "Camera access restricted"
       case .authorized:
@@ -471,7 +481,9 @@ class AppState: ObservableObject {
 
     // Remove current inputs
     for input in manager.captureSession.inputs {
-      manager.captureSession.removeInput(input)
+      if let v = input as? AVCaptureDeviceInput, v.device.hasMediaType(.video) {
+        manager.captureSession.removeInput(v)
+      }
     }
 
     // Add new input
@@ -510,13 +522,13 @@ class AppState: ObservableObject {
     let deadline = Date().addingTimeInterval(devicePollWindow)
 
     // ensure timer is created on the main run loop
-    devicePollTimer = Timer.scheduledTimer(withTimeInterval: devicePollInterval, repeats: true) { [weak self] _ in
+    let t = Timer(timeInterval: devicePollInterval, repeats: true) { [weak self] _ in
       Task { @MainActor in
         guard let self else { return }
 
         // Prefer provider readiness to avoid noisy device scans once the extension has signaled readiness
         let providerReady = UserDefaults(suiteName: Identifiers.appGroup.rawValue)?
-          .bool(forKey: "ExtensionProviderReady") ?? false
+          .bool(forKey: AppGroupKeys.extensionProviderReady) ?? false
         if providerReady {
           self.devicePollTimer?.invalidate()
           self.extensionStatus = .installed
@@ -540,8 +552,9 @@ class AppState: ObservableObject {
     }
 
     // keep firing while UI is interacting (scroll/menus)
-    devicePollTimer?.tolerance = 0.1
-    RunLoop.main.add(devicePollTimer!, forMode: .common)
+    devicePollTimer = t
+    t.tolerance = 0.1
+    RunLoop.main.add(t, forMode: .common)
   }
 }
 
