@@ -10,6 +10,7 @@ import SwiftUI
 struct OverlaySettingsView: View {
   @ObservedObject var appState: AppState
   @State private var localSettings: OverlaySettings
+  // Local color picker state removed for now; reintroduce when needed.
   @State private var showingColorPicker = false
 
   init(appState: AppState) {
@@ -245,12 +246,4 @@ struct OverlaySettingsView: View {
   }
 }
 
-#Preview {
-  OverlaySettingsView(appState: AppState(
-    systemExtensionManager: SystemExtensionRequestManager(logText: ""),
-    propertyManager: CustomPropertyManager(),
-    outputImageManager: OutputImageManager()
-  ))
-  .frame(width: 600, height: 700)
-  .background(Color.black)
-}
+// Intentionally no PreviewProvider to reduce compile surface for tooling.

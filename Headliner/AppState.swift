@@ -44,8 +44,6 @@ class AppState: ObservableObject {
 
   private enum UserDefaultsKeys {
     static let selectedCameraID = "SelectedCameraID"
-    static let hasCompletedOnboarding = "HasCompletedOnboarding"
-    static let overlaySettings = "OverlaySettings"
   }
 
   // MARK: - Initialization

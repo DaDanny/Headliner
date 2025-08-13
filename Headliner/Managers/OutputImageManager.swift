@@ -11,10 +11,6 @@ import SwiftUI
 
 class OutputImageManager: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate, ObservableObject {
   @Published var videoExtensionStreamOutputImage: CGImage?
-  let noVideoImage: CGImage = NSImage(
-    systemSymbolName: "video.slash",
-    accessibilityDescription: "Image to indicate no video feed available"
-  )!.cgImage(forProposedRect: nil, context: nil, hints: nil)! // OK to fail if this isn't available.
 
   func captureOutput(_: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer, from _: AVCaptureConnection) {
     autoreleasepool {

@@ -23,7 +23,8 @@ class SystemExtensionRequestManager: NSObject, ObservableObject {
   @Published var logText: String = "Installation results here"
   @Published var phase: ExtensionInstallPhase = .idle
 
-  func postNotification(named notificationName: NotificationName) {
+  @discardableResult
+  func postNotification(named notificationName: NotificationName) -> Bool {
     logger
       .debug(
         "Posting notification \(notificationName.rawValue) from container app"
@@ -36,6 +37,7 @@ class SystemExtensionRequestManager: NSObject, ObservableObject {
       nil,
       true
     )
+    return true
   }
 
   func install() {
@@ -48,7 +50,8 @@ class SystemExtensionRequestManager: NSObject, ObservableObject {
     OSSystemExtensionManager.shared.submitRequest(activationRequest)
   }
 
-  func uninstall() {
+  @discardableResult
+  func uninstall() -> Bool {
     guard let extensionIdentifier = _extensionBundle().bundleIdentifier else { return }
     let deactivationRequest = OSSystemExtensionRequest.deactivationRequest(
       forExtensionWithIdentifier: extensionIdentifier,
@@ -56,6 +59,7 @@ class SystemExtensionRequestManager: NSObject, ObservableObject {
     )
     deactivationRequest.delegate = self
     OSSystemExtensionManager.shared.submitRequest(deactivationRequest)
+    return true
   }
 
   func _extensionBundle() -> Bundle {

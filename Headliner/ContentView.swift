@@ -6,7 +6,6 @@
 //
 
 import SwiftUI
-import SystemExtensions
 
 // MARK: - ContentView
 
@@ -18,7 +17,6 @@ struct ContentView {
     propertyManager: CustomPropertyManager,
     outputImageManager: OutputImageManager
   ) {
-    self.systemExtensionRequestManager = systemExtensionRequestManager
     self.propertyManager = propertyManager
     self.outputImageManager = outputImageManager
 
@@ -33,7 +31,6 @@ struct ContentView {
   // MARK: Internal
 
   @StateObject private var appState: AppState
-  private let systemExtensionRequestManager: SystemExtensionRequestManager
   private let propertyManager: CustomPropertyManager
   private let outputImageManager: OutputImageManager
 
@@ -59,13 +56,4 @@ extension ContentView: View {
   }
 }
 
-struct ContentView_Previews: PreviewProvider {
-  static var previews: some View {
-    ContentView(
-      systemExtensionRequestManager: SystemExtensionRequestManager(logText: ""),
-      propertyManager: CustomPropertyManager(),
-      outputImageManager: OutputImageManager()
-    )
-    .frame(width: 1200, height: 800)
-  }
-}
+// Intentionally no PreviewProvider to reduce compile surface for tooling.

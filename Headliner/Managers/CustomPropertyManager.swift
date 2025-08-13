@@ -7,6 +7,7 @@
 
 import AVFoundation
 import CoreMediaIO
+import OSLog
 import Foundation
 import SwiftUI
 

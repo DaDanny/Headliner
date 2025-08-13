@@ -1,8 +1,17 @@
-# Phase 2 — Periphery Scan Results (Stub)
+# Phase 2 — Periphery Scan Results
 
-Periphery configuration will be added as `periphery.yml` at repo root. Once Periphery is available locally, run:
+Ran: `periphery scan --project Headliner.xcodeproj --schemes Headliner`
 
-periphery scan --config periphery.yml
+Actions applied (Main App only):
+- Removed PreviewProviders from: `ContentView`, `MainAppView`, `AnimatedBackground`, `CameraPreviewCard`, `CameraSelector`, `StatusCard`, `ModernButton`, `OverlaySettingsView`, `GlassmorphicCard`.
+- `ContentView`: removed unused stored property `systemExtensionRequestManager`.
+- `OutputImageManager`: removed unused `noVideoImage`.
+- `SystemExtensionRequestManager`: mark `postNotification(named:)` and `uninstall()` with `@discardableResult` to silence unused result.
+- `AppState.UserDefaultsKeys`: removed unused `hasCompletedOnboarding`.
 
-Track candidates and justifications here.
+Remaining (not edited in main app):
+- Items in `CameraExtension/*` (ignored per scope): `kWhiteStripeHeight`, `selectedCameraDevice`, several `Shared.swift` helpers (`MoodName`, `PropertyName`, `OverlayColor.displayName`, `OverlayUserDefaultsKeys.userName`, `String.convertedToCMIOObjectPropertySelectorName`).
+
+Next steps:
+- Extract shared types to `HeadlinerShared/` and prune unused after consolidation (Phase 3).
 

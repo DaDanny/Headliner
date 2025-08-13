@@ -163,17 +163,4 @@ struct FeatureRow: View {
   }
 }
 
-// MARK: - Preview
-
-struct OnboardingView_Previews: PreviewProvider {
-  static var previews: some View {
-    OnboardingView(
-      appState: AppState(
-        systemExtensionManager: SystemExtensionRequestManager(logText: ""),
-        propertyManager: CustomPropertyManager(),
-        outputImageManager: OutputImageManager()
-      )
-    )
-    .frame(width: 800, height: 600)
-  }
-}
+// Intentionally no PreviewProvider to reduce compile surface for tooling.

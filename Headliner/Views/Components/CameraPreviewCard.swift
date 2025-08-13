@@ -66,15 +66,4 @@ struct CameraPreviewCard: View {
   }
 }
 
-// MARK: - Preview
-
-struct CameraPreviewCard_Previews: PreviewProvider {
-  static var previews: some View {
-    VStack(spacing: 20) {
-      CameraPreviewCard(previewImage: nil, isActive: true)
-      CameraPreviewCard(previewImage: nil, isActive: false)
-    }
-    .padding()
-    .background(Color.gray.opacity(0.1))
-  }
-}
+// Intentionally no PreviewProvider to reduce compile surface for tooling.
