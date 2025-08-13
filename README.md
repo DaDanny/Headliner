@@ -44,18 +44,18 @@ Headliner is a modern virtual camera application for macOS that provides profess
 1. Open your video conferencing app (Zoom, Meet, Teams, etc.)
 2. Go to video/camera settings
 3. Select "Headliner" as your camera source
-4. You should now see your video feed with the selected effects
+4. You should now see your Headliner camera feed (with overlays if enabled)
 
 ### Overlay Settings
 
-Use the settings panel to configure overlays such as display name, position, and appearance. The extension reads settings from the shared app group.
+Use the settings panel to configure overlays such as display name, position, and appearance. The extension reads settings from the shared app group and applies them while streaming.
 
 ### Camera Controls
 
 - **Start Camera**: Begin streaming your video feed
 - **Stop Camera**: Stop the virtual camera
 - **Camera Source**: Select from available camera devices
-- **Effects Panel**: Choose and apply video effects
+- **Overlay Settings**: Configure name/brand overlays
 
 ## Architecture
 
@@ -65,36 +65,27 @@ Headliner consists of two main components:
 The main user interface built with SwiftUI that provides:
 - Modern, professional user interface
 - Camera device selection and management
-- Effect selection and control
+- Overlay configuration
 - System extension management
 - Real-time preview of video feed
 
 ### System Extension (`CameraExtension/`)
 A CoreMediaIO Camera Extension that:
 - Creates a virtual camera device visible to other applications
-- Processes video frames with real-time effects using vImage
-- Manages video pipeline and streaming
+- Manages video pipeline and streaming of the camera feed
+- Reads overlay settings via shared app group and Darwin notifications
 - Handles communication with the container app
 
 ## Technical Details
-
-### Video Processing
-- Uses Apple's vImage framework for high-performance image processing
-- Real-time histogram specification for color grading effects
-- Temporal blur and noise generation for cinematic effects
-- 1280x720 HD output resolution at 24fps
 
 ### Communication
 - Darwin notifications for app-extension communication
 - UserDefaults sharing for persistent settings
 - Custom CMIO properties for effect control
 
-### Effects Engine
-The effects system uses sophisticated image processing techniques:
-- **Histogram Specification**: Matches video feed to reference image histograms
-- **Temporal Blur**: Adds subtle motion blur for film-like quality
-- **Procedural Noise**: Generates film grain and texture
-- **Color Grading**: Professional color correction and styling
+### Overlays
+- Overlay settings are represented by `OverlaySettings` and stored in the shared app group.
+- The container app saves settings and posts a Darwin notification; the extension reloads and applies them when streaming.
 
 ## Troubleshooting
 
@@ -137,7 +128,8 @@ Headliner/
 ├── Headliner/              # Container app
 │   ├── Views/              # SwiftUI views and components
 │   ├── AppState.swift      # Main app state management
-│   ├── ContentView.swift   # Root view controller
+│   ├── ContentView.swift   # Root view; switches between onboarding and main app
+│   ├── Previews/           # DEBUG-only SwiftUI previews
 │   └── HeadlinerApp.swift  # App entry point
 ├── CameraExtension/        # System extension
 │   ├── CameraExtensionProvider.swift  # Main extension logic
@@ -149,13 +141,12 @@ Headliner/
 ### SwiftUI Previews
 
 - Previews are kept for rapid overlay iteration.
-- Previews live under `Headliner/Previews` or inline behind `#if DEBUG`.
+- Previews live under `Headliner/Previews` and are guarded by `#if DEBUG`.
 - Periphery ignores previews; release builds exclude them.
 
 ### Key Technologies
 - **SwiftUI**: Modern declarative UI framework
 - **CoreMediaIO**: Camera extension APIs
-- **vImage**: High-performance image processing
 - **AVFoundation**: Camera capture and video processing
 - **SystemExtensions**: System extension management
 
