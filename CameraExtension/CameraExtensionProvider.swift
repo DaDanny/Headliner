@@ -604,32 +604,20 @@ class CameraExtensionDeviceSource: NSObject, CMIOExtensionDeviceSource, AVCaptur
 	
 	// MARK: Overlay Settings Management
 	
-	    private func loadOverlaySettings() {
+        private func loadOverlaySettings() {
         self.overlaySettingsLock.lock()
         defer { self.overlaySettingsLock.unlock() }
         
-        // First try to load from temp file (sent via notification)
-        if let sharedDefaults = UserDefaults(suiteName: "378NGS49HA.com.dannyfrancken.Headliner"),
-           let tempFilePath = sharedDefaults.string(forKey: "OverlaySettingsFilePath") {
-            
-            let tempFileURL = URL(fileURLWithPath: tempFilePath)
-            
+        // Load from app group UserDefaults (shared between app and extension)
+        if let sharedDefaults = UserDefaults(suiteName: Identifiers.appGroup.rawValue),
+           let overlayData = sharedDefaults.data(forKey: OverlayUserDefaultsKeys.overlaySettings) {
             do {
-                let overlayData = try Data(contentsOf: tempFileURL)
                 let decodedSettings = try JSONDecoder().decode(OverlaySettings.self, from: overlayData)
                 self.overlaySettings = decodedSettings
-                
-                logger.debug("✅ Loaded overlay settings from temp file: enabled=\(self.overlaySettings.isEnabled), userName='\(self.overlaySettings.userName)', position=\(self.overlaySettings.namePosition.rawValue), fontSize=\(self.overlaySettings.fontSize)")
-                
-                // Clean up the temp file
-                try? FileManager.default.removeItem(at: tempFileURL)
-                sharedDefaults.removeObject(forKey: "OverlaySettingsFilePath")
-                
+                logger.debug("✅ Loaded overlay settings from app group defaults: enabled=\(self.overlaySettings.isEnabled), userName='\(self.overlaySettings.userName)', position=\(self.overlaySettings.namePosition.rawValue), fontSize=\(self.overlaySettings.fontSize)")
                 return
             } catch {
-                logger.error("❌ Failed to load overlay settings from temp file: \(error)")
-                // Clean up invalid temp file reference
-                sharedDefaults.removeObject(forKey: "OverlaySettingsFilePath")
+                logger.error("❌ Failed to decode overlay settings from app group defaults: \(error)")
             }
         }
         
@@ -679,7 +667,7 @@ class CameraExtensionDeviceSource: NSObject, CMIOExtensionDeviceSource, AVCaptur
 		logger.debug("Setting camera device to: \(deviceID)")
 		
 		// Store the selected device ID in UserDefaults so CaptureSessionManager can use it
-		if let userDefaults = UserDefaults(suiteName: "378NGS49HA.com.dannyfrancken.Headliner") {
+        if let userDefaults = UserDefaults(suiteName: Identifiers.appGroup.rawValue) {
 			userDefaults.set(deviceID, forKey: "SelectedCameraID")
 			userDefaults.synchronize()
 			print("✅ [Camera Extension] Saved camera device selection to UserDefaults")
@@ -826,7 +814,7 @@ class CameraExtensionProviderSource: NSObject, CMIOExtensionProviderSource {
 		}
 
 		// Signal readiness to the container app via shared defaults
-		if let sharedDefaults = UserDefaults(suiteName: "378NGS49HA.com.dannyfrancken.Headliner") {
+        if let sharedDefaults = UserDefaults(suiteName: Identifiers.appGroup.rawValue) {
 			sharedDefaults.set(true, forKey: "ExtensionProviderReady")
 			sharedDefaults.synchronize()
 			logger.debug("✅ Marked ExtensionProviderReady in shared defaults")
@@ -920,7 +908,7 @@ class CameraExtensionProviderSource: NSObject, CMIOExtensionProviderSource {
     
     private func handleCameraDeviceChange() {
         // Read camera device ID from UserDefaults
-        if let userDefaults = UserDefaults(suiteName: "378NGS49HA.com.dannyfrancken.Headliner"),
+        if let userDefaults = UserDefaults(suiteName: Identifiers.appGroup.rawValue),
            let deviceID = userDefaults.string(forKey: "SelectedCameraID") {
             logger.debug("Setting camera device to: \(deviceID)")
             deviceSource.setCameraDevice(deviceID)

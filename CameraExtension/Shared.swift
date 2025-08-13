@@ -164,7 +164,7 @@ class CaptureSessionManager: NSObject {
 
 // MARK: Identifiers
 enum Identifiers: String {
-    case appGroup = "378NGS49HA.com.dannyfrancken.Headliner"
+    case appGroup = "group.378NGS49HA.com.dannyfrancken.Headliner"
     case orgIDAndProduct = "com.dannyfrancken.Headliner"
 }
 
@@ -215,34 +215,21 @@ class NotificationManager {
                 "Posting notification \(notificationName.rawValue) with overlay settings from container app"
             )
         
-        // Create a temporary file to pass the overlay settings data
-        let tempDir = FileManager.default.temporaryDirectory
-        let tempFile = tempDir.appendingPathComponent("overlay_settings_\(UUID().uuidString).json")
-        
-        do {
-            let overlayData = try JSONEncoder().encode(overlaySettings)
-            try overlayData.write(to: tempFile)
-            
-            // Store the file path in a well-known UserDefaults location that both can access
-            let sharedDefaults = UserDefaults(suiteName: "378NGS49HA.com.dannyfrancken.Headliner")
-            sharedDefaults?.set(tempFile.path, forKey: "OverlaySettingsFilePath")
-            sharedDefaults?.synchronize()
-            
-            sharedLogger.debug("📂 Saved overlay settings to temp file: \(tempFile.path)")
-            
-            // Post the notification
-            CFNotificationCenterPostNotification(
-                CFNotificationCenterGetDarwinNotifyCenter(),
-                CFNotificationName(notificationName.rawValue as NSString),
-                nil,
-                nil,
-                true
-            )
-        } catch {
-            sharedLogger.error("❌ Failed to create overlay settings temp file: \(error)")
-            // Fallback to regular notification
-            postNotification(named: notificationName)
+        // Save settings directly to shared app group defaults
+        if let sharedDefaults = UserDefaults(suiteName: Identifiers.appGroup.rawValue),
+           let encoded = try? JSONEncoder().encode(overlaySettings) {
+            sharedDefaults.set(encoded, forKey: OverlayUserDefaultsKeys.overlaySettings)
+            sharedDefaults.synchronize()
         }
+        
+        // Post the notification to tell the extension to reload from shared defaults
+        CFNotificationCenterPostNotification(
+            CFNotificationCenterGetDarwinNotifyCenter(),
+            CFNotificationName(notificationName.rawValue as NSString),
+            nil,
+            nil,
+            true
+        )
     }
 }
 

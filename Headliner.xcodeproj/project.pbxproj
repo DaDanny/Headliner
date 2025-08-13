@@ -75,6 +75,13 @@
 			);
 			target = C9F9CC412E3E873F00A24466 /* Headliner */;
 		};
+		C927EF8E2E4C4A5200F1C342 /* Exceptions for "CameraExtension" folder in "Headliner" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Shared.swift,
+			);
+			target = C9F9CC412E3E873F00A24466 /* Headliner */;
+		};
 		C92FB7B42E3EF922001195E9 /* Exceptions for "CameraExtension" folder in "HeadlinerEndToEnd" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
@@ -85,7 +92,6 @@
 				5.jpg,
 				6.jpg,
 				7.jpg,
-				CameraExtensionProvider.swift,
 			);
 			target = C92FB7A32E3EF737001195E9 /* HeadlinerEndToEnd */;
 		};
@@ -102,6 +108,7 @@
 		C91B53A62E3EA3AD006F3D44 /* CameraExtension */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
+				C927EF8E2E4C4A5200F1C342 /* Exceptions for "CameraExtension" folder in "Headliner" target */,
 				C91B53B32E3EA3AD006F3D44 /* Exceptions for "CameraExtension" folder in "CameraExtension" target */,
 				C92FB7B42E3EF922001195E9 /* Exceptions for "CameraExtension" folder in "HeadlinerEndToEnd" target */,
 			);
@@ -454,7 +461,7 @@
 			buildSettings = {
 				CODE_SIGN_ENTITLEMENTS = CameraExtension/CameraExtension.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 16;
+				CURRENT_PROJECT_VERSION = 18;
 				DEVELOPMENT_TEAM = 378NGS49HA;
 				ENABLE_HARDENED_RUNTIME = NO;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -485,7 +492,7 @@
 			buildSettings = {
 				CODE_SIGN_ENTITLEMENTS = CameraExtension/CameraExtension.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 16;
+				CURRENT_PROJECT_VERSION = 18;
 				DEVELOPMENT_TEAM = 378NGS49HA;
 				ENABLE_HARDENED_RUNTIME = NO;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -519,7 +526,7 @@
 				CODE_SIGN_ENTITLEMENTS = HeadlinerEndToEnd/HeadlinerEndToEnd.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 16;
+				CURRENT_PROJECT_VERSION = 18;
 				DEVELOPMENT_TEAM = 378NGS49HA;
 				ENABLE_HARDENED_RUNTIME = NO;
 				ENABLE_PREVIEWS = YES;
@@ -552,7 +559,7 @@
 				CODE_SIGN_ENTITLEMENTS = HeadlinerEndToEnd/HeadlinerEndToEnd.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 16;
+				CURRENT_PROJECT_VERSION = 18;
 				DEVELOPMENT_TEAM = 378NGS49HA;
 				ENABLE_HARDENED_RUNTIME = NO;
 				ENABLE_PREVIEWS = YES;
@@ -706,7 +713,7 @@
 				CODE_SIGN_ENTITLEMENTS = Headliner/Headliner.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 16;
+				CURRENT_PROJECT_VERSION = 18;
 				DEVELOPMENT_TEAM = 378NGS49HA;
 				ENABLE_HARDENED_RUNTIME = NO;
 				ENABLE_PREVIEWS = YES;
@@ -740,7 +747,7 @@
 				CODE_SIGN_ENTITLEMENTS = Headliner/Headliner.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 16;
+				CURRENT_PROJECT_VERSION = 18;
 				DEVELOPMENT_TEAM = 378NGS49HA;
 				ENABLE_HARDENED_RUNTIME = NO;
 				ENABLE_PREVIEWS = YES;
@@ -770,7 +777,7 @@
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 16;
+				CURRENT_PROJECT_VERSION = 18;
 				DEVELOPMENT_TEAM = 378NGS49HA;
 				GENERATE_INFOPLIST_FILE = YES;
 				MACOSX_DEPLOYMENT_TARGET = 15.5;
@@ -788,7 +795,7 @@
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 16;
+				CURRENT_PROJECT_VERSION = 18;
 				DEVELOPMENT_TEAM = 378NGS49HA;
 				GENERATE_INFOPLIST_FILE = YES;
 				MACOSX_DEPLOYMENT_TARGET = 15.5;
@@ -805,7 +812,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 16;
+				CURRENT_PROJECT_VERSION = 18;
 				DEVELOPMENT_TEAM = 378NGS49HA;
 				GENERATE_INFOPLIST_FILE = YES;
 				MARKETING_VERSION = 1.0;
@@ -821,7 +828,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 16;
+				CURRENT_PROJECT_VERSION = 18;
 				DEVELOPMENT_TEAM = 378NGS49HA;
 				GENERATE_INFOPLIST_FILE = YES;
 				MARKETING_VERSION = 1.0;

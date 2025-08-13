@@ -182,7 +182,7 @@ class AppState: ObservableObject {
         statusMessage = "Selected camera: \(camera.name)"
         
         // Notify extension about camera device change
-        if let appGroupDefaults = UserDefaults(suiteName: "378NGS49HA.com.dannyfrancken.Headliner") {
+        if let appGroupDefaults = UserDefaults(suiteName: Identifiers.appGroup.rawValue) {
             appGroupDefaults.set(camera.id, forKey: "SelectedCameraID")
             notificationManager.postNotification(named: .setCameraDevice)
         }
@@ -215,7 +215,7 @@ class AppState: ObservableObject {
     
     private func saveOverlaySettings() {
         // Save to app group defaults for extension access
-        guard let appGroupDefaults = UserDefaults(suiteName: "378NGS49HA.com.dannyfrancken.Headliner") else {
+        guard let appGroupDefaults = UserDefaults(suiteName: Identifiers.appGroup.rawValue) else {
             logger.error("Failed to access app group UserDefaults for saving overlay settings")
             return
         }
@@ -294,7 +294,7 @@ class AppState: ObservableObject {
     
     private func loadOverlaySettings() {
         // Load from app group defaults for extension access
-        guard let appGroupDefaults = UserDefaults(suiteName: "378NGS49HA.com.dannyfrancken.Headliner") else {
+        guard let appGroupDefaults = UserDefaults(suiteName: Identifiers.appGroup.rawValue) else {
             logger.debug("Failed to access app group UserDefaults for overlay settings")
             return
         }
@@ -313,12 +313,19 @@ class AppState: ObservableObject {
     private func checkExtensionStatus() {
         logger.debug("Checking extension status...")
         
-        // Refresh the property manager to check for newly installed extensions
-        propertyManager.refreshExtensionStatus()
-        
-        // Check if extension device is available
+        // Prefer fast readiness check to avoid noisy device scans
         let providerReady = UserDefaults(suiteName: Identifiers.appGroup.rawValue)?.bool(forKey: "ExtensionProviderReady") ?? false
-        if propertyManager.deviceObjectID != nil || providerReady {
+        if providerReady {
+            logger.debug("Extension detected via provider readiness - setting status to installed")
+            extensionStatus = .installed
+            statusMessage = "Extension is installed and ready"
+            logger.debug("Final extension status: \(String(describing: self.extensionStatus))")
+            return
+        }
+        
+        // Fallback to device scan when provider readiness hasn't been set yet
+        propertyManager.refreshExtensionStatus()
+        if propertyManager.deviceObjectID != nil {
             logger.debug("Extension detected - setting status to installed")
             extensionStatus = .installed
             statusMessage = "Extension is installed and ready"
@@ -462,10 +469,19 @@ class AppState: ObservableObject {
             Task { @MainActor in
                 guard let self else { return }
 
-                self.propertyManager.refreshExtensionStatus()
-
+                // Prefer provider readiness to avoid noisy device scans once the extension has signaled readiness
                 let providerReady = UserDefaults(suiteName: Identifiers.appGroup.rawValue)?.bool(forKey: "ExtensionProviderReady") ?? false
-                if self.propertyManager.deviceObjectID != nil || providerReady {
+                if providerReady {
+                    self.devicePollTimer?.invalidate()
+                    self.extensionStatus = .installed
+                    self.statusMessage = "Extension installed and ready"
+                    logger.debug("✅ Virtual camera detected after activation")
+                    return
+                }
+
+                // Only scan devices if provider readiness hasn't been signaled yet
+                self.propertyManager.refreshExtensionStatus()
+                if self.propertyManager.deviceObjectID != nil {
                     self.devicePollTimer?.invalidate()
                     self.extensionStatus = .installed
                     self.statusMessage = "Extension installed and ready"
