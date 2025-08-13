@@ -1,0 +1,250 @@
+# Headliner Codebase Audit & Cleanup — Phase Plan for Cursor
+# Scope: Start with main app in Headliner/ (exclude CameraExtension/* for now)
+
+meta:
+  repo_root: "."
+  app_dir: "Headliner"
+  exclude_dirs:
+    - "CameraExtension"
+    - "RituallyMockups"
+    - "Ritually*"
+    - "SceneIt*"
+    - ".build"
+  branch: "chore/audit-main-app"
+  commit_prefix: "chore(audit):"
+
+##############################################################################
+# PHASE 0 — Project Map & Baseline
+##############################################################################
+phase_0:
+  goal: >
+    Build a current map of the app target, identify obvious dead files, duplicate symbols,
+    legacy names, and create a TODO index to drive the rest of the cleanup.
+  actions:
+    - "Create/refresh Xcode index. Confirm app target builds & runs."
+    - "List Swift files under Headliner/ (exclude test folders for now)."
+    - "Generate a feature map: key modules, SwiftUI views, services, singletons,
+       notification names, models, overlay code paths, and any 'manager' classes."
+    - "Flag files that appear unused (no references) or clearly legacy."
+    - "Locate legacy naming: SceneIt, Ritually, moods/effect demo code & duplicated overlay settings."
+  search_patterns:
+    - "SceneIt"
+    - "Ritually"
+    - "RituallyMockups"
+    - "moods"
+    - "effect"
+    - "NotificationManager"
+    - "Shared.swift"
+    - "OverlaySettings"
+    - "PropertyManager"
+  deliverables:
+    - "docs/audit/PHASE_0_REPORT.md"
+  exit_criteria:
+    - "PHASE_0_REPORT.md includes: (1) file inventory, (2) dependency/feature map,
+       (3) a list of suspected-dead files & symbols, (4) legacy-name hotspots,
+       (5) duplicate responsibilities to resolve."
+  notes:
+    - "Shared types currently live in CameraExtension/Shared.swift; extract to HeadlinerShared in Phase 3."
+
+##############################################################################
+# PHASE 1 — Automated Hygiene (Format, Lint, Warnings-as-Errors)
+##############################################################################
+phase_1:
+  goal: "Standardize formatting & linting; surface issues early."
+  actions:
+    - "Add/Update SwiftFormat and SwiftLint configs at repo root."
+    - "Add an Xcode Build Phase in the Headliner target: run SwiftFormat + SwiftLint."
+    - "Turn on 'Treat warnings as errors' for Headliner target (Swift warnings only)."
+  files_to_add:
+    - path: ".swiftformat"
+      content: |
+        --disable redundantSelf,wrapArguments
+        --stripunusedargs closure-only
+        --ifdef no-indent
+        --trimwhitespace always
+        --indent 2
+        --maxwidth 120
+        --swiftversion 5.10
+    - path: ".swiftlint.yml"
+      content: |
+        disabled_rules:
+          - trailing_whitespace
+          - line_length
+          - identifier_name
+        opt_in_rules:
+          - closure_body_length
+          - file_length
+          - redundant_type_annotation
+          - unused_import
+        reporter: xcode
+        included:
+          - Headliner
+        excluded:
+          - CameraExtension
+          - .build
+        warning_threshold: 0
+  build_phase_script:
+    name: "Lint & Format"
+    script: |
+      if which swiftformat >/dev/null; then
+        swiftformat Headliner
+      fi
+      if which swiftlint >/dev/null; then
+        swiftlint lint --quiet
+      fi
+  exit_criteria:
+    - "Build succeeds with zero Swift warnings in Headliner target."
+    - "Code formatted consistently."
+
+##############################################################################
+# PHASE 2 — Dead-Code Detection (Periphery)
+##############################################################################
+phase_2:
+  goal: "Detect & remove unused code safely."
+  actions:
+    - "Add Periphery configuration and run against Headliner target only."
+    - "Quarantine any risky removals behind a temporary branch before deletion."
+  files_to_add:
+    - path: "periphery.yml"
+      content: |
+        project: Headliner.xcodeproj
+        schemes: [Headliner]
+        targets: [Headliner]
+        retain_public: true
+        retain_assign_only_properties: true
+        index_store_path: ".periphery-index"
+        strict: true
+        verbose: false
+        format: xcode
+        workspace: ""
+        incremental: true
+        exclude:
+          - CameraExtension
+          - Ritually*
+          - SceneIt*
+  commands:
+    - "periphery scan --config periphery.yml"
+  deliverables:
+    - "docs/audit/PHASE_2_PERIPHERY.md"
+  exit_criteria:
+    - "PHASE_2_PERIPHERY.md lists each removal candidate with location & justification."
+    - "All safe deletions applied; project still builds & runs."
+
+##############################################################################
+# PHASE 3 — Naming & Module Consolidation
+##############################################################################
+phase_3:
+  goal: "Eliminate legacy naming & consolidate shared types to one place."
+  actions:
+    - "Replace legacy naming (SceneIt, Ritually) with Headliner consistently."
+    - "Create HeadlinerShared/ (Swift package or local group) for shared models & constants:
+       OverlaySettings, Notification names/keys, IPC structs, simple DTOs."
+    - "Move duplicated notification names/keys into a single Notifications.swift."
+    - "Ensure OverlaySettings has a single source of truth used by main app & (later) extension."
+  refactors:
+    - "Remove duplicated OverlaySettings variants and keep the most complete one."
+    - "Remove demo 'moods/effect' code if not used by the current overlay flow."
+  deliverables:
+    - "docs/audit/PHASE_3_RENAMES.md"
+  exit_criteria:
+    - "Build succeeds; only one OverlaySettings definition remains."
+    - "No references to SceneIt/Ritually in Headliner/ except comments/changelogs."
+
+##############################################################################
+# PHASE 4 — Managers & Singletons Diet
+##############################################################################
+phase_4:
+  goal: "Reduce complexity in *Manager singletons; clarify ownership & lifecycles."
+  actions:
+    - "Inventory all *Manager singletons in PHASE_0_REPORT.md; for each:
+       define responsibilities, inbound deps, outbound deps, and whether it must be a singleton."
+    - "Split multi-purpose managers (e.g., VirtualCameraManager doing too much) into smaller services:
+       - CaptureService (AVCaptureSession setup/lifecycle)
+       - OverlayRenderService (CI/Metal pipeline)
+       - IPCService (notifications/XPC bridge)
+       - SettingsService (OverlaySettings load/save, observation)"
+    - "Make managers ObservableObjects only when bound to SwiftUI state; otherwise keep them as plain services."
+  acceptance:
+    - "No manager should own both UI state and OS resources unless necessary."
+    - "Main app’s top-level view model composes services; views consume view model only."
+  exit_criteria:
+    - "Reduced public surface area, fewer cross-imports, simpler init graphs."
+    - "Build passes and overlay flow still works in Google Meet/Chrome."
+
+##############################################################################
+# PHASE 5 — Notifications & State Flow
+##############################################################################
+phase_5:
+  goal: "Create a clear, auditable data flow for overlay updates."
+  actions:
+    - "Define a single Notifications.swift with names and userInfo keys:
+       - com.headliner.overlay.updated
+       - com.headliner.extension.status.changed
+       - com.headliner.camera.input.changed
+    - "Wrap NotificationCenter sends/receives in IPCService with typed helpers."
+    - "Replace ad-hoc observers with scoped, cancellable subscriptions owned by view models."
+  exit_criteria:
+    - "All notification string literals replaced by typed constants."
+    - "Zero duplicate notification names remain."
+
+##############################################################################
+# PHASE 6 — Dependency Pruning & Build Settings
+##############################################################################
+phase_6:
+  goal: "Tighten build settings & remove unused frameworks."
+  actions:
+    - "Audit imports (AVFoundation, CoreMediaIO, CoreImage, CoreVideo, AppKit, etc). Remove unused ones."
+    - "In Build Settings for Headliner:
+       - Enable 'Dead Code Stripping' = YES
+       - Other Swift Flags: -warn-concurrency -enable-actors
+       - Swift 6 migration hints enabled if available, but do not bump language mode yet."
+    - "Mark internal types & methods as `internal` (default), restrict `public` usage."
+  exit_criteria:
+    - "No unused imports flagged by SwiftLint."
+    - "Build remains clean."
+
+##############################################################################
+# PHASE 7 — Safety Net & Docs
+##############################################################################
+phase_7:
+  goal: "Document, test the flow, and tag the cleanup state."
+  actions:
+    - "Add docs/audit/README.md summarizing key changes, new structure, and how to extend overlays."
+    - "Smoke test checklist: install extension, set overlay, start virtual camera, verify in Chrome/Meet."
+    - "Create a lightweight UI Test or Manual QA script in docs for release builds."
+  exit_criteria:
+    - "README.md complete; smoke test passes. Create PR with succinct change log."
+
+##############################################################################
+# GLOBAL UTILITIES FOR CURSOR
+##############################################################################
+utilities:
+  ripgrep_scans:
+    - "rg -n \"SceneIt|Ritually|moods|effect|RituallyMockups\" Headliner || true"
+    - "rg -n \"NotificationCenter|addObserver|post\\(\" Headliner || true"
+    - "rg -n \"OverlaySettings\" Headliner || true"
+  git_flow:
+    - "git checkout -b chore/audit-main-app"
+    - "Commit early, commit often with small scopes."
+  commit_examples:
+    - "chore(audit): add SwiftFormat/SwiftLint configs and build phase"
+    - "chore(audit): periphery setup + initial unused symbols removal"
+    - "refactor(shared): extract OverlaySettings into HeadlinerShared"
+    - "refactor(notifications): centralize notification names & typed IPC"
+    - "refactor(services): split VirtualCameraManager into Capture/Overlay/IPC services"
+    - "chore(build): enable warnings-as-errors and dead code stripping"
+    - "docs(audit): add PHASE reports & final README"
+
+##############################################################################
+# DO/AVOID GUIDELINES
+##############################################################################
+guidelines:
+  do:
+    - "Prefer small, reversible commits."
+    - "Leave CameraExtension compiling but untouched until main app cleanup is done."
+    - "Prefer composition over inheritance; keep view models thin."
+    - "Add TODOs in code *only* if accompanied by an issue or doc note."
+  avoid:
+    - "Renaming product bundle IDs or entitlements in this cleanup pass."
+    - "Changing concurrency isolation unless needed to fix warnings."
+    - "Large sweeping renames without a clear mapping doc."

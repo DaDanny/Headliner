@@ -1,0 +1,8 @@
+--disable redundantSelf,wrapArguments
+--stripunusedargs closure-only
+--ifdef no-indent
+--trimwhitespace always
+--indent 2
+--maxwidth 120
+--swiftversion 5.10
+

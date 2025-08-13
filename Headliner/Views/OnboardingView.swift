@@ -52,17 +52,17 @@ struct OnboardingView: View {
             // Features Section
             VStack(spacing: 24) {
                 FeatureRow(
-                    icon: "camera.filters",
-                    title: "Advanced Video Effects",
-                    description: "Apply professional-grade filters and effects to your video feed in real-time."
+                    icon: "text.badge.star",
+                    title: "Configurable Overlays",
+                    description: "Add your display name and version badge to the video feed."
                 )
-                
+
                 FeatureRow(
                     icon: "video.and.waveform",
                     title: "High-Quality Streaming",
                     description: "Stream in HD quality to any app that supports video cameras."
                 )
-                
+
                 FeatureRow(
                     icon: "gear.badge.checkmark",
                     title: "Easy Setup",

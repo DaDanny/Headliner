@@ -2,15 +2,15 @@
 
 **Professional Virtual Camera for macOS**
 
-Headliner is a modern virtual camera application for macOS that provides professional-grade video effects and seamless integration with video conferencing apps like Zoom, Google Meet, Teams, and more.
+Headliner is a modern virtual camera application for macOS that provides professional-grade video features and seamless integration with video conferencing apps like Zoom, Google Meet, Teams, and more.
 
 ## Features
 
-✨ **Real-time Video Effects**: Apply professional video filters and effects to your camera feed
+✨ **Real-time Video Pipeline**: Clean, low-latency camera pipeline ready for overlays
 🎥 **HD Quality Streaming**: Stream in high-definition quality to any compatible application  
 🔄 **Multiple Camera Sources**: Support for built-in cameras, external webcams, and iPhone Continuity Camera
 ⚡ **Low Latency**: Optimized for real-time performance with minimal delay
-🎨 **Multiple Moods**: Choose from various artistic effects including New Wave, Berlin, Old Film, Sunset, and more
+🎨 **Overlays**: Configurable name and version overlays (UI in progress)
 🛠 **Easy Setup**: Simple one-click installation with guided onboarding
 
 ## System Requirements
@@ -46,18 +46,9 @@ Headliner is a modern virtual camera application for macOS that provides profess
 3. Select "Headliner" as your camera source
 4. You should now see your video feed with the selected effects
 
-### Applying Effects
+### Overlay Settings
 
-1. In the Headliner app, click the "Effects" button
-2. Choose from available video effects:
-   - **Bypass**: No effects (default)
-   - **New Wave**: Retro-style color grading
-   - **Berlin**: Cool, urban aesthetic
-   - **Old Film**: Vintage film look
-   - **Sunset**: Warm, golden tones
-   - **Bad Energy**: High contrast, dramatic
-   - **Beyond The Beyond**: Surreal effects
-   - **Drama**: Cinematic enhancement
+Use the settings panel to configure overlays such as display name, position, and appearance. The extension reads settings from the shared app group.
 
 ### Camera Controls
 
@@ -151,7 +142,7 @@ Headliner/
 ├── CameraExtension/        # System extension
 │   ├── CameraExtensionProvider.swift  # Main extension logic
 │   ├── Shared.swift        # Shared types and utilities
-│   └── Effects/            # Video effects implementation
+│   └── (effects removed)   # Legacy effects code removed from main app
 └── Assets/                 # App icons and resources
 ```
 
