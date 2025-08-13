@@ -13,4 +13,7 @@ exclude:
   - CameraExtension
   - Ritually*
   - SceneIt*
+  # Ignore SwiftUI previews & helper folder
+  - Headliner/Previews
+  - "**/*Preview*.swift"
 

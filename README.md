@@ -146,6 +146,12 @@ Headliner/
 └── Assets/                 # App icons and resources
 ```
 
+### SwiftUI Previews
+
+- Previews are kept for rapid overlay iteration.
+- Previews live under `Headliner/Previews` or inline behind `#if DEBUG`.
+- Periphery ignores previews; release builds exclude them.
+
 ### Key Technologies
 - **SwiftUI**: Modern declarative UI framework
 - **CoreMediaIO**: Camera extension APIs
