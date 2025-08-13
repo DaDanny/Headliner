@@ -7,8 +7,8 @@
 
 import AVFoundation
 import CoreMediaIO
-import OSLog
 import Foundation
+import OSLog
 import SwiftUI
 
 private let propertyLogger = Logger(

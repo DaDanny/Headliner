@@ -229,7 +229,8 @@ class AppState: ObservableObject {
 
       // Verify the save worked by reading it back
       if let savedData = appGroupDefaults.data(forKey: OverlayUserDefaultsKeys.overlaySettings),
-         let verificationSettings = try? JSONDecoder().decode(OverlaySettings.self, from: savedData) {
+         let verificationSettings = try? JSONDecoder().decode(OverlaySettings.self, from: savedData)
+      {
         logger
           .debug(
             "✅ Verified saved settings: userName='\(verificationSettings.userName)', position=\(verificationSettings.namePosition.rawValue)"
@@ -303,7 +304,8 @@ class AppState: ObservableObject {
     }
 
     if let overlayData = appGroupDefaults.data(forKey: OverlayUserDefaultsKeys.overlaySettings),
-       let decodedSettings = try? JSONDecoder().decode(OverlaySettings.self, from: overlayData) {
+       let decodedSettings = try? JSONDecoder().decode(OverlaySettings.self, from: overlayData)
+    {
       self.overlaySettings = decodedSettings
       logger.debug("Loaded overlay settings: enabled=\(self.overlaySettings.isEnabled)")
     } else {

@@ -75,8 +75,8 @@ class SystemExtensionRequestManager: NSObject, ObservableObject {
         options: .skipsHiddenFiles
       )
     } catch {
-      fatalError("failed to get the contents of \(extensionsDirectoryURL.absoluteString): \(error.localizedDescription)"
-      )
+      let msg = "failed to get the contents of \(extensionsDirectoryURL.absoluteString): \(error.localizedDescription)"
+      fatalError(msg)
     }
     guard let extensionURL = extensionURLs.first else {
       fatalError("failed to find any system extensions")
