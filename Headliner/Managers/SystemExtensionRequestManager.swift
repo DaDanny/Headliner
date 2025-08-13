@@ -7,108 +7,125 @@
 
 import SwiftUI
 import SystemExtensions
-import OSLog
 
 enum ExtensionInstallPhase: String {
-    case idle, requesting, needsApproval, installing, installed, willCompleteAfterReboot, failed
+  case idle, requesting, needsApproval, installing, installed, willCompleteAfterReboot, failed
 }
 
 class SystemExtensionRequestManager: NSObject, ObservableObject {
-    // MARK: Lifecycle
+  // MARK: Lifecycle
 
-    init(logText: String) {
-        super.init()
-        self.logText = logText
-    }
-    
-    @Published var logText: String = "Installation results here"
-    @Published var phase: ExtensionInstallPhase = .idle
+  init(logText: String) {
+    super.init()
+    self.logText = logText
+  }
 
-    func postNotification(named notificationName: NotificationName) {
-        logger
-            .debug(
-                "Posting notification \(notificationName.rawValue) from container app"
-            )
+  @Published var logText: String = "Installation results here"
+  @Published var phase: ExtensionInstallPhase = .idle
 
-        CFNotificationCenterPostNotification(
-            CFNotificationCenterGetDarwinNotifyCenter(),
-            CFNotificationName(notificationName.rawValue as NSString),
-            nil,
-            nil,
-            true
-        )
-    }
-    
-    func install() {
-        guard let extensionIdentifier = _extensionBundle().bundleIdentifier else { return }
-        let activationRequest = OSSystemExtensionRequest.activationRequest(forExtensionWithIdentifier: extensionIdentifier, queue: .main)
-        activationRequest.delegate = self
-        OSSystemExtensionManager.shared.submitRequest(activationRequest)
-    }
+  func postNotification(named notificationName: NotificationName) {
+    logger
+      .debug(
+        "Posting notification \(notificationName.rawValue) from container app"
+      )
 
-    func uninstall() {
-        guard let extensionIdentifier = _extensionBundle().bundleIdentifier else { return }
-        let deactivationRequest = OSSystemExtensionRequest.deactivationRequest(forExtensionWithIdentifier: extensionIdentifier, queue: .main)
-        deactivationRequest.delegate = self
-        OSSystemExtensionManager.shared.submitRequest(deactivationRequest)
-    }
+    CFNotificationCenterPostNotification(
+      CFNotificationCenterGetDarwinNotifyCenter(),
+      CFNotificationName(notificationName.rawValue as NSString),
+      nil,
+      nil,
+      true
+    )
+  }
 
-    func _extensionBundle() -> Bundle {
-        let extensionsDirectoryURL = URL(fileURLWithPath: "Contents/Library/SystemExtensions", relativeTo: Bundle.main.bundleURL)
-        let extensionURLs: [URL]
-        do {
-            extensionURLs = try FileManager.default.contentsOfDirectory(at: extensionsDirectoryURL, includingPropertiesForKeys: nil, options: .skipsHiddenFiles)
-        } catch {
-            fatalError("failed to get the contents of \(extensionsDirectoryURL.absoluteString): \(error.localizedDescription)")
-        }
-        guard let extensionURL = extensionURLs.first else {
-            fatalError("failed to find any system extensions")
-        }
-        guard let extensionBundle = Bundle(url: extensionURL) else {
-            fatalError("failed to create a bundle with URL \(extensionURL.absoluteString)")
-        }
-        return extensionBundle
+  func install() {
+    guard let extensionIdentifier = _extensionBundle().bundleIdentifier else { return }
+    let activationRequest = OSSystemExtensionRequest.activationRequest(
+      forExtensionWithIdentifier: extensionIdentifier,
+      queue: .main
+    )
+    activationRequest.delegate = self
+    OSSystemExtensionManager.shared.submitRequest(activationRequest)
+  }
+
+  func uninstall() {
+    guard let extensionIdentifier = _extensionBundle().bundleIdentifier else { return }
+    let deactivationRequest = OSSystemExtensionRequest.deactivationRequest(
+      forExtensionWithIdentifier: extensionIdentifier,
+      queue: .main
+    )
+    deactivationRequest.delegate = self
+    OSSystemExtensionManager.shared.submitRequest(deactivationRequest)
+  }
+
+  func _extensionBundle() -> Bundle {
+    let extensionsDirectoryURL = URL(
+      fileURLWithPath: "Contents/Library/SystemExtensions",
+      relativeTo: Bundle.main.bundleURL
+    )
+    let extensionURLs: [URL]
+    do {
+      extensionURLs = try FileManager.default.contentsOfDirectory(
+        at: extensionsDirectoryURL,
+        includingPropertiesForKeys: nil,
+        options: .skipsHiddenFiles
+      )
+    } catch {
+      fatalError("failed to get the contents of \(extensionsDirectoryURL.absoluteString): \(error.localizedDescription)"
+      )
     }
-    
-    // Call this on app launch in DEBUG (or behind a user-facing "Reload Extension" button)
-    func activateLatest() {
-        guard let id = _extensionBundle().bundleIdentifier else { return }
-        phase = .requesting
-        let req = OSSystemExtensionRequest.activationRequest(forExtensionWithIdentifier: id, queue: .main)
-        req.delegate = self
-        OSSystemExtensionManager.shared.submitRequest(req)
+    guard let extensionURL = extensionURLs.first else {
+      fatalError("failed to find any system extensions")
     }
+    guard let extensionBundle = Bundle(url: extensionURL) else {
+      fatalError("failed to create a bundle with URL \(extensionURL.absoluteString)")
+    }
+    return extensionBundle
+  }
+
+  // Call this on app launch in DEBUG (or behind a user-facing "Reload Extension" button)
+  func activateLatest() {
+    guard let id = _extensionBundle().bundleIdentifier else { return }
+    phase = .requesting
+    let req = OSSystemExtensionRequest.activationRequest(forExtensionWithIdentifier: id, queue: .main)
+    req.delegate = self
+    OSSystemExtensionManager.shared.submitRequest(req)
+  }
 }
 
 extension SystemExtensionRequestManager: OSSystemExtensionRequestDelegate {
-    public func request(_ request: OSSystemExtensionRequest, actionForReplacingExtension existing: OSSystemExtensionProperties, withExtension ext: OSSystemExtensionProperties) -> OSSystemExtensionRequest.ReplacementAction {
-        logText = "Replacing extension version \(existing.bundleShortVersion) with \(ext.bundleShortVersion)"
-        phase = .installing
-        return .replace
-    }
+  func request(
+    _ request: OSSystemExtensionRequest,
+    actionForReplacingExtension existing: OSSystemExtensionProperties,
+    withExtension ext: OSSystemExtensionProperties
+  ) -> OSSystemExtensionRequest.ReplacementAction {
+    logText = "Replacing extension version \(existing.bundleShortVersion) with \(ext.bundleShortVersion)"
+    phase = .installing
+    return .replace
+  }
 
-    public func requestNeedsUserApproval(_ request: OSSystemExtensionRequest) {
-        logText = "Extension needs user approval"
-        phase = .needsApproval
-    }
+  func requestNeedsUserApproval(_ request: OSSystemExtensionRequest) {
+    logText = "Extension needs user approval"
+    phase = .needsApproval
+  }
 
-    public func request(_ request: OSSystemExtensionRequest, didFinishWithResult result: OSSystemExtensionRequest.Result) {
-        switch result {
-        case .completed:
-            logText = "Extension activation completed"
-            phase = .installed
-        case .willCompleteAfterReboot:
-            logText = "Extension will complete after reboot"
-            phase = .willCompleteAfterReboot
-        @unknown default:
-            logText = "Extension finished with result \(result.rawValue)"
-            phase = .installing
-        }
+  func request(_ request: OSSystemExtensionRequest, didFinishWithResult result: OSSystemExtensionRequest.Result) {
+    switch result {
+    case .completed:
+      logText = "Extension activation completed"
+      phase = .installed
+    case .willCompleteAfterReboot:
+      logText = "Extension will complete after reboot"
+      phase = .willCompleteAfterReboot
+    @unknown default:
+      logText = "Extension finished with result \(result.rawValue)"
+      phase = .installing
     }
+  }
 
-    public func request(_ request: OSSystemExtensionRequest, didFailWithError error: Error) {
-        let ns = error as NSError
-        logText = "Extension failed: \(ns.code) \(ns.localizedDescription)"
-        phase = .failed
-    }
+  func request(_ request: OSSystemExtensionRequest, didFailWithError error: Error) {
+    let ns = error as NSError
+    logText = "Extension failed: \(ns.code) \(ns.localizedDescription)"
+    phase = .failed
+  }
 }
