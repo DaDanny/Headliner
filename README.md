@@ -2,15 +2,15 @@
 
 **Professional Virtual Camera for macOS**
 
-Headliner is a modern virtual camera application for macOS that provides professional-grade video effects and seamless integration with video conferencing apps like Zoom, Google Meet, Teams, and more.
+Headliner is a modern virtual camera application for macOS that provides professional-grade video features and seamless integration with video conferencing apps like Zoom, Google Meet, Teams, and more.
 
 ## Features
 
-✨ **Real-time Video Effects**: Apply professional video filters and effects to your camera feed
+✨ **Real-time Video Pipeline**: Clean, low-latency camera pipeline ready for overlays
 🎥 **HD Quality Streaming**: Stream in high-definition quality to any compatible application  
 🔄 **Multiple Camera Sources**: Support for built-in cameras, external webcams, and iPhone Continuity Camera
 ⚡ **Low Latency**: Optimized for real-time performance with minimal delay
-🎨 **Multiple Moods**: Choose from various artistic effects including New Wave, Berlin, Old Film, Sunset, and more
+🎨 **Overlays**: Configurable name and version overlays (UI in progress)
 🛠 **Easy Setup**: Simple one-click installation with guided onboarding
 
 ## System Requirements
@@ -44,27 +44,18 @@ Headliner is a modern virtual camera application for macOS that provides profess
 1. Open your video conferencing app (Zoom, Meet, Teams, etc.)
 2. Go to video/camera settings
 3. Select "Headliner" as your camera source
-4. You should now see your video feed with the selected effects
+4. You should now see your Headliner camera feed (with overlays if enabled)
 
-### Applying Effects
+### Overlay Settings
 
-1. In the Headliner app, click the "Effects" button
-2. Choose from available video effects:
-   - **Bypass**: No effects (default)
-   - **New Wave**: Retro-style color grading
-   - **Berlin**: Cool, urban aesthetic
-   - **Old Film**: Vintage film look
-   - **Sunset**: Warm, golden tones
-   - **Bad Energy**: High contrast, dramatic
-   - **Beyond The Beyond**: Surreal effects
-   - **Drama**: Cinematic enhancement
+Use the settings panel to configure overlays such as display name, position, and appearance. The extension reads settings from the shared app group and applies them while streaming.
 
 ### Camera Controls
 
 - **Start Camera**: Begin streaming your video feed
 - **Stop Camera**: Stop the virtual camera
 - **Camera Source**: Select from available camera devices
-- **Effects Panel**: Choose and apply video effects
+- **Overlay Settings**: Configure name/brand overlays
 
 ## Architecture
 
@@ -74,36 +65,27 @@ Headliner consists of two main components:
 The main user interface built with SwiftUI that provides:
 - Modern, professional user interface
 - Camera device selection and management
-- Effect selection and control
+- Overlay configuration
 - System extension management
 - Real-time preview of video feed
 
 ### System Extension (`CameraExtension/`)
 A CoreMediaIO Camera Extension that:
 - Creates a virtual camera device visible to other applications
-- Processes video frames with real-time effects using vImage
-- Manages video pipeline and streaming
+- Manages video pipeline and streaming of the camera feed
+- Reads overlay settings via shared app group and Darwin notifications
 - Handles communication with the container app
 
 ## Technical Details
-
-### Video Processing
-- Uses Apple's vImage framework for high-performance image processing
-- Real-time histogram specification for color grading effects
-- Temporal blur and noise generation for cinematic effects
-- 1280x720 HD output resolution at 24fps
 
 ### Communication
 - Darwin notifications for app-extension communication
 - UserDefaults sharing for persistent settings
 - Custom CMIO properties for effect control
 
-### Effects Engine
-The effects system uses sophisticated image processing techniques:
-- **Histogram Specification**: Matches video feed to reference image histograms
-- **Temporal Blur**: Adds subtle motion blur for film-like quality
-- **Procedural Noise**: Generates film grain and texture
-- **Color Grading**: Professional color correction and styling
+### Overlays
+- Overlay settings are represented by `OverlaySettings` and stored in the shared app group.
+- The container app saves settings and posts a Darwin notification; the extension reloads and applies them when streaming.
 
 ## Troubleshooting
 
@@ -146,19 +128,25 @@ Headliner/
 ├── Headliner/              # Container app
 │   ├── Views/              # SwiftUI views and components
 │   ├── AppState.swift      # Main app state management
-│   ├── ContentView.swift   # Root view controller
+│   ├── ContentView.swift   # Root view; switches between onboarding and main app
+│   ├── Previews/           # DEBUG-only SwiftUI previews
 │   └── HeadlinerApp.swift  # App entry point
 ├── CameraExtension/        # System extension
 │   ├── CameraExtensionProvider.swift  # Main extension logic
 │   ├── Shared.swift        # Shared types and utilities
-│   └── Effects/            # Video effects implementation
+│   └── (effects removed)   # Legacy effects code removed from main app
 └── Assets/                 # App icons and resources
 ```
+
+### SwiftUI Previews
+
+- Previews are kept for rapid overlay iteration.
+- Previews live under `Headliner/Previews` and are guarded by `#if DEBUG`.
+- Periphery ignores previews; release builds exclude them.
 
 ### Key Technologies
 - **SwiftUI**: Modern declarative UI framework
 - **CoreMediaIO**: Camera extension APIs
-- **vImage**: High-performance image processing
 - **AVFoundation**: Camera capture and video processing
 - **SystemExtensions**: System extension management
 

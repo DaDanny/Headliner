@@ -1,0 +1,21 @@
+disabled_rules:
+  - trailing_whitespace
+  - line_length
+  - identifier_name
+  - closure_body_length
+  - multiple_closures_with_trailing_closure
+  - trailing_comma
+  - type_body_length
+  - file_length
+opt_in_rules:
+  - redundant_type_annotation
+reporter: xcode
+included:
+  - Headliner
+excluded:
+  - CameraExtension
+  - .build
+  - Headliner/Previews
+analyzer_rules:
+  - unused_import
+

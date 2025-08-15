@@ -4,18 +4,18 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Headliner is a professional virtual camera application for macOS that provides real-time video effects and seamless integration with video conferencing apps. The project consists of two main components:
+Headliner is a professional virtual camera application for macOS that provides a clean, low-latency video pipeline with configurable overlays and seamless integration with video conferencing apps. The project consists of two main components:
 
 ### Container App (`Headliner/`)
 - SwiftUI-based main application that users interact with
-- Manages system extension installation, camera selection, and video effects
+- Manages system extension installation, camera selection, and overlay configuration
 - Located at `/Applications/Headliner.app` for proper system extension installation
 - Main entry point: `HeadlinerApp.swift`, root view: `MainAppView.swift`
 - State management: `AppState.swift` coordinates UI, extension, and camera management
 
 ### System Extension (`CameraExtension/`)
 - CoreMediaIO Camera Extension that creates the virtual camera device
-- Processes video frames with real-time effects using vImage framework
+- Streams frames and applies overlay settings read from the shared app group
 - Communicates with container app via Darwin notifications and UserDefaults
 - **CRITICAL: Do not modify system extension files, entitlements, or Info.plist files**
 
@@ -33,27 +33,28 @@ The build scheme includes a post-action that copies the built app to `/Applicati
 ## Architecture Details
 
 ### Communication Between Components
-- **Darwin Notifications**: App-to-extension communication for starting/stopping camera, effect changes
+- **Darwin Notifications**: App-to-extension communication for starting/stopping camera, overlay updates
 - **UserDefaults (App Group)**: Shared settings storage using suite `378NGS49HA.com.dannyfrancken.Headliner`
 - **Custom CMIO Properties**: Extension property management via `CustomPropertyManager`
 
-### Video Processing Pipeline
-- Container app captures preview using `CaptureSessionManager` 
-- Extension processes frames with vImage framework for effects
-- Supports multiple effects: New Wave, Berlin, Old Film, Sunset, Bad Energy, Beyond The Beyond, Drama
-- 1280x720 HD output at 60fps to virtual camera device
+### Video Pipeline & Overlays
+- Container app captures preview using `CaptureSessionManager` (shared in `CameraExtension/Shared.swift`)
+- Extension streams to the virtual camera and reads overlay settings from the app group
+- Target output: 1280x720 to virtual camera device
 
 ### Key Managers
 - `AppState`: Main state coordination and camera management
-- `SystemExtensionRequestManager`: Handles system extension installation/uninstallation
-- `CustomPropertyManager`: Manages CMIO device properties and extension detection
-- `OutputImageManager`: Handles video frame processing for preview
+- `SystemExtensionRequestManager`: Handles system extension install/uninstall and Darwin posts
+- `CustomPropertyManager`: CMIO/AVFoundation detection for extension presence and devices
+- `OutputImageManager`: AVCaptureVideoDataOutput delegate for preview frames
+- `Logging`: Centralized `logger` (OSLog) in `Headliner/Managers/Logging.swift`
 
 ### SwiftUI View Structure
-- `MainAppView`: Root application view with onboarding/main UI switching
+- `ContentView`: Switches between onboarding and main app based on extension status
+- `MainAppView`: Main app layout
 - `OnboardingView`: System extension installation flow
 - `Components/`: Reusable UI components (CameraSelector, StatusCard, etc.)
-- `OverlaySettings`: User name overlay configuration
+- `Previews/`: DEBUG-only SwiftUI previews, excluded from Periphery/SwiftLint
 
 ## Development Guidelines
 
@@ -68,10 +69,9 @@ The build scheme includes a post-action that copies the built app to `/Applicati
 - Supports built-in cameras, external webcams, iPhone Continuity Camera, Desk View Camera
 - Camera selection persisted in UserDefaults and shared with extension
 
-### Effects System
-- Reference images stored in `CameraExtension/` (1.jpg through 7.jpg)
-- Histogram specification and color grading applied via vImage
-- Effect changes communicated via Darwin notifications
+### Overlays System
+- Overlay settings (`OverlaySettings`) live in `CameraExtension/Shared.swift` and are shared with the app
+- Settings are encoded to the app group by the container app and loaded by the extension on update
 
 ### Testing
 - Unit tests: `HeadlinerTests.xctest`
@@ -82,8 +82,7 @@ The build scheme includes a post-action that copies the built app to `/Applicati
 
 The app uses App Group `378NGS49HA.com.dannyfrancken.Headliner` for container-extension communication. Settings shared include:
 - Selected camera device ID
-- Overlay settings (username, enabled state)
-- Effect preferences
+- Overlay settings (isEnabled, userName, position, colors)
 
 ## Troubleshooting Notes
 
@@ -91,3 +90,9 @@ The app uses App Group `378NGS49HA.com.dannyfrancken.Headliner` for container-ex
 - Camera permissions required for both preview and virtual camera functionality
 - System extension approval required in System Preferences > Privacy & Security
 - Darwin notification system used for real-time communication between app and extension
+
+## Developer Utilities
+
+- Format: `swiftformat Headliner`
+- Lint: `swiftlint lint --quiet`
+- Dead code: `periphery scan --project Headliner.xcodeproj --schemes Headliner`

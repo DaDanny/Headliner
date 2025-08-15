@@ -1,0 +1,19 @@
+project: Headliner.xcodeproj
+schemes: [Headliner]
+targets: [Headliner]
+retain_public: true
+retain_assign_only_properties: true
+index_store_path: .periphery-index
+strict: true
+verbose: false
+format: xcode
+workspace: ""
+incremental: true
+exclude:
+  - CameraExtension
+  - Ritually*
+  - SceneIt*
+  # Ignore SwiftUI previews & helper folder
+  - Headliner/Previews
+  - "**/*Preview*.swift"
+
