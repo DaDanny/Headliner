@@ -52,7 +52,7 @@ class SystemExtensionRequestManager: NSObject, ObservableObject {
 
   @discardableResult
   func uninstall() -> Bool {
-    guard let extensionIdentifier = _extensionBundle().bundleIdentifier else { return }
+    guard let extensionIdentifier = _extensionBundle().bundleIdentifier else { return false }
     let deactivationRequest = OSSystemExtensionRequest.deactivationRequest(
       forExtensionWithIdentifier: extensionIdentifier,
       queue: .main
