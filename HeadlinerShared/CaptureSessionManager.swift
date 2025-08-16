@@ -27,7 +27,7 @@ final class CaptureSessionManager: NSObject {
     configured = configureCaptureSession()
   }
 
-  private let sessionPreset = AVCaptureSession.Preset.hd1280x720
+  private let sessionPreset = AVCaptureSession.Preset.hd1920x1080
 
   func configureCaptureSession() -> Bool {
     switch AVCaptureDevice.authorizationStatus(for: .video) {

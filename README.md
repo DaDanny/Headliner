@@ -7,7 +7,7 @@ Headliner is a modern virtual camera application for macOS that provides a clean
 ## Features
 
 ✨ **Real-time Video Streaming**: Low-latency camera pipeline with real-time preview
-🎥 **HD Quality**: Stream in 720p HD quality to any compatible application  
+🎥 **Full HD Quality**: Stream in 1080p @ 60 FPS to any compatible application  
 🔄 **Multiple Camera Sources**: Support for built-in cameras, external webcams, Continuity Camera, and DeskView cameras
 ⚡ **Professional Overlays**: Add customizable name and version overlays to your video feed
 🎨 **Modern UI**: Beautiful SwiftUI interface with animated backgrounds and glassmorphic design
@@ -165,7 +165,7 @@ Headliner processes all video locally on your device. No video data is transmitt
 ✅ **Working Features**:
 
 - Virtual camera appears in all video apps
-- Real-time camera streaming with low latency
+- 1080p @ 60 FPS streaming with low latency
 - Camera selection with persistence
 - Name and version overlays with customizable positioning
 - Beautiful modern UI with animations
