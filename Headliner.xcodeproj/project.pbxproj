@@ -8,6 +8,8 @@
 
 /* Begin PBXBuildFile section */
 		C91B53AF2E3EA3AD006F3D44 /* com.dannyfrancken.Headliner.CameraExtension.systemextension in Embed System Extensions */ = {isa = PBXBuildFile; fileRef = C91B53A52E3EA3AD006F3D44 /* com.dannyfrancken.Headliner.CameraExtension.systemextension */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		C9C955B22E51114F00B4025F /* Logger.swift in Sources */ = {isa = PBXBuildFile; fileRef = C9C955B12E51114F00B4025F /* Logger.swift */; };
+		C9C955B32E51114F00B4025F /* Logger.swift in Sources */ = {isa = PBXBuildFile; fileRef = C9C955B12E51114F00B4025F /* Logger.swift */; };
 		C9CAFF892E4EF19800FC4672 /* Notifications.swift in Sources */ = {isa = PBXBuildFile; fileRef = C9CAFF862E4EF19800FC4672 /* Notifications.swift */; };
 		C9CAFF8A2E4EF19800FC4672 /* OverlaySettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = C9CAFF872E4EF19800FC4672 /* OverlaySettings.swift */; };
 		C9CAFF8B2E4EF19800FC4672 /* CaptureSessionManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = C9CAFF842E4EF19800FC4672 /* CaptureSessionManager.swift */; };
@@ -59,6 +61,7 @@
 /* Begin PBXFileReference section */
 		C91B53A52E3EA3AD006F3D44 /* com.dannyfrancken.Headliner.CameraExtension.systemextension */ = {isa = PBXFileReference; explicitFileType = "wrapper.system-extension"; includeInIndex = 0; path = com.dannyfrancken.Headliner.CameraExtension.systemextension; sourceTree = BUILT_PRODUCTS_DIR; };
 		C92FB7A42E3EF737001195E9 /* HeadlinerEndToEnd.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = HeadlinerEndToEnd.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		C9C955B12E51114F00B4025F /* Logger.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Logger.swift; sourceTree = "<group>"; };
 		C9CAFF842E4EF19800FC4672 /* CaptureSessionManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureSessionManager.swift; sourceTree = "<group>"; };
 		C9CAFF852E4EF19800FC4672 /* Identifiers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Identifiers.swift; sourceTree = "<group>"; };
 		C9CAFF862E4EF19800FC4672 /* Notifications.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Notifications.swift; sourceTree = "<group>"; };
@@ -175,6 +178,7 @@
 		C9CAFF882E4EF19800FC4672 /* HeadlinerShared */ = {
 			isa = PBXGroup;
 			children = (
+				C9C955B12E51114F00B4025F /* Logger.swift */,
 				C9CAFF842E4EF19800FC4672 /* CaptureSessionManager.swift */,
 				C9CAFF852E4EF19800FC4672 /* Identifiers.swift */,
 				C9CAFF862E4EF19800FC4672 /* Notifications.swift */,
@@ -415,6 +419,7 @@
 				C9CAFF8D2E4EF19800FC4672 /* Notifications.swift in Sources */,
 				C9CAFF8E2E4EF19800FC4672 /* OverlaySettings.swift in Sources */,
 				C9CAFF8F2E4EF19800FC4672 /* CaptureSessionManager.swift in Sources */,
+				C9C955B22E51114F00B4025F /* Logger.swift in Sources */,
 				C9CAFF902E4EF19800FC4672 /* Identifiers.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -430,6 +435,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				C9C955B32E51114F00B4025F /* Logger.swift in Sources */,
 				C9CAFF892E4EF19800FC4672 /* Notifications.swift in Sources */,
 				C9CAFF8A2E4EF19800FC4672 /* OverlaySettings.swift in Sources */,
 				C9CAFF8B2E4EF19800FC4672 /* CaptureSessionManager.swift in Sources */,
@@ -477,7 +483,7 @@
 			buildSettings = {
 				CODE_SIGN_ENTITLEMENTS = CameraExtension/CameraExtension.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 24;
+				CURRENT_PROJECT_VERSION = 28;
 				DEVELOPMENT_TEAM = 378NGS49HA;
 				ENABLE_HARDENED_RUNTIME = NO;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -508,7 +514,7 @@
 			buildSettings = {
 				CODE_SIGN_ENTITLEMENTS = CameraExtension/CameraExtension.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 24;
+				CURRENT_PROJECT_VERSION = 28;
 				DEVELOPMENT_TEAM = 378NGS49HA;
 				ENABLE_HARDENED_RUNTIME = NO;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -542,7 +548,7 @@
 				CODE_SIGN_ENTITLEMENTS = HeadlinerEndToEnd/HeadlinerEndToEnd.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 24;
+				CURRENT_PROJECT_VERSION = 28;
 				DEVELOPMENT_TEAM = 378NGS49HA;
 				ENABLE_HARDENED_RUNTIME = NO;
 				ENABLE_PREVIEWS = YES;
@@ -575,7 +581,7 @@
 				CODE_SIGN_ENTITLEMENTS = HeadlinerEndToEnd/HeadlinerEndToEnd.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 24;
+				CURRENT_PROJECT_VERSION = 28;
 				DEVELOPMENT_TEAM = 378NGS49HA;
 				ENABLE_HARDENED_RUNTIME = NO;
 				ENABLE_PREVIEWS = YES;
@@ -729,7 +735,7 @@
 				CODE_SIGN_ENTITLEMENTS = Headliner/Headliner.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 24;
+				CURRENT_PROJECT_VERSION = 28;
 				DEVELOPMENT_TEAM = 378NGS49HA;
 				ENABLE_HARDENED_RUNTIME = NO;
 				ENABLE_PREVIEWS = YES;
@@ -763,7 +769,7 @@
 				CODE_SIGN_ENTITLEMENTS = Headliner/Headliner.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 24;
+				CURRENT_PROJECT_VERSION = 28;
 				DEVELOPMENT_TEAM = 378NGS49HA;
 				ENABLE_HARDENED_RUNTIME = NO;
 				ENABLE_PREVIEWS = YES;
@@ -793,7 +799,7 @@
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 24;
+				CURRENT_PROJECT_VERSION = 28;
 				DEVELOPMENT_TEAM = 378NGS49HA;
 				GENERATE_INFOPLIST_FILE = YES;
 				MACOSX_DEPLOYMENT_TARGET = 15.5;
@@ -811,7 +817,7 @@
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 24;
+				CURRENT_PROJECT_VERSION = 28;
 				DEVELOPMENT_TEAM = 378NGS49HA;
 				GENERATE_INFOPLIST_FILE = YES;
 				MACOSX_DEPLOYMENT_TARGET = 15.5;
@@ -828,7 +834,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 24;
+				CURRENT_PROJECT_VERSION = 28;
 				DEVELOPMENT_TEAM = 378NGS49HA;
 				GENERATE_INFOPLIST_FILE = YES;
 				MARKETING_VERSION = 1.0;
@@ -844,7 +850,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 24;
+				CURRENT_PROJECT_VERSION = 28;
 				DEVELOPMENT_TEAM = 378NGS49HA;
 				GENERATE_INFOPLIST_FILE = YES;
 				MARKETING_VERSION = 1.0;

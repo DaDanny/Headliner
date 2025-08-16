@@ -7,7 +7,7 @@ final class CaptureSessionManager: NSObject {
     case headliner = "Headliner"
   }
 
-  let logger = Logger(subsystem: Identifiers.orgIDAndProduct.rawValue, category: "CaptureSessionManager")
+  let logger = HeadlinerLogger.logger(for: .captureSession)
 
   var configured: Bool = false
   var captureHeadliner = false
@@ -36,7 +36,9 @@ final class CaptureSessionManager: NSObject {
     case .notDetermined:
       AVCaptureDevice.requestAccess(for: .video) { granted in
         if granted {
-          DispatchQueue.main.async { _ = self.configureCaptureSession() }
+          DispatchQueue.main.async { 
+            self.configured = self.configureCaptureSession() 
+          }
         } else {
           self.logger.error("Camera permission denied by user")
         }

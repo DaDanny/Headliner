@@ -9,7 +9,7 @@ enum NotificationName: String, CaseIterable {
 }
 
 final class NotificationManager {
-  private static let logger = Logger(subsystem: Identifiers.orgIDAndProduct.rawValue, category: "Notify")
+  private static let logger = HeadlinerLogger.logger(for: .notifications)
 
   class func postNotification(named notificationName: String) {
     let completeNotificationName = Identifiers.appGroup.rawValue + "." + notificationName

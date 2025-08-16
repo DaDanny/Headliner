@@ -2,12 +2,10 @@
 //  Logging.swift
 //  Headliner
 //
-//  Centralized logger for the application.
+//  Application-wide logger instance.
 //
 
 import OSLog
 
-let logger = Logger(
-  subsystem: Identifiers.orgIDAndProduct.rawValue.lowercased(),
-  category: "Application"
-)
+// Use the shared logger configuration for consistency
+let logger = HeadlinerLogger.logger(for: .application)
