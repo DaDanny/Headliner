@@ -33,6 +33,26 @@ final class NotificationManager {
       true
     )
   }
+
+  class func postNotification(named notificationName: NotificationName, overlaySettings: OverlaySettings) {
+    logger.debug("Posting notification \(notificationName.rawValue) with overlay settings")
+    
+    // Save settings directly to shared app group defaults
+    if let sharedDefaults = UserDefaults(suiteName: Identifiers.appGroup.rawValue),
+       let encoded = try? JSONEncoder().encode(overlaySettings) {
+      sharedDefaults.set(encoded, forKey: OverlayUserDefaultsKeys.overlaySettings)
+      sharedDefaults.synchronize()
+    }
+    
+    // Post the notification to tell the extension to reload from shared defaults
+    CFNotificationCenterPostNotification(
+      CFNotificationCenterGetDarwinNotifyCenter(),
+      CFNotificationName(notificationName.rawValue as NSString),
+      nil,
+      nil,
+      true
+    )
+  }
 }
 
 
