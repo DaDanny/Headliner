@@ -13,7 +13,7 @@ public struct HeadlinerLogger {
     
     // MARK: - Private Properties
     
-    private static let subsystem = Identifiers.orgIDAndProduct.rawValue.lowercased()
+    private static let subsystem = Identifiers.orgIDAndProduct.lowercased()
     
     // MARK: - Logger Categories
     

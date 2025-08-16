@@ -607,7 +607,7 @@ class CameraExtensionDeviceSource: NSObject, CMIOExtensionDeviceSource, AVCaptur
         defer { self.overlaySettingsLock.unlock() }
         
         // Load from app group UserDefaults (shared between app and extension)
-        if let sharedDefaults = UserDefaults(suiteName: Identifiers.appGroup.rawValue),
+        if let sharedDefaults = UserDefaults(suiteName: Identifiers.appGroup),
            let overlayData = sharedDefaults.data(forKey: OverlayUserDefaultsKeys.overlaySettings) {
             do {
                 let decodedSettings = try JSONDecoder().decode(OverlaySettings.self, from: overlayData)
@@ -665,7 +665,7 @@ class CameraExtensionDeviceSource: NSObject, CMIOExtensionDeviceSource, AVCaptur
 		extensionLogger.debug("Setting camera device to: \(deviceID)")
 		
 		// Store the selected device ID in UserDefaults so CaptureSessionManager can use it
-        if let userDefaults = UserDefaults(suiteName: Identifiers.appGroup.rawValue) {
+        if let userDefaults = UserDefaults(suiteName: Identifiers.appGroup) {
 			userDefaults.set(deviceID, forKey: "SelectedCameraID")
 			userDefaults.synchronize()
 			print("✅ [Camera Extension] Saved camera device selection to UserDefaults")
@@ -812,7 +812,7 @@ class CameraExtensionProviderSource: NSObject, CMIOExtensionProviderSource {
 		}
 
 		// Signal readiness to the container app via shared defaults
-        if let sharedDefaults = UserDefaults(suiteName: Identifiers.appGroup.rawValue) {
+        if let sharedDefaults = UserDefaults(suiteName: Identifiers.appGroup) {
 			sharedDefaults.set(true, forKey: "ExtensionProviderReady")
 			sharedDefaults.synchronize()
 			extensionLogger.debug("✅ Marked ExtensionProviderReady in shared defaults")
@@ -906,7 +906,7 @@ class CameraExtensionProviderSource: NSObject, CMIOExtensionProviderSource {
     
     private func handleCameraDeviceChange() {
         // Read camera device ID from UserDefaults
-        if let userDefaults = UserDefaults(suiteName: Identifiers.appGroup.rawValue),
+        if let userDefaults = UserDefaults(suiteName: Identifiers.appGroup),
            let deviceID = userDefaults.string(forKey: "SelectedCameraID") {
             extensionLogger.debug("Setting camera device to: \(deviceID)")
             deviceSource.setCameraDevice(deviceID)
