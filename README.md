@@ -2,16 +2,16 @@
 
 **Professional Virtual Camera for macOS**
 
-Headliner is a modern virtual camera application for macOS that provides professional-grade video features and seamless integration with video conferencing apps like Zoom, Google Meet, Teams, and more.
+Headliner is a modern virtual camera application for macOS that provides a clean video pipeline with overlay capabilities, seamlessly integrating with video conferencing apps like Zoom, Google Meet, Teams, and more.
 
 ## Features
 
-✨ **Real-time Video Pipeline**: Clean, low-latency camera pipeline ready for overlays
-🎥 **HD Quality Streaming**: Stream in high-definition quality to any compatible application  
-🔄 **Multiple Camera Sources**: Support for built-in cameras, external webcams, and iPhone Continuity Camera
-⚡ **Low Latency**: Optimized for real-time performance with minimal delay
-🎨 **Overlays**: Configurable name and version overlays (UI in progress)
-🛠 **Easy Setup**: Simple one-click installation with guided onboarding
+✨ **Real-time Video Streaming**: Low-latency camera pipeline with real-time preview
+🎥 **HD Quality**: Stream in 720p HD quality to any compatible application  
+🔄 **Multiple Camera Sources**: Support for built-in cameras, external webcams, Continuity Camera, and DeskView cameras
+⚡ **Professional Overlays**: Add customizable name and version overlays to your video feed
+🎨 **Modern UI**: Beautiful SwiftUI interface with animated backgrounds and glassmorphic design
+🛠 **Easy Setup**: Guided onboarding with automatic system extension installation
 
 ## System Requirements
 
@@ -46,23 +46,21 @@ Headliner is a modern virtual camera application for macOS that provides profess
 3. Select "Headliner" as your camera source
 4. You should now see your Headliner camera feed (with overlays if enabled)
 
-### Overlay Settings
+### Controls
 
-Use the settings panel to configure overlays such as display name, position, and appearance. The extension reads settings from the shared app group and applies them while streaming.
-
-### Camera Controls
-
-- **Start Camera**: Begin streaming your video feed
-- **Stop Camera**: Stop the virtual camera
-- **Camera Source**: Select from available camera devices
-- **Overlay Settings**: Configure name/brand overlays
+- **Start/Stop Camera**: Control the virtual camera streaming
+- **Camera Selection**: Choose from available camera devices (built-in, external, Continuity)
+- **Overlay Settings**: Configure your display name, position, colors, and visibility
+- **Real-time Preview**: See your camera feed with overlays before going live
 
 ## Architecture
 
 Headliner consists of two main components:
 
 ### Container App (`Headliner/`)
+
 The main user interface built with SwiftUI that provides:
+
 - Modern, professional user interface
 - Camera device selection and management
 - Overlay configuration
@@ -70,7 +68,9 @@ The main user interface built with SwiftUI that provides:
 - Real-time preview of video feed
 
 ### System Extension (`CameraExtension/`)
+
 A CoreMediaIO Camera Extension that:
+
 - Creates a virtual camera device visible to other applications
 - Manages video pipeline and streaming of the camera feed
 - Reads overlay settings via shared app group and Darwin notifications
@@ -78,28 +78,34 @@ A CoreMediaIO Camera Extension that:
 
 ## Technical Details
 
-### Communication
-- Darwin notifications for app-extension communication
-- UserDefaults sharing for persistent settings
-- Custom CMIO properties for effect control
+### Inter-Process Communication
 
-### Overlays
-- Overlay settings are represented by `OverlaySettings` and stored in the shared app group.
-- The container app saves settings and posts a Darwin notification; the extension reloads and applies them when streaming.
+- **Darwin Notifications**: Real-time communication between app and extension
+- **UserDefaults (App Group)**: Shared settings storage for camera selection and overlay configuration
+- **Shared Code**: Common functionality in `HeadlinerShared/` used by both targets
+
+### Video Pipeline
+
+- **Capture**: `CaptureSessionManager` handles camera device selection and capture session
+- **Streaming**: CoreMediaIO extension provides virtual camera visible to other apps
+- **Overlays**: Real-time overlay rendering with customizable text, position, and styling
 
 ## Troubleshooting
 
 ### Extension Not Installing
+
 - Ensure the app is in `/Applications`
 - Check System Preferences > Privacy & Security for pending approvals
 - Restart the app and try again
 
 ### Camera Not Appearing in Other Apps
+
 - Restart the video conferencing app
 - Check that Headliner camera is started in the app
 - Verify camera permissions are granted
 
 ### Video Quality Issues
+
 - Check your source camera quality
 - Ensure adequate lighting
 - Try different camera sources
@@ -110,41 +116,41 @@ A CoreMediaIO Camera Extension that:
 ### Building from Source
 
 ```bash
-# Clone the repository
-git clone https://github.com/your-username/headliner.git
-cd headliner
-
 # Open in Xcode
 open Headliner.xcodeproj
 
-# Build and run
-# Make sure to configure signing and provisioning profiles
+# Build and run (⌘R)
+# Note: Configure signing with your Apple Developer account
+# The app must run from /Applications for the system extension to work
 ```
 
 ### Project Structure
 
 ```
 Headliner/
-├── Headliner/              # Container app
-│   ├── Views/              # SwiftUI views and components
+├── Headliner/              # Main application
+│   ├── Views/              # SwiftUI views
+│   │   ├── Components/     # Reusable UI components
+│   │   ├── MainAppView.swift
+│   │   └── OnboardingView.swift
+│   ├── Managers/           # App-specific managers
 │   ├── AppState.swift      # Main app state management
-│   ├── ContentView.swift   # Root view; switches between onboarding and main app
-│   ├── Previews/           # DEBUG-only SwiftUI previews
+│   ├── ContentView.swift   # Root view controller
 │   └── HeadlinerApp.swift  # App entry point
 ├── CameraExtension/        # System extension
-│   ├── CameraExtensionProvider.swift  # Main extension logic
-│   ├── Shared.swift        # Shared types and utilities
-│   └── (effects removed)   # Legacy effects code removed from main app
+│   ├── CameraExtensionProvider.swift  # Virtual camera implementation
+│   └── main.swift          # Extension entry point
+├── HeadlinerShared/        # Shared code between app and extension
+│   ├── CaptureSessionManager.swift    # Camera capture logic
+│   ├── Identifiers.swift   # Bundle and app group identifiers
+│   ├── Logger.swift        # Centralized logging configuration
+│   ├── Notifications.swift # Darwin notification system
+│   └── OverlaySettings.swift          # Overlay configuration models
 └── Assets/                 # App icons and resources
 ```
 
-### SwiftUI Previews
-
-- Previews are kept for rapid overlay iteration.
-- Previews live under `Headliner/Previews` and are guarded by `#if DEBUG`.
-- Periphery ignores previews; release builds exclude them.
-
 ### Key Technologies
+
 - **SwiftUI**: Modern declarative UI framework
 - **CoreMediaIO**: Camera extension APIs
 - **AVFoundation**: Camera capture and video processing
@@ -152,23 +158,24 @@ Headliner/
 
 ## Privacy
 
-Headliner processes video locally on your device. No video data is transmitted to external servers. Camera access is only used for the virtual camera functionality and can be revoked at any time through System Preferences.
+Headliner processes all video locally on your device. No video data is transmitted to external servers. Camera access is required for the virtual camera functionality and can be revoked at any time through System Settings > Privacy & Security > Camera.
 
-## License
+## Current Status (MVP)
 
-[Add your license information here]
+✅ **Working Features**:
 
-## Support
+- Virtual camera appears in all video apps
+- Real-time camera streaming with low latency
+- Camera selection with persistence
+- Name and version overlays with customizable positioning
+- Beautiful modern UI with animations
 
-If you encounter issues or have questions:
-1. Check the troubleshooting section above
-2. Review existing GitHub issues
-3. Create a new issue with detailed information about your problem
+🚧 **Known Limitations**:
 
-## Contributing
-
-Contributions are welcome! Please read our contributing guidelines and submit pull requests for any improvements.
+- App must be in `/Applications` folder for system extension
+- Camera changes require restarting the capture session
+- Initial camera permission request requires app restart
 
 ---
 
-**Made with ❤️ for the macOS community**
+**Built with SwiftUI and ❤️ for macOS**
