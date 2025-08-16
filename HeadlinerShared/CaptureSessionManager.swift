@@ -56,6 +56,11 @@ final class CaptureSessionManager: NSObject {
     }
 
     captureSession.beginConfiguration()
+    
+    // Clear existing inputs/outputs to avoid duplication on reconfigure
+    captureSession.inputs.forEach { captureSession.removeInput($0) }
+    captureSession.outputs.forEach { captureSession.removeOutput($0) }
+    
     captureSession.sessionPreset = sessionPreset
 
     guard let camera = getCameraIfAvailable(camera: captureHeadliner ? .headliner : .anyCamera) else {
@@ -78,18 +83,32 @@ final class CaptureSessionManager: NSObject {
           return false
         }
       }
-      captureSession.addInput(input)
+      if captureSession.canAddInput(input) {
+        captureSession.addInput(input)
+      } else {
+        logger.error("Can't add video input to capture session")
+        captureSession.commitConfiguration()
+        return false
+      }
     } catch {
       logger.error("Can't create AVCaptureDeviceInput: \(error.localizedDescription)")
       captureSession.commitConfiguration()
       return false
     }
 
-    videoOutput = AVCaptureVideoDataOutput()
-    if let videoOutput, captureSession.canAddOutput(videoOutput) {
-      captureSession.addOutput(videoOutput)
+    let videoOut = AVCaptureVideoDataOutput()
+    videoOut.alwaysDiscardsLateVideoFrames = true
+    videoOut.videoSettings = [
+      kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA
+    ]
+    
+    if captureSession.canAddOutput(videoOut) {
+      captureSession.addOutput(videoOut)
+      videoOutput = videoOut
       captureSession.commitConfiguration()
       return true
+    } else {
+      logger.error("Can't add video output to capture session")
     }
 
     captureSession.commitConfiguration()
