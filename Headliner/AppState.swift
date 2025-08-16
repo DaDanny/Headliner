@@ -215,7 +215,7 @@ class AppState: ObservableObject {
     statusMessage = "Selected camera: \(camera.name)"
 
     // Notify extension about camera device change
-    if let appGroupDefaults = UserDefaults(suiteName: Identifiers.appGroup.rawValue) {
+    if let appGroupDefaults = UserDefaults(suiteName: Identifiers.appGroup) {
       appGroupDefaults.set(camera.id, forKey: AppGroupKeys.selectedCameraID)
       notificationManager.postNotification(named: .setCameraDevice)
     }
@@ -251,7 +251,7 @@ class AppState: ObservableObject {
   /// Persist `overlaySettings` to the shared app group so the extension can load them.
   private func saveOverlaySettings() {
     // Save to app group defaults for extension access
-    guard let appGroupDefaults = UserDefaults(suiteName: Identifiers.appGroup.rawValue) else {
+    guard let appGroupDefaults = UserDefaults(suiteName: Identifiers.appGroup) else {
       logger.error("Failed to access app group UserDefaults for saving overlay settings")
       return
     }
@@ -340,7 +340,7 @@ class AppState: ObservableObject {
   /// Load overlay settings from the shared app group, or set sensible defaults.
   private func loadOverlaySettings() {
     // Load from app group defaults for extension access
-    guard let appGroupDefaults = UserDefaults(suiteName: Identifiers.appGroup.rawValue) else {
+    guard let appGroupDefaults = UserDefaults(suiteName: Identifiers.appGroup) else {
       logger.debug("Failed to access app group UserDefaults for overlay settings")
       return
     }
@@ -362,7 +362,7 @@ class AppState: ObservableObject {
     logger.debug("Checking extension status...")
 
     // Prefer fast readiness check to avoid noisy device scans
-    let providerReady = UserDefaults(suiteName: Identifiers.appGroup.rawValue)?
+    let providerReady = UserDefaults(suiteName: Identifiers.appGroup)?
       .bool(forKey: "ExtensionProviderReady") ?? false
     if providerReady {
       logger.debug("Extension detected via provider readiness - setting status to installed")
@@ -527,7 +527,7 @@ class AppState: ObservableObject {
         guard let self else { return }
 
         // Prefer provider readiness to avoid noisy device scans once the extension has signaled readiness
-        let providerReady = UserDefaults(suiteName: Identifiers.appGroup.rawValue)?
+        let providerReady = UserDefaults(suiteName: Identifiers.appGroup)?
           .bool(forKey: AppGroupKeys.extensionProviderReady) ?? false
         if providerReady {
           self.devicePollTimer?.invalidate()

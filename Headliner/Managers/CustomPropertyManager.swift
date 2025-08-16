@@ -11,10 +11,7 @@ import Foundation
 import OSLog
 import SwiftUI
 
-private let propertyLogger = Logger(
-  subsystem: "com.dannyfrancken.Headliner",
-  category: "CustomPropertyManager"
-)
+private let propertyLogger = HeadlinerLogger.logger(for: .customProperty)
 
 class CustomPropertyManager: NSObject, ObservableObject {
   // MARK: Lifecycle

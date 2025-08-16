@@ -8,7 +8,6 @@
 import Foundation
 import CoreMediaIO
 import IOKit.audio
-import os.log
 import AVFoundation
 import Cocoa
 
@@ -16,8 +15,7 @@ let kWhiteStripeHeight: Int = 10
 let kFrameRate: Int = 60
 
 
-let logger = Logger(subsystem: "com.dannyfrancken.headliner",
-                    category: "Extension")
+private let extensionLogger = HeadlinerLogger.logger(for: .cameraExtension)
 
 // MARK: - ExtensionDeviceSourceDelegate
 
@@ -89,13 +87,13 @@ class CameraExtensionDeviceSource: NSObject, CMIOExtensionDeviceSource, AVCaptur
 		}
 		
 		// Initialize capture session using shared CaptureSessionManager
-		logger.debug("🚀 CameraExtensionDeviceSource init - about to call setupCaptureSession")
+		extensionLogger.debug("🚀 CameraExtensionDeviceSource init - about to call setupCaptureSession")
 		setupCaptureSession()
-		logger.debug("✅ CameraExtensionDeviceSource init - setupCaptureSession completed")
+		extensionLogger.debug("✅ CameraExtensionDeviceSource init - setupCaptureSession completed")
 		
 		// Load overlay settings
 		loadOverlaySettings()
-		logger.debug("✅ CameraExtensionDeviceSource init - overlay settings loaded")
+		extensionLogger.debug("✅ CameraExtensionDeviceSource init - overlay settings loaded")
 	}
 	
 	var availableProperties: Set<CMIOExtensionProperty> {
@@ -122,15 +120,15 @@ class CameraExtensionDeviceSource: NSObject, CMIOExtensionDeviceSource, AVCaptur
 	}
 	
 	func startStreaming() {
-		logger.debug("Virtual camera requested by external app - starting frame generation")
+		extensionLogger.debug("Virtual camera requested by external app - starting frame generation")
 		
 		guard let _ = _bufferPool else {
-			logger.error("No buffer pool available")
+			extensionLogger.error("No buffer pool available")
 			return
 		}
 		
 		_streamingCounter += 1
-		logger.debug("Virtual camera streaming counter: \(self._streamingCounter)")
+		extensionLogger.debug("Virtual camera streaming counter: \(self._streamingCounter)")
 		
 		// Always start the timer for virtual camera (this provides splash screen when app isn't streaming)
 		if _timer == nil {
@@ -147,7 +145,7 @@ class CameraExtensionDeviceSource: NSObject, CMIOExtensionDeviceSource, AVCaptur
 			}
 			
 			_timer!.resume()
-			logger.debug("Started virtual camera frame generation timer")
+			extensionLogger.debug("Started virtual camera frame generation timer")
 		}
 		
 		// Only start real camera capture if app has enabled streaming
@@ -158,12 +156,12 @@ class CameraExtensionDeviceSource: NSObject, CMIOExtensionDeviceSource, AVCaptur
 		if shouldStartCameraCapture {
 			startCameraCapture()
 		} else {
-			logger.debug("App-controlled streaming not enabled - showing splash screen")
+			extensionLogger.debug("App-controlled streaming not enabled - showing splash screen")
 		}
 	}
 	
 	func startAppControlledStreaming() {
-		logger.debug("App requesting camera stream start")
+		extensionLogger.debug("App requesting camera stream start")
 		
 		_streamStateLock.lock()
 		_isAppControlledStreaming = true
@@ -173,7 +171,7 @@ class CameraExtensionDeviceSource: NSObject, CMIOExtensionDeviceSource, AVCaptur
 	}
 	
 	func stopAppControlledStreaming() {
-		logger.debug("App requesting camera stream stop")
+		extensionLogger.debug("App requesting camera stream stop")
 		
 		_streamStateLock.lock()
 		_isAppControlledStreaming = false
@@ -184,41 +182,41 @@ class CameraExtensionDeviceSource: NSObject, CMIOExtensionDeviceSource, AVCaptur
 	
 	private func startCameraCapture() {
 		print("🎬 [Camera Extension] Starting real camera capture...")
-		logger.debug("Starting real camera capture...")
+		extensionLogger.debug("Starting real camera capture...")
 		
 		if let manager = captureSessionManager, manager.configured {
 			print("✅ [Camera Extension] CaptureSessionManager is configured")
-			logger.debug("CaptureSessionManager is configured and ready")
+			extensionLogger.debug("CaptureSessionManager is configured and ready")
 			
 			if !manager.captureSession.isRunning {
 				print("🚀 [Camera Extension] Starting capture session...")
-				logger.debug("Starting capture session...")
+				extensionLogger.debug("Starting capture session...")
 				
 				// Set self as the delegate for video frames
 				manager.videoOutput?.setSampleBufferDelegate(self, queue: manager.dataOutputQueue)
 				
 				manager.captureSession.startRunning()
 				print("✅ [Camera Extension] Started real camera capture session")
-				logger.debug("Started real camera capture session for content")
+				extensionLogger.debug("Started real camera capture session for content")
 			} else {
 				print("✅ [Camera Extension] Capture session already running")
-				logger.debug("Capture session already running")
+				extensionLogger.debug("Capture session already running")
 			}
 		} else {
 			print("❌ [Camera Extension] CaptureSessionManager not configured - retrying setup")
-			logger.error("CaptureSessionManager not configured - attempting retry")
+			extensionLogger.error("CaptureSessionManager not configured - attempting retry")
 			setupCaptureSession()
 		}
 	}
 	
 	private func stopCameraCapture() {
 		print("🛑 [Camera Extension] Stopping real camera capture...")
-		logger.debug("Stopping real camera capture...")
+		extensionLogger.debug("Stopping real camera capture...")
 		
 		if let manager = captureSessionManager, manager.captureSession.isRunning {
 			manager.captureSession.stopRunning()
 			print("✅ [Camera Extension] Stopped real camera capture session")
-			logger.debug("Stopped real camera capture session")
+			extensionLogger.debug("Stopped real camera capture session")
 		}
 		
 		// Clear current camera frame so splash screen shows
@@ -228,11 +226,11 @@ class CameraExtensionDeviceSource: NSObject, CMIOExtensionDeviceSource, AVCaptur
 	}
 	
 	func stopStreaming() {
-		logger.debug("External app stopping virtual camera streaming")
+		extensionLogger.debug("External app stopping virtual camera streaming")
 		
 		if _streamingCounter > 1 {
 			_streamingCounter -= 1
-			logger.debug("Virtual camera streaming counter: \(self._streamingCounter)")
+			extensionLogger.debug("Virtual camera streaming counter: \(self._streamingCounter)")
 		} else {
 			_streamingCounter = 0
 			
@@ -240,7 +238,7 @@ class CameraExtensionDeviceSource: NSObject, CMIOExtensionDeviceSource, AVCaptur
 			if let timer = _timer {
 				timer.cancel()
 				_timer = nil
-				logger.debug("Stopped virtual camera frame generation timer")
+				extensionLogger.debug("Stopped virtual camera frame generation timer")
 			}
 			
 			// Stop real camera capture session
@@ -270,12 +268,12 @@ class CameraExtensionDeviceSource: NSObject, CMIOExtensionDeviceSource, AVCaptur
 		)
 		
 		if err != 0 {
-			logger.error("Failed to create pixel buffer: \(err)")
+			extensionLogger.error("Failed to create pixel buffer: \(err)")
 			return
 		}
 		
 		guard let pixelBuffer = pixelBuffer else {
-			logger.error("Pixel buffer is nil")
+			extensionLogger.error("Pixel buffer is nil")
 			return
 		}
 		
@@ -297,7 +295,7 @@ class CameraExtensionDeviceSource: NSObject, CMIOExtensionDeviceSource, AVCaptur
 			space: rgbColorSpace,
 			bitmapInfo: CGBitmapInfo.byteOrder32Little.rawValue | CGImageAlphaInfo.premultipliedFirst.rawValue
 		) else {
-			logger.error("Failed to create CGContext")
+			extensionLogger.error("Failed to create CGContext")
 			return
 		}
 		
@@ -343,14 +341,14 @@ class CameraExtensionDeviceSource: NSObject, CMIOExtensionDeviceSource, AVCaptur
 		)
 		
 		if err == 0, let sampleBuffer = sampleBuffer {
-			logger.debug("Sending virtual camera frame to stream")
+			extensionLogger.debug("Sending virtual camera frame to stream")
 			_streamSource.stream.send(
 				sampleBuffer,
 				discontinuity: [],
 				hostTimeInNanoseconds: UInt64(timingInfo.presentationTimeStamp.seconds * Double(NSEC_PER_SEC))
 			)
 		} else {
-			logger.error("Failed to create sample buffer: \(err)")
+			extensionLogger.error("Failed to create sample buffer: \(err)")
 		}
 	}
 	
@@ -532,7 +530,7 @@ class CameraExtensionDeviceSource: NSObject, CMIOExtensionDeviceSource, AVCaptur
 		let bundle = Bundle.main
 		let shortVersion = bundle.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "?"
 		let buildNumber = bundle.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "?"
-		let versionText = "Headliner v\(shortVersion) (\(buildNumber))"
+		let versionText = "Headliner V\(shortVersion) (\(buildNumber))"
 		
 		let font = NSFont.systemFont(ofSize: settings.versionFontSize, weight: .regular)
 		let attributes: [NSAttributedString.Key: Any] = [
@@ -609,44 +607,44 @@ class CameraExtensionDeviceSource: NSObject, CMIOExtensionDeviceSource, AVCaptur
         defer { self.overlaySettingsLock.unlock() }
         
         // Load from app group UserDefaults (shared between app and extension)
-        if let sharedDefaults = UserDefaults(suiteName: Identifiers.appGroup.rawValue),
+        if let sharedDefaults = UserDefaults(suiteName: Identifiers.appGroup),
            let overlayData = sharedDefaults.data(forKey: OverlayUserDefaultsKeys.overlaySettings) {
             do {
                 let decodedSettings = try JSONDecoder().decode(OverlaySettings.self, from: overlayData)
                 self.overlaySettings = decodedSettings
-                logger.debug("✅ Loaded overlay settings from app group defaults: enabled=\(self.overlaySettings.isEnabled), userName='\(self.overlaySettings.userName)', position=\(self.overlaySettings.namePosition.rawValue), fontSize=\(self.overlaySettings.fontSize)")
+                extensionLogger.debug("✅ Loaded overlay settings from app group defaults: enabled=\(self.overlaySettings.isEnabled), userName='\(self.overlaySettings.userName)', position=\(self.overlaySettings.namePosition.rawValue), fontSize=\(self.overlaySettings.fontSize)")
                 return
             } catch {
-                logger.error("❌ Failed to decode overlay settings from app group defaults: \(error)")
+                extensionLogger.error("❌ Failed to decode overlay settings from app group defaults: \(error)")
             }
         }
         
         // Fallback: Use default settings with system username
-        logger.debug("📝 Using default overlay settings as fallback")
+        extensionLogger.debug("📝 Using default overlay settings as fallback")
         self.overlaySettings = OverlaySettings()
         self.overlaySettings.userName = NSUserName()
         self.overlaySettings.isEnabled = true
         self.overlaySettings.showUserName = true
-        logger.debug("Using default overlay settings with user name: \(self.overlaySettings.userName)")
+        extensionLogger.debug("Using default overlay settings with user name: \(self.overlaySettings.userName)")
     }
 	
 	func updateOverlaySettings() {
 		loadOverlaySettings()
-		logger.debug("Overlay settings updated from UserDefaults")
+		extensionLogger.debug("Overlay settings updated from UserDefaults")
 	}
 	
 	// MARK: Camera Setup
 	
 	private func setupCaptureSession() {
 		print("🔧 [Camera Extension] Setting up capture session using CaptureSessionManager...")
-		logger.debug("Setting up Camera Extension capture session using shared CaptureSessionManager...")
+		extensionLogger.debug("Setting up Camera Extension capture session using shared CaptureSessionManager...")
 		
 		// Use the shared CaptureSessionManager (same as main app)
 		captureSessionManager = CaptureSessionManager(capturingHeadliner: false)
 		
 		if let manager = captureSessionManager, manager.configured {
 			print("✅ [Camera Extension] CaptureSessionManager configured successfully")
-			logger.debug("CaptureSessionManager configured successfully for Camera Extension")
+			extensionLogger.debug("CaptureSessionManager configured successfully for Camera Extension")
 			
 			// Configure video output for our specific needs
 			if let videoOutput = manager.videoOutput {
@@ -658,16 +656,16 @@ class CameraExtensionDeviceSource: NSObject, CMIOExtensionDeviceSource, AVCaptur
 			}
 		} else {
 			print("❌ [Camera Extension] Failed to configure CaptureSessionManager")
-			logger.error("Failed to configure CaptureSessionManager for Camera Extension")
+			extensionLogger.error("Failed to configure CaptureSessionManager for Camera Extension")
 		}
 	}
 	
 	func setCameraDevice(_ deviceID: String) {
 		print("📷 [Camera Extension] Setting camera device to: \(deviceID)")
-		logger.debug("Setting camera device to: \(deviceID)")
+		extensionLogger.debug("Setting camera device to: \(deviceID)")
 		
 		// Store the selected device ID in UserDefaults so CaptureSessionManager can use it
-        if let userDefaults = UserDefaults(suiteName: Identifiers.appGroup.rawValue) {
+        if let userDefaults = UserDefaults(suiteName: Identifiers.appGroup) {
 			userDefaults.set(deviceID, forKey: "SelectedCameraID")
 			userDefaults.synchronize()
 			print("✅ [Camera Extension] Saved camera device selection to UserDefaults")
@@ -697,10 +695,10 @@ class CameraExtensionDeviceSource: NSObject, CMIOExtensionDeviceSource, AVCaptur
 		self._frameCount += 1
 		if self._frameCount == 1 {
 			print("🎉 [Camera Extension] Received FIRST camera frame! Camera capture is working.")
-			logger.debug("Received first camera frame - camera capture is working")
+			extensionLogger.debug("Received first camera frame - camera capture is working")
 		} else if self._frameCount % 60 == 0 {
 			print("📸 [Camera Extension] Captured real camera frame \(self._frameCount)")
-			logger.debug("Captured real camera frame \(self._frameCount) for virtual camera content")
+			extensionLogger.debug("Captured real camera frame \(self._frameCount) for virtual camera content")
 		}
 	}
 }
@@ -732,7 +730,7 @@ class CameraExtensionStreamSource: NSObject, CMIOExtensionStreamSource {
 		
 		didSet {
 			if activeFormatIndex >= 1 {
-				os_log(.error, "Invalid index")
+				extensionLogger.error("Invalid index")
 			}
 		}
 	}
@@ -764,13 +762,13 @@ class CameraExtensionStreamSource: NSObject, CMIOExtensionStreamSource {
 	}
 	
 	func authorizedToStartStream(for client: CMIOExtensionClient) -> Bool {
-		logger.debug("External app requesting stream authorization: \(client.clientID)")
+		extensionLogger.debug("External app requesting stream authorization: \(client.clientID)")
 		// An opportunity to inspect the client info and decide if it should be allowed to start the stream.
 		return true
 	}
 	
 	func startStream() throws {
-		logger.debug("External app starting virtual camera stream")
+		extensionLogger.debug("External app starting virtual camera stream")
 		guard let deviceSource = device.source as? CameraExtensionDeviceSource else {
 			fatalError("Unexpected source type \(String(describing: device.source))")
 		}
@@ -778,7 +776,7 @@ class CameraExtensionStreamSource: NSObject, CMIOExtensionStreamSource {
 	}
 	
 	func stopStream() throws {
-		logger.debug("External app stopping virtual camera stream")
+		extensionLogger.debug("External app stopping virtual camera stream")
 		guard let deviceSource = device.source as? CameraExtensionDeviceSource else {
 			fatalError("Unexpected source type \(String(describing: device.source))")
 		}
@@ -814,10 +812,10 @@ class CameraExtensionProviderSource: NSObject, CMIOExtensionProviderSource {
 		}
 
 		// Signal readiness to the container app via shared defaults
-        if let sharedDefaults = UserDefaults(suiteName: Identifiers.appGroup.rawValue) {
+        if let sharedDefaults = UserDefaults(suiteName: Identifiers.appGroup) {
 			sharedDefaults.set(true, forKey: "ExtensionProviderReady")
 			sharedDefaults.synchronize()
-			logger.debug("✅ Marked ExtensionProviderReady in shared defaults")
+			extensionLogger.debug("✅ Marked ExtensionProviderReady in shared defaults")
 		}
 	}
     
@@ -860,25 +858,25 @@ class CameraExtensionProviderSource: NSObject, CMIOExtensionProviderSource {
     // MARK: Private
     
     private func notificationReceived(notificationName: String) {
-        logger.debug("📡 Received notification: \(notificationName)")
+        extensionLogger.debug("📡 Received notification: \(notificationName)")
         
         guard let name = NotificationName(rawValue: notificationName) else {
-            logger.debug("❌ Unknown notification name: \(notificationName)")
+            extensionLogger.debug("❌ Unknown notification name: \(notificationName)")
             return
         }
 
         switch name {
         case .startStream:
-            logger.debug("App requesting camera stream start")
+            extensionLogger.debug("App requesting camera stream start")
             deviceSource.startAppControlledStreaming()
         case .stopStream:
-            logger.debug("App requesting camera stream stop")
+            extensionLogger.debug("App requesting camera stream stop")
             deviceSource.stopAppControlledStreaming()
         case .setCameraDevice:
-            logger.debug("Camera device selection changed")
+            extensionLogger.debug("Camera device selection changed")
             handleCameraDeviceChange()
         case .updateOverlaySettings:
-            logger.debug("🎨 Overlay settings changed - updating now")
+            extensionLogger.debug("🎨 Overlay settings changed - updating now")
             deviceSource.updateOverlaySettings()
         }
     }
@@ -908,9 +906,9 @@ class CameraExtensionProviderSource: NSObject, CMIOExtensionProviderSource {
     
     private func handleCameraDeviceChange() {
         // Read camera device ID from UserDefaults
-        if let userDefaults = UserDefaults(suiteName: Identifiers.appGroup.rawValue),
+        if let userDefaults = UserDefaults(suiteName: Identifiers.appGroup),
            let deviceID = userDefaults.string(forKey: "SelectedCameraID") {
-            logger.debug("Setting camera device to: \(deviceID)")
+            extensionLogger.debug("Setting camera device to: \(deviceID)")
             deviceSource.setCameraDevice(deviceID)
         }
     }

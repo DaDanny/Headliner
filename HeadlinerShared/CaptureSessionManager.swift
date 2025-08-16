@@ -7,7 +7,7 @@ final class CaptureSessionManager: NSObject {
     case headliner = "Headliner"
   }
 
-  let logger = Logger(subsystem: Identifiers.orgIDAndProduct.rawValue, category: "CaptureSessionManager")
+  let logger = HeadlinerLogger.logger(for: .captureSession)
 
   var configured: Bool = false
   var captureHeadliner = false
@@ -27,7 +27,7 @@ final class CaptureSessionManager: NSObject {
     configured = configureCaptureSession()
   }
 
-  private let sessionPreset = AVCaptureSession.Preset.hd1280x720
+  private let sessionPreset = AVCaptureSession.Preset.hd1920x1080
 
   func configureCaptureSession() -> Bool {
     switch AVCaptureDevice.authorizationStatus(for: .video) {
@@ -36,7 +36,9 @@ final class CaptureSessionManager: NSObject {
     case .notDetermined:
       AVCaptureDevice.requestAccess(for: .video) { granted in
         if granted {
-          DispatchQueue.main.async { _ = self.configureCaptureSession() }
+          DispatchQueue.main.async { 
+            self.configured = self.configureCaptureSession() 
+          }
         } else {
           self.logger.error("Camera permission denied by user")
         }
@@ -54,6 +56,11 @@ final class CaptureSessionManager: NSObject {
     }
 
     captureSession.beginConfiguration()
+    
+    // Clear existing inputs/outputs to avoid duplication on reconfigure
+    captureSession.inputs.forEach { captureSession.removeInput($0) }
+    captureSession.outputs.forEach { captureSession.removeOutput($0) }
+    
     captureSession.sessionPreset = sessionPreset
 
     guard let camera = getCameraIfAvailable(camera: captureHeadliner ? .headliner : .anyCamera) else {
@@ -76,18 +83,32 @@ final class CaptureSessionManager: NSObject {
           return false
         }
       }
-      captureSession.addInput(input)
+      if captureSession.canAddInput(input) {
+        captureSession.addInput(input)
+      } else {
+        logger.error("Can't add video input to capture session")
+        captureSession.commitConfiguration()
+        return false
+      }
     } catch {
       logger.error("Can't create AVCaptureDeviceInput: \(error.localizedDescription)")
       captureSession.commitConfiguration()
       return false
     }
 
-    videoOutput = AVCaptureVideoDataOutput()
-    if let videoOutput, captureSession.canAddOutput(videoOutput) {
-      captureSession.addOutput(videoOutput)
+    let videoOut = AVCaptureVideoDataOutput()
+    videoOut.alwaysDiscardsLateVideoFrames = true
+    videoOut.videoSettings = [
+      kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA
+    ]
+    
+    if captureSession.canAddOutput(videoOut) {
+      captureSession.addOutput(videoOut)
+      videoOutput = videoOut
       captureSession.commitConfiguration()
       return true
+    } else {
+      logger.error("Can't add video output to capture session")
     }
 
     captureSession.commitConfiguration()
