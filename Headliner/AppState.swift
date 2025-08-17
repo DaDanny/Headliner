@@ -247,6 +247,72 @@ class AppState: ObservableObject {
     // Notify extension about overlay settings change with the actual settings data
     notificationManager.postNotification(named: .updateOverlaySettings, overlaySettings: newSettings)
   }
+  
+  // MARK: - Preset Management (Reusable by any view)
+  
+  /// Switch to a different overlay preset
+  func selectPreset(_ presetId: String) {
+    overlaySettings.selectedPresetId = presetId
+    
+    // Preserve existing tokens if they exist, especially the tagline
+    let existingTokens = overlaySettings.overlayTokens
+    
+    // If switching to Personal preset and no tokens exist, populate with defaults
+    if presetId == "personal" && overlaySettings.overlayTokens == nil {
+      overlaySettings.overlayTokens = OverlayTokens(
+        displayName: overlaySettings.userName.isEmpty ? NSUserName() : overlaySettings.userName,
+        tagline: existingTokens?.tagline,  // Preserve tagline
+        accentColorHex: "#34C759",
+        aspect: overlaySettings.overlayAspect
+      )
+    } else if overlaySettings.overlayTokens == nil {
+      // Initialize tokens for other presets
+      overlaySettings.overlayTokens = OverlayTokens(
+        displayName: overlaySettings.userName.isEmpty ? NSUserName() : overlaySettings.userName,
+        tagline: presetId == "professional" ? "Senior Developer" : nil,
+        accentColorHex: "#007AFF",
+        aspect: overlaySettings.overlayAspect
+      )
+    }
+    // Note: If tokens already exist, they are preserved (including tagline)
+    
+    saveOverlaySettings()
+    notificationManager.postNotification(named: .updateOverlaySettings, overlaySettings: overlaySettings)
+  }
+  
+  /// Update overlay tokens (display name, tagline, colors, etc.)
+  func updateOverlayTokens(_ tokens: OverlayTokens) {
+    overlaySettings.overlayTokens = tokens
+    overlaySettings.userName = tokens.displayName // Keep legacy field in sync
+    saveOverlaySettings()
+    notificationManager.postNotification(named: .updateOverlaySettings, overlaySettings: overlaySettings)
+  }
+  
+  /// Switch aspect ratio
+  func selectAspectRatio(_ aspect: OverlayAspect) {
+    overlaySettings.overlayAspect = aspect
+    if overlaySettings.overlayTokens != nil {
+      overlaySettings.overlayTokens?.aspect = aspect
+    } else {
+      overlaySettings.overlayTokens = OverlayTokens(
+        displayName: overlaySettings.userName.isEmpty ? NSUserName() : overlaySettings.userName,
+        accentColorHex: "#007AFF",
+        aspect: aspect
+      )
+    }
+    saveOverlaySettings()
+    notificationManager.postNotification(named: .updateOverlaySettings, overlaySettings: overlaySettings)
+  }
+  
+  /// Get current preset ID
+  var currentPresetId: String {
+    overlaySettings.selectedPresetId.isEmpty ? "professional" : overlaySettings.selectedPresetId
+  }
+  
+  /// Get current aspect ratio
+  var currentAspectRatio: OverlayAspect {
+    overlaySettings.overlayAspect
+  }
 
   /// Persist `overlaySettings` to the shared app group so the extension can load them.
   private func saveOverlaySettings() {

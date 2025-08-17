@@ -2,14 +2,14 @@
 
 **Professional Virtual Camera for macOS**
 
-Headliner is a modern virtual camera application for macOS that provides a clean video pipeline with overlay capabilities, seamlessly integrating with video conferencing apps like Zoom, Google Meet, Teams, and more.
+Headliner is a modern virtual camera application for macOS that adds professional overlays to your video feed, seamlessly integrating with video conferencing apps like Zoom, Google Meet, Teams, and more.
 
 ## Features
 
 ✨ **Real-time Video Streaming**: Low-latency camera pipeline with real-time preview
 🎥 **Full HD Quality**: Stream in 1080p @ 60 FPS to any compatible application  
-🔄 **Multiple Camera Sources**: Support for built-in cameras, external webcams, Continuity Camera, and DeskView cameras
-⚡ **Professional Overlays**: Add customizable name and version overlays to your video feed
+🔄 **Multiple Camera Sources**: Support for built-in cameras, external webcams, and Continuity Camera
+📝 **Professional Overlays**: Add customizable lower thirds, info pills, and more to your video
 🎨 **Modern UI**: Beautiful SwiftUI interface with animated backgrounds and glassmorphic design
 🛠 **Easy Setup**: Guided onboarding with automatic system extension installation
 
@@ -46,49 +46,35 @@ Headliner is a modern virtual camera application for macOS that provides a clean
 3. Select "Headliner" as your camera source
 4. You should now see your Headliner camera feed (with overlays if enabled)
 
+### Available Overlay Presets
+
+- **Professional**: Lower third with name and tagline at bottom of screen
+- **Personal**: Info pill with location/time/weather at top-left
+- **None**: Clean video feed without overlays
+
 ### Controls
 
 - **Start/Stop Camera**: Control the virtual camera streaming
-- **Camera Selection**: Choose from available camera devices (built-in, external, Continuity)
-- **Overlay Settings**: Configure your display name, position, colors, and visibility
+- **Camera Selection**: Choose from available camera devices
+- **Preset Selection**: Switch between overlay presets
+- **Display Name**: Set your name for overlays
+- **Tagline**: Add optional title or description
 - **Real-time Preview**: See your camera feed with overlays before going live
 
-## Architecture
+## Architecture & Technical Details
 
-Headliner consists of two main components:
+For detailed information about the camera extension architecture, overlay system, and technical implementation, see:
 
-### Container App (`Headliner/`)
+📖 **[Camera Extension & Overlay System Documentation](docs/CAMERA_EXTENSION_AND_OVERLAYS.md)**
 
-The main user interface built with SwiftUI that provides:
+This comprehensive guide covers:
 
-- Modern, professional user interface
-- Camera device selection and management
-- Overlay configuration
-- System extension management
-- Real-time preview of video feed
-
-### System Extension (`CameraExtension/`)
-
-A CoreMediaIO Camera Extension that:
-
-- Creates a virtual camera device visible to other applications
-- Manages video pipeline and streaming of the camera feed
-- Reads overlay settings via shared app group and Darwin notifications
-- Handles communication with the container app
-
-## Technical Details
-
-### Inter-Process Communication
-
-- **Darwin Notifications**: Real-time communication between app and extension
-- **UserDefaults (App Group)**: Shared settings storage for camera selection and overlay configuration
-- **Shared Code**: Common functionality in `HeadlinerShared/` used by both targets
-
-### Video Pipeline
-
-- **Capture**: `CaptureSessionManager` handles camera device selection and capture session
-- **Streaming**: CoreMediaIO extension provides virtual camera visible to other apps
-- **Overlays**: Real-time overlay rendering with customizable text, position, and styling
+- System architecture and components
+- How the overlay system works
+- Creating and customizing overlays
+- Technical implementation details
+- Performance optimizations
+- Troubleshooting guide
 
 ## Troubleshooting
 
@@ -128,26 +114,22 @@ open Headliner.xcodeproj
 
 ```
 Headliner/
-├── Headliner/              # Main application
-│   ├── Views/              # SwiftUI views
-│   │   ├── Components/     # Reusable UI components
-│   │   ├── MainAppView.swift
-│   │   └── OnboardingView.swift
-│   ├── Managers/           # App-specific managers
-│   ├── AppState.swift      # Main app state management
-│   ├── ContentView.swift   # Root view controller
-│   └── HeadlinerApp.swift  # App entry point
+├── Headliner/              # Main application (SwiftUI)
+│   ├── Views/              # UI components
+│   ├── Managers/           # App services
+│   └── AppState.swift      # State management
 ├── CameraExtension/        # System extension
-│   ├── CameraExtensionProvider.swift  # Virtual camera implementation
-│   └── main.swift          # Extension entry point
-├── HeadlinerShared/        # Shared code between app and extension
-│   ├── CaptureSessionManager.swift    # Camera capture logic
-│   ├── Identifiers.swift   # Bundle and app group identifiers
-│   ├── Logger.swift        # Centralized logging configuration
-│   ├── Notifications.swift # Darwin notification system
-│   └── OverlaySettings.swift          # Overlay configuration models
-└── Assets/                 # App icons and resources
+│   ├── CameraExtensionProvider.swift
+│   └── Rendering/          # Overlay renderer
+├── HeadlinerShared/        # Shared code
+│   ├── OverlayModels.swift
+│   ├── OverlayPresets.swift
+│   └── CaptureSessionManager.swift
+└── docs/                   # Documentation
+    └── CAMERA_EXTENSION_AND_OVERLAYS.md
 ```
+
+For detailed component descriptions, see the [technical documentation](docs/CAMERA_EXTENSION_AND_OVERLAYS.md).
 
 ### Key Technologies
 
@@ -160,21 +142,24 @@ Headliner/
 
 Headliner processes all video locally on your device. No video data is transmitted to external servers. Camera access is required for the virtual camera functionality and can be revoked at any time through System Settings > Privacy & Security > Camera.
 
-## Current Status (MVP)
+## Current Status
 
 ✅ **Working Features**:
 
 - Virtual camera appears in all video apps
 - 1080p @ 60 FPS streaming with low latency
-- Camera selection with persistence
-- Name and version overlays with customizable positioning
+- Camera selection with device persistence
+- Professional overlay presets (Lower Third, Info Pill)
+- Customizable display name and tagline
 - Beautiful modern UI with animations
+- Real-time preview with overlay
+- Smooth transitions between presets
 
 🚧 **Known Limitations**:
 
 - App must be in `/Applications` folder for system extension
-- Camera changes require restarting the capture session
-- Initial camera permission request requires app restart
+- Weather/location data currently uses placeholder values
+- Color customization requires manual configuration
 
 ---
 

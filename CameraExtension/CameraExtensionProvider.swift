@@ -58,6 +58,12 @@ class CameraExtensionDeviceSource: NSObject, CMIOExtensionDeviceSource, AVCaptur
 	private var overlaySettings: OverlaySettings = OverlaySettings()
 	private let overlaySettingsLock = NSLock()
 	
+	// Preset system components
+	private var overlayRenderer: CameraOverlayRenderer?
+	private var overlayPresetStore: OverlayPresetStore?
+	private var lastRenderedOverlay: CIImage?
+	private var lastAspectRatio: OverlayAspect?
+	
 	init(localizedName: String) {
 		
 		super.init()
@@ -94,6 +100,12 @@ class CameraExtensionDeviceSource: NSObject, CMIOExtensionDeviceSource, AVCaptur
 		// Load overlay settings
 		loadOverlaySettings()
 		extensionLogger.debug("✅ CameraExtensionDeviceSource init - overlay settings loaded")
+		
+		// Initialize preset system components
+		// Use thread-safe renderer with Core frameworks only (no AppKit)
+		overlayRenderer = CameraOverlayRenderer()
+		overlayPresetStore = OverlayPresetStore()
+		extensionLogger.debug("✅ Initialized camera overlay renderer (thread-safe, Metal-backed)")
 	}
 	
 	var availableProperties: Set<CMIOExtensionProperty> {
@@ -321,8 +333,8 @@ class CameraExtensionDeviceSource: NSObject, CMIOExtensionDeviceSource, AVCaptur
 		}
 		_cameraFrameLock.unlock()
 		
-		// Always draw overlays on top of camera feed or placeholder
-		drawOverlays(on: context, in: rect)
+		// Always use preset system for overlays
+		drawOverlaysWithPresetSystem(pixelBuffer: pixelBuffer, context: context, rect: rect)
 		
 		// Create and send CMSampleBuffer
 		var sampleBuffer: CMSampleBuffer?
@@ -630,7 +642,73 @@ class CameraExtensionDeviceSource: NSObject, CMIOExtensionDeviceSource, AVCaptur
 	
 	func updateOverlaySettings() {
 		loadOverlaySettings()
+		// Clear cached overlay when settings change
+		lastRenderedOverlay = nil
 		extensionLogger.debug("Overlay settings updated from UserDefaults")
+	}
+	
+	// MARK: Preset System Support
+	
+	private func drawOverlaysWithPresetSystem(pixelBuffer: CVPixelBuffer, context: CGContext, rect: CGRect) {
+		guard let renderer = overlayRenderer,
+		      let presetStore = overlayPresetStore else {
+			extensionLogger.error("Preset system components not initialized")
+			return
+		}
+		
+		overlaySettingsLock.lock()
+		let settings = self.overlaySettings
+		overlaySettingsLock.unlock()
+		
+		// Only draw overlays if enabled
+		guard settings.isEnabled else { return }
+		
+		// Get current preset and tokens
+		var preset = presetStore.selectedPreset
+		var tokens = presetStore.overlayTokens
+		
+		// Check if we have custom settings that override preset
+		if let customTokens = settings.overlayTokens {
+			tokens = customTokens
+		}
+		
+		// If using preset from settings
+		if !settings.selectedPresetId.isEmpty {
+			if let selectedPreset = OverlayPresets.preset(withId: settings.selectedPresetId) {
+				preset = selectedPreset
+			}
+		}
+		
+		// Update tokens with current user name if needed
+		if tokens.displayName.isEmpty {
+			tokens.displayName = settings.userName.isEmpty ? NSUserName() : settings.userName
+		}
+		
+		// Check for aspect ratio change
+		let currentAspect = settings.overlayAspect
+		let aspectChanged = lastAspectRatio != nil && lastAspectRatio != currentAspect
+		
+		// Notify renderer about aspect change for optimized crossfade
+		if aspectChanged {
+			renderer.notifyAspectChanged()
+		}
+		
+		// Render overlay using Core Image renderer
+		let overlayImage = renderer.render(
+			pixelBuffer: pixelBuffer,
+			preset: preset,
+			tokens: tokens,
+			previousFrame: aspectChanged ? lastRenderedOverlay : nil
+		)
+		
+		// Cache the rendered overlay and aspect
+		lastRenderedOverlay = overlayImage
+		lastAspectRatio = currentAspect
+		
+		// Convert CIImage to CGImage and draw it
+		if let cgImage = CIContext().createCGImage(overlayImage, from: overlayImage.extent) {
+			context.draw(cgImage, in: rect)
+		}
 	}
 	
 	// MARK: Camera Setup

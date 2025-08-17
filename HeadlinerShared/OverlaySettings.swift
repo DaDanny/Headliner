@@ -17,6 +17,11 @@ struct OverlaySettings: Codable {
   var versionBackgroundColor: OverlayColor = .blackTransparent
   var versionTextColor: OverlayColor = .white
   var versionFontSize: CGFloat = 16
+  
+  // Preset system fields
+  var selectedPresetId: String = "professional"
+  var overlayTokens: OverlayTokens?
+  var overlayAspect: OverlayAspect = .widescreen
 }
 
 enum OverlayPosition: String, Codable, CaseIterable {
