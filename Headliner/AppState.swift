@@ -19,6 +19,10 @@ import SystemExtensions
 class AppState: ObservableObject {
   // MARK: - Published Properties
 
+  /// Current onboarding phase for the wizard UI.
+  @Published var onboardingPhase: OnboardingPhase = .preflight
+  /// Current camera permission status.
+  @Published var cameraPermission: PermissionStatus = .unknown
   /// Current install/run status of the system extension.
   @Published var extensionStatus: ExtensionStatus = .unknown
   /// Current run state of the local preview/virtual camera.
@@ -87,6 +91,7 @@ class AppState: ObservableObject {
     checkExtensionStatus()
     loadAvailableCameras()
     setupCaptureSession()
+    beginOnboarding()
 
     logger.debug("AppState initialization complete")
   }
@@ -102,6 +107,57 @@ class AppState: ObservableObject {
 
   // MARK: - Public Methods
 
+  /// Begin the onboarding flow by computing the initial phase.
+  func beginOnboarding() {
+    logger.debug("Beginning onboarding flow...")
+    // Update camera permission status
+    cameraPermission = PermissionStatus(from: AVCaptureDevice.authorizationStatus(for: .video))
+    recomputeOnboardingPhase()
+  }
+  
+  /// Recompute the current onboarding phase based on extension and camera states.
+  func recomputeOnboardingPhase() {
+    let previousPhase = onboardingPhase
+    
+    // Check for error states first
+    if case .error(let message) = extensionStatus {
+      onboardingPhase = .error(message)
+    } else if case .error(let message) = cameraStatus {
+      onboardingPhase = .error(message)
+    } else if cameraPermission == .denied {
+      onboardingPhase = .error("Camera access denied. Enable in System Settings → Privacy & Security → Camera.")
+    } else if cameraPermission == .restricted {
+      onboardingPhase = .error("Camera access restricted by system policy.")
+    } else {
+      // Compute phase based on current states
+      switch extensionStatus {
+      case .unknown, .notInstalled:
+        onboardingPhase = .needsExtensionInstall
+      case .installing:
+        onboardingPhase = .awaitingApproval
+      case .installed:
+        switch cameraStatus {
+        case .stopped:
+          onboardingPhase = .readyToStart
+        case .starting:
+          onboardingPhase = .startingCamera
+        case .running:
+          onboardingPhase = .running
+        case .stopping:
+          onboardingPhase = .readyToStart // Will transition back to ready
+        case .error:
+          break // Already handled above
+        }
+      case .error:
+        break // Already handled above
+      }
+    }
+    
+    if previousPhase != onboardingPhase {
+      logger.debug("Onboarding phase changed: \(previousPhase) → \(onboardingPhase)")
+    }
+  }
+
   /// Begin installation flow for the system extension and start device detection polling.
   func installExtension() {
     extensionStatus = .installing
@@ -109,6 +165,36 @@ class AppState: ObservableObject {
     systemExtensionManager.install()
     // start watching for the device to appear
     waitForExtensionDeviceAppear()
+    recomputeOnboardingPhase()
+  }
+  
+  /// Request camera permission if needed and call completion with the result.
+  func requestCameraPermissionIfNeeded(completion: @escaping (Bool) -> Void) {
+    let authStatus = AVCaptureDevice.authorizationStatus(for: .video)
+    cameraPermission = PermissionStatus(from: authStatus)
+    
+    switch authStatus {
+    case .authorized:
+      completion(true)
+    case .notDetermined:
+      logger.debug("Requesting camera permission...")
+      AVCaptureDevice.requestAccess(for: .video) { [weak self] granted in
+        DispatchQueue.main.async {
+          self?.cameraPermission = PermissionStatus(from: AVCaptureDevice.authorizationStatus(for: .video))
+          self?.recomputeOnboardingPhase()
+          completion(granted)
+        }
+      }
+    case .denied:
+      onboardingPhase = .error("Camera access denied. Enable in System Settings → Privacy & Security → Camera.")
+      completion(false)
+    case .restricted:
+      onboardingPhase = .error("Camera access restricted by system policy.")
+      completion(false)
+    @unknown default:
+      onboardingPhase = .error("Unknown camera permission status.")
+      completion(false)
+    }
   }
 
   /// Start the virtual camera and local preview.
@@ -121,42 +207,16 @@ class AppState: ObservableObject {
       return
     }
 
-    // Check camera permission before starting
-    let authStatus = AVCaptureDevice.authorizationStatus(for: .video)
-    switch authStatus {
-    case .authorized:
-      // Permission granted, proceed with starting camera
-      proceedWithCameraStart()
-    case .notDetermined:
-      // Request permission
-      logger.debug("Requesting camera permission...")
-      statusMessage = "Requesting camera permission..."
-      AVCaptureDevice.requestAccess(for: .video) { [weak self] granted in
-        DispatchQueue.main.async {
-          if granted {
-            logger.debug("Camera permission granted, retrying capture session setup...")
-            // Retry capture session setup with new permissions
-            self?.retryCaptureSession()
-            self?.proceedWithCameraStart()
-          } else {
-            self?.cameraStatus = .error("Camera permission denied")
-            self?.statusMessage = "Camera access denied - enable in System Settings > Privacy & Security > Camera"
-            logger.error("Camera permission denied by user")
-          }
-        }
+    // Request camera permission if needed
+    requestCameraPermissionIfNeeded { [weak self] granted in
+      guard let self = self else { return }
+      if granted {
+        // Retry capture session setup with new permissions if needed
+        self.retryCaptureSession()
+        self.proceedWithCameraStart()
+      } else {
+        logger.error("Camera permission denied by user")
       }
-    case .denied:
-      cameraStatus = .error("Camera permission denied")
-      statusMessage = "Camera access denied - enable in System Settings > Privacy & Security > Camera"
-      logger.error("Camera access denied - user needs to enable in System Settings")
-    case .restricted:
-      cameraStatus = .error("Camera access restricted")
-      statusMessage = "Camera access restricted by system policy"
-      logger.error("Camera access restricted by system policy")
-    @unknown default:
-      cameraStatus = .error("Unknown camera permission status")
-      statusMessage = "Camera permission issue"
-      logger.error("Unknown camera authorization status")
     }
   }
 
@@ -166,6 +226,7 @@ class AppState: ObservableObject {
     logger.debug("Starting camera...")
     cameraStatus = .starting
     statusMessage = "Starting camera..."
+    recomputeOnboardingPhase()
     notificationManager.postNotification(named: .startStream)
 
     // Send current overlay settings to extension when camera starts
@@ -181,6 +242,7 @@ class AppState: ObservableObject {
     DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
       self.cameraStatus = .running
       self.statusMessage = "Camera is running"
+      self.recomputeOnboardingPhase()
       logger.debug("Camera status updated to running")
     }
   }
@@ -189,6 +251,7 @@ class AppState: ObservableObject {
   func stopCamera() {
     cameraStatus = .stopping
     statusMessage = "Stopping camera..."
+    recomputeOnboardingPhase()
     notificationManager.postNotification(named: .stopStream)
 
     // Stop the capture session for preview
@@ -204,6 +267,7 @@ class AppState: ObservableObject {
     DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
       self.cameraStatus = .stopped
       self.statusMessage = "Camera stopped"
+      self.recomputeOnboardingPhase()
     }
   }
 
@@ -237,6 +301,7 @@ class AppState: ObservableObject {
     loadAvailableCameras()
     // Also refresh extension status when refreshing cameras
     checkExtensionStatus()
+    recomputeOnboardingPhase()
   }
 
   /// Update and persist overlay settings, then notify the extension.
@@ -435,6 +500,7 @@ class AppState: ObservableObject {
       extensionStatus = .installed
       statusMessage = "Extension is installed and ready"
       logger.debug("Final extension status: \(String(describing: self.extensionStatus))")
+      recomputeOnboardingPhase()
       return
     }
 
@@ -451,6 +517,7 @@ class AppState: ObservableObject {
     }
 
     logger.debug("Final extension status: \(String(describing: self.extensionStatus))")
+    recomputeOnboardingPhase()
   }
 
   /// Discover all physical cameras (excluding the Headliner virtual camera) for selection.
@@ -579,6 +646,8 @@ class AppState: ObservableObject {
     } else if logText.contains("fail") || logText.contains("error") {
       extensionStatus = .notInstalled
     }
+    
+    recomputeOnboardingPhase()
   }
 
   /// Poll for extension device readiness with a time-bounded timer.
@@ -599,6 +668,7 @@ class AppState: ObservableObject {
           self.devicePollTimer?.invalidate()
           self.extensionStatus = .installed
           self.statusMessage = "Extension installed and ready"
+          self.recomputeOnboardingPhase()
           logger.debug("✅ Virtual camera detected after activation")
           return
         }
@@ -609,9 +679,11 @@ class AppState: ObservableObject {
           self.devicePollTimer?.invalidate()
           self.extensionStatus = .installed
           self.statusMessage = "Extension installed and ready"
+          self.recomputeOnboardingPhase()
           logger.debug("✅ Virtual camera detected after activation")
         } else if Date() > deadline {
           self.devicePollTimer?.invalidate()
+          self.onboardingPhase = .error("Timed out waiting for approval. Open System Settings → Login Items & Extensions → Camera Extensions and enable Headliner.")
           logger.debug("⌛ Timed out waiting for device; user may still be approving or camera is in-use")
         }
       }
