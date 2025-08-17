@@ -143,12 +143,9 @@ struct ContentSplit: View {
   
   var body: some View {
     HStack(spacing: DesignTokens.Layout.contentGutter) {
-      // Preview Pane
-      PreviewPane(
-        appState: appState,
-        outputImageManager: outputImageManager
-      )
-      .frame(maxWidth: DesignTokens.Layout.previewMaxWidth)
+      // Preview Pane - Placeholder (will be replaced by live preview card from other branch)
+      PreviewPanePlaceholder()
+        .frame(maxWidth: DesignTokens.Layout.previewMaxWidth)
       
       // Control Pane
       ControlPane(
@@ -225,7 +222,58 @@ struct FooterActions: View {
   }
 }
 
-// The PreviewPane and ControlPane are now implemented in their own files
+// MARK: - Preview Pane Placeholder
+
+/// Simple placeholder to avoid conflicts with live preview card implementation in other branch
+private struct PreviewPanePlaceholder: View {
+  var body: some View {
+    VStack(spacing: DesignTokens.Spacing.lg) {
+      // Title row
+      HStack {
+        Text("Live Preview")
+          .font(DesignTokens.Typography.titleFont)
+          .foregroundColor(DesignTokens.Colors.textPrimary)
+        
+        Spacer()
+        
+        HStack(spacing: DesignTokens.Spacing.md) {
+          // Simple overlay status indicator
+          HStack(spacing: DesignTokens.Spacing.sm) {
+            Circle()
+              .fill(DesignTokens.Colors.textTertiary)
+              .frame(width: 8, height: 8)
+            
+            Text("Overlays")
+              .font(DesignTokens.Typography.captionFont)
+              .foregroundColor(DesignTokens.Colors.textSecondary)
+          }
+          
+          // Aspect selector placeholder
+          Text("16:9")
+            .font(DesignTokens.Typography.captionFont)
+            .foregroundColor(DesignTokens.Colors.textSecondary)
+        }
+      }
+      
+      // Preview frame placeholder
+      RoundedRectangle(cornerRadius: DesignTokens.Radius.xl)
+        .fill(Color(hex: "#0A0B0C"))
+        .overlay(
+          VStack(spacing: DesignTokens.Spacing.lg) {
+            Image(systemName: "video.slash")
+              .font(.system(size: 48, weight: .light))
+              .foregroundColor(DesignTokens.Colors.textTertiary)
+            
+            Text("Preview card will be implemented in other branch")
+              .font(DesignTokens.Typography.bodyFont)
+              .foregroundColor(DesignTokens.Colors.textSecondary)
+              .multilineTextAlignment(.center)
+          }
+        )
+        .frame(height: 360)
+    }
+  }
+}
 
 // MARK: - Preview
 
