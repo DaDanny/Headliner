@@ -8,23 +8,13 @@
 import SwiftUI
 
 struct OverlaySettingsView: View {
-  @ObservedObject var appState: AppState
+  @EnvironmentObject var appState: AppState
   @State private var selectedPresetId: String = ""
   @State private var displayName: String = ""
   @State private var tagline: String = ""
   @State private var accentColorHex: String = "#007AFF"
   @State private var selectedAspect: OverlayAspect = .widescreen
   @State private var showColorPicker = false
-  
-  init(appState: AppState) {
-    self.appState = appState
-    // Initialize state from current settings
-    self._selectedPresetId = State(initialValue: appState.currentPresetId)
-    self._displayName = State(initialValue: appState.overlaySettings.overlayTokens?.displayName ?? appState.overlaySettings.userName)
-    self._tagline = State(initialValue: appState.overlaySettings.overlayTokens?.tagline ?? "")
-    self._accentColorHex = State(initialValue: appState.overlaySettings.overlayTokens?.accentColorHex ?? "#007AFF")
-    self._selectedAspect = State(initialValue: appState.currentAspectRatio)
-  }
   
   var body: some View {
     VStack(spacing: 20) {
@@ -242,7 +232,7 @@ struct OverlaySettingsView: View {
         .clipShape(RoundedRectangle(cornerRadius: 20))
     )
     .onAppear {
-      // Refresh state from current settings
+      // Initialize state from current settings
       selectedPresetId = appState.currentPresetId
       displayName = appState.overlaySettings.overlayTokens?.displayName ?? appState.overlaySettings.userName
       tagline = appState.overlaySettings.overlayTokens?.tagline ?? ""
