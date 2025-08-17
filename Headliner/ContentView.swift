@@ -43,7 +43,7 @@ extension ContentView: View {
   var body: some View {
     Group {
       if appState.extensionStatus.isInstalled {
-        MainAppView(
+        HeadlinerAppShell(
           appState: appState,
           outputImageManager: outputImageManager,
           propertyManager: propertyManager
