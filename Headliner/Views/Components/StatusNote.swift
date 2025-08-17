@@ -65,3 +65,17 @@ struct StatusNote: View {
         .padding(.horizontal, 32)
     }
 }
+
+// MARK: - Preview
+
+#Preview {
+    VStack(spacing: 16) {
+        StatusNote("This may momentarily reload audio/video services.", style: .info)
+        
+        StatusNote("Camera access denied. Enable in System Settings.", style: .warning)
+        
+        StatusNote("Look for 'Headliner' in your video app's camera selection menu.", style: .success)
+    }
+    .frame(width: 500, height: 200)
+    .background(Color(NSColor.windowBackgroundColor))
+}

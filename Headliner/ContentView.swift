@@ -42,17 +42,33 @@ struct ContentView {
 extension ContentView: View {
   var body: some View {
     Group {
-      if appState.extensionStatus.isInstalled {
+      if shouldShowOnboarding {
+        OnboardingView(appState: appState)
+      } else {
         MainAppView(
           appState: appState,
           outputImageManager: outputImageManager,
           propertyManager: propertyManager
         )
-      } else {
-        OnboardingView(appState: appState)
       }
     }
-    .animation(.easeInOut(duration: 0.3), value: appState.extensionStatus.isInstalled)
+    .animation(.easeInOut(duration: 0.3), value: shouldShowOnboarding)
+  }
+  
+  /// Determine whether to show onboarding based on the current phase
+  private var shouldShowOnboarding: Bool {
+    // Check UserDefaults flag first - if onboarding was completed before, skip it
+    let onboardingCompleted = UserDefaults.standard.bool(forKey: "OnboardingCompleted")
+    if onboardingCompleted && appState.extensionStatus.isInstalled {
+      return false
+    }
+    
+    switch appState.onboardingPhase {
+    case .preflight, .needsExtensionInstall, .awaitingApproval, .readyToStart, .startingCamera, .running, .personalizeOptional, .error:
+      return true
+    case .completed:
+      return false
+    }
   }
 }
 

@@ -112,7 +112,21 @@ class AppState: ObservableObject {
     logger.debug("Beginning onboarding flow...")
     // Update camera permission status
     cameraPermission = PermissionStatus(from: AVCaptureDevice.authorizationStatus(for: .video))
-    recomputeOnboardingPhase()
+    
+    // Check if onboarding was previously completed but we need to restart due to extension issues
+    let onboardingCompleted = UserDefaults.standard.bool(forKey: "OnboardingCompleted")
+    if onboardingCompleted && extensionStatus.isInstalled {
+      onboardingPhase = .readyToStart
+    } else {
+      recomputeOnboardingPhase()
+    }
+  }
+  
+  /// Complete the onboarding flow and mark it as finished.
+  func completeOnboarding() {
+    logger.debug("Completing onboarding flow...")
+    UserDefaults.standard.set(true, forKey: "OnboardingCompleted")
+    onboardingPhase = .completed
   }
   
   /// Recompute the current onboarding phase based on extension and camera states.

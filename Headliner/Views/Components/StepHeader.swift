@@ -50,3 +50,15 @@ struct StepHeader: View {
         .padding(.vertical, 24)
     }
 }
+
+// MARK: - Preview
+
+#Preview {
+    StepHeader(
+        icon: "arrow.down.circle",
+        title: "Install Headliner Camera",
+        subtitle: "One-time setup so Meet/Zoom can see your video."
+    )
+    .frame(width: 400, height: 300)
+    .background(Color(NSColor.windowBackgroundColor))
+}

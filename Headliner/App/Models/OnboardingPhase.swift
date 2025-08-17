@@ -30,6 +30,9 @@ enum OnboardingPhase: Equatable {
     /// After running; optional personalization step
     case personalizeOptional
     
+    /// Onboarding flow completed successfully
+    case completed
+    
     /// Recoverable error with specific message and recovery actions
     case error(String)
     
@@ -48,6 +51,8 @@ enum OnboardingPhase: Equatable {
             return "Camera Ready"
         case .personalizeOptional:
             return "Personalize Your Overlay"
+        case .completed:
+            return "Welcome to Headliner"
         case .error:
             return "Setup Issue"
         }
@@ -68,6 +73,8 @@ enum OnboardingPhase: Equatable {
             return "Your camera is live and ready to use!"
         case .personalizeOptional:
             return "Add your name and customize your overlay."
+        case .completed:
+            return "Setup complete! Your virtual camera is ready to use."
         case .error(let message):
             return message
         }
@@ -88,6 +95,8 @@ enum OnboardingPhase: Equatable {
             return "Personalize Overlay"
         case .personalizeOptional:
             return "Finish"
+        case .completed:
+            return "Get Started"
         case .error(let message):
             if message.contains("Camera access denied") {
                 return "Open Privacy Settings"
@@ -112,6 +121,8 @@ enum OnboardingPhase: Equatable {
             return "Finish"
         case .personalizeOptional:
             return nil
+        case .completed:
+            return nil
         case .error:
             return "Contact Support"
         }
@@ -126,6 +137,8 @@ enum OnboardingPhase: Equatable {
             return 2
         case .personalizeOptional:
             return 3
+        case .completed:
+            return 0 // No step number for completion
         case .error:
             return 0 // No step for errors
         }

@@ -156,3 +156,34 @@ struct StepCard: View {
         .padding(.horizontal, 32)
     }
 }
+
+// MARK: - Preview
+
+#Preview {
+    VStack(spacing: 20) {
+        StepCard(
+            title: "Install Headliner Camera",
+            bullets: [
+                "Lets apps like Zoom/Meet use Headliner's video",
+                "You'll approve it in System Settings",
+                "One-time setup for all your video calls"
+            ],
+            primaryTitle: "Install & Enable",
+            primaryAction: {},
+            secondaryTitle: "Open System Settings",
+            secondaryAction: {},
+            progressIndex: 1
+        )
+        
+        StepCard(
+            title: "Starting Camera",
+            primaryTitle: "Starting camera...",
+            primaryAction: {},
+            progressIndex: 2,
+            isLoading: true,
+            isInteractive: false
+        )
+    }
+    .frame(width: 500, height: 600)
+    .background(Color(NSColor.windowBackgroundColor))
+}
