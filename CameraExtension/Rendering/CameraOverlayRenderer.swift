@@ -381,22 +381,16 @@ final class CameraOverlayRenderer: OverlayRenderer {
         
         guard let attributed = CFAttributedStringCreate(kCFAllocatorDefault, text as CFString, attrs as CFDictionary) else { return }
         let framesetter = CTFramesetterCreateWithAttributedString(attributed)
-        
-        // Build text path in unflipped CG space (frame as-is)
+        // Build text path in current CG space (no flips)
         let path = CGMutablePath()
         path.addRect(frame)
-        _ = CTFramesetterCreateFrame(framesetter, CFRange(location: 0, length: 0), path, nil) // created only to validate
-        
+
         context.saveGState()
-        // Flip only the local text region
-        context.translateBy(x: frame.minX, y: frame.maxY)
-        context.scaleBy(x: 1.0, y: -1.0)
         context.textMatrix = .identity
-        
-        let localPath = CGMutablePath()
-        localPath.addRect(CGRect(origin: .zero, size: CGSize(width: frame.width, height: frame.height)))
-        let localFrame = CTFramesetterCreateFrame(framesetter, CFRange(location: 0, length: 0), localPath, nil)
-        CTFrameDraw(localFrame, context)
+
+        let ctFrame = CTFramesetterCreateFrame(framesetter, CFRange(location: 0, length: 0), path, nil)
+        CTFrameDraw(ctFrame, context)
+
         context.restoreGState()
     }
     
