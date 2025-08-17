@@ -71,10 +71,13 @@ final class CameraOverlayRenderer: OverlayRenderer {
     }
     
     /// LRU cache for rendered overlay images to avoid redundant rendering
-    private var cache = LRUCache<LayoutKey, CIImage>(capacity: 12)
+    private var cache = LRUCache<LayoutKey, CIImage>(capacity: 6)  // Reduced for MVP memory footprint
     
     /// Provider for personal information (location, time, weather)
     private let personalInfoProvider: PersonalInfoProvider
+    
+    /// Track last layout key to detect content changes for crossfade
+    private var lastKey: LayoutKey?
     
     // MARK: - Initialization
     
@@ -156,10 +159,11 @@ final class CameraOverlayRenderer: OverlayRenderer {
                 }
             }
             
-            // Auto-trigger crossfade if overlay extent changes
-            if previousOverlay?.extent != overlay.extent {
+            // Auto-trigger crossfade if content or extent changes
+            if lastKey != key || previousOverlay?.extent != overlay.extent {
                 crossfadeStart = CACurrentMediaTime()
             }
+            lastKey = key
             
             // Handle crossfade animation
             if let prev = previousOverlay,
@@ -175,7 +179,10 @@ final class CameraOverlayRenderer: OverlayRenderer {
                     dissolveFilter.setValue(t, forKey: kCIInputTimeKey)
                     
                     if let blended = dissolveFilter.outputImage {
-                        let composited = blended.composited(over: base)
+                        // Crop to base extent to prevent edge artifacts
+                        let composited = blended
+                            .cropped(to: base.extent)
+                            .composited(over: base)
                         
                         // Crossfade complete
                         if t >= 1.0 {
@@ -217,7 +224,7 @@ final class CameraOverlayRenderer: OverlayRenderer {
         let width = Int(size.width)
         let height = Int(size.height)
         
-        // Create Core Graphics context (thread-safe, no AppKit dependencies)
+        // Create Core Graphics context with predictable configuration
         // Using premultiplied alpha for correct blending with video
         guard let context = CGContext(
             data: nil,
@@ -226,10 +233,14 @@ final class CameraOverlayRenderer: OverlayRenderer {
             bitsPerComponent: 8,
             bytesPerRow: 0,
             space: colorSpace,
-            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue | CGBitmapInfo.byteOrder32Big.rawValue
         ) else {
             return CIImage.empty()
         }
+        
+        // Enable high-quality rendering
+        context.interpolationQuality = .high
+        context.setShouldAntialias(true)
         
         // Clear background
         context.clear(CGRect(x: 0, y: 0, width: width, height: height))
@@ -344,16 +355,10 @@ final class CameraOverlayRenderer: OverlayRenderer {
         let text = node.text.replacingTokens(with: tokens).trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else { return }
         
-        // Calculate font size
         let fontSize = frame.height * 0.7
-        
-        // Create system font with weight traits
         let ctFont = createSystemFont(size: fontSize, weightName: node.fontWeight)
-        
-        // Get color
         let color = cgColor(from: node.colorHex.replacingTokens(with: tokens)) ?? CGColor(gray: 1.0, alpha: 1.0)
         
-        // Create paragraph style for alignment
         var alignment: CTTextAlignment = .center
         switch node.alignment.lowercased() {
         case "left": alignment = .left
@@ -368,46 +373,30 @@ final class CameraOverlayRenderer: OverlayRenderer {
         )
         let paragraphStyle = CTParagraphStyleCreate(&alignmentSetting, 1)
         
-        // Create attributed string with Core Text attributes
-        let attributes: [CFString: Any] = [
+        let attrs: [CFString: Any] = [
             kCTFontAttributeName: ctFont,
             kCTForegroundColorAttributeName: color,
             kCTParagraphStyleAttributeName: paragraphStyle
         ]
         
-        let attributedString = CFAttributedStringCreate(
-            kCFAllocatorDefault,
-            text as CFString,
-            attributes as CFDictionary
-        )
+        guard let attributed = CFAttributedStringCreate(kCFAllocatorDefault, text as CFString, attrs as CFDictionary) else { return }
+        let framesetter = CTFramesetterCreateWithAttributedString(attributed)
         
-        // Create framesetter and frame
-        let framesetter = CTFramesetterCreateWithAttributedString(attributedString!)
-        
-        // Flip entire context once for text drawing (more efficient than per-text flipping)
-        context.saveGState()
-        
-        // Get context height for proper coordinate transformation
-        let contextHeight = CGFloat(context.height)
-        
-        // Flip Y axis once
-        context.translateBy(x: 0, y: contextHeight)
-        context.scaleBy(x: 1.0, y: -1.0)
-        
-        // Mirror frame's Y coordinate in flipped space
-        let flippedFrame = CGRect(
-            x: frame.origin.x,
-            y: contextHeight - frame.maxY,
-            width: frame.width,
-            height: frame.height
-        )
-        
+        // Build text path in unflipped CG space (frame as-is)
         let path = CGMutablePath()
-        path.addRect(flippedFrame)
+        path.addRect(frame)
+        _ = CTFramesetterCreateFrame(framesetter, CFRange(location: 0, length: 0), path, nil) // created only to validate
         
-        let ctFrame = CTFramesetterCreateFrame(framesetter, CFRange(location: 0, length: 0), path, nil)
-        CTFrameDraw(ctFrame, context)
+        context.saveGState()
+        // Flip only the local text region
+        context.translateBy(x: frame.minX, y: frame.maxY)
+        context.scaleBy(x: 1.0, y: -1.0)
+        context.textMatrix = .identity
         
+        let localPath = CGMutablePath()
+        localPath.addRect(CGRect(origin: .zero, size: CGSize(width: frame.width, height: frame.height)))
+        let localFrame = CTFramesetterCreateFrame(framesetter, CFRange(location: 0, length: 0), localPath, nil)
+        CTFrameDraw(localFrame, context)
         context.restoreGState()
     }
     

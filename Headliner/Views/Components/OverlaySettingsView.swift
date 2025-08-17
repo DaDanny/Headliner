@@ -262,7 +262,7 @@ struct OverlaySettingsView: View {
     if selectedPresetId != "none" {
       let tokens = OverlayTokens(
         displayName: displayName.isEmpty ? NSUserName() : displayName,
-        tagline: selectedPresetId == "professional" ? tagline : nil,
+        tagline: tagline.isEmpty ? nil : tagline,  // Always save tagline if not empty
         accentColorHex: accentColorHex,
         aspect: selectedAspect
       )

@@ -254,10 +254,14 @@ class AppState: ObservableObject {
   func selectPreset(_ presetId: String) {
     overlaySettings.selectedPresetId = presetId
     
+    // Preserve existing tokens if they exist, especially the tagline
+    let existingTokens = overlaySettings.overlayTokens
+    
     // If switching to Personal preset and no tokens exist, populate with defaults
     if presetId == "personal" && overlaySettings.overlayTokens == nil {
       overlaySettings.overlayTokens = OverlayTokens(
         displayName: overlaySettings.userName.isEmpty ? NSUserName() : overlaySettings.userName,
+        tagline: existingTokens?.tagline,  // Preserve tagline
         accentColorHex: "#34C759",
         aspect: overlaySettings.overlayAspect
       )
@@ -270,6 +274,7 @@ class AppState: ObservableObject {
         aspect: overlaySettings.overlayAspect
       )
     }
+    // Note: If tokens already exist, they are preserved (including tagline)
     
     saveOverlaySettings()
     notificationManager.postNotification(named: .updateOverlaySettings, overlaySettings: overlaySettings)
