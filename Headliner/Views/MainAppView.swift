@@ -96,6 +96,9 @@ struct MainAppView: View {
       OverlaySettingsView(appState: appState)
         .frame(width: 600, height: 700)
     }
+    .sheet(isPresented: $appState.isShowingSettings) {
+      SettingsView(appState: appState)
+    }
     .onAppear {
       // Basic setup
     }

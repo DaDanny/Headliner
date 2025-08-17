@@ -42,6 +42,7 @@ class AppState: ObservableObject {
   private let propertyManager: CustomPropertyManager
   private let outputImageManager: OutputImageManager
   private let notificationManager = NotificationManager.self
+  private let personalInfoPump = PersonalInfoPump()
 
   // MARK: - Private Properties
 
@@ -87,6 +88,7 @@ class AppState: ObservableObject {
     checkExtensionStatus()
     loadAvailableCameras()
     setupCaptureSession()
+    startPersonalInfoPump()
 
     logger.debug("AppState initialization complete")
   }
@@ -95,6 +97,7 @@ class AppState: ObservableObject {
 
   deinit {
     devicePollTimer?.invalidate()
+    personalInfoPump.stop()
     if let token = didBecomeActiveObserver {
       NSWorkspace.shared.notificationCenter.removeObserver(token)
     }
@@ -312,6 +315,21 @@ class AppState: ObservableObject {
   /// Get current aspect ratio
   var currentAspectRatio: OverlayAspect {
     overlaySettings.overlayAspect
+  }
+  
+  /// Start personal info pump for weather and location updates
+  func startPersonalInfoPump() {
+    personalInfoPump.start()
+  }
+  
+  /// Stop personal info pump
+  func stopPersonalInfoPump() {
+    personalInfoPump.stop()
+  }
+  
+  /// Manually refresh personal info immediately
+  func refreshPersonalInfoNow() {
+    personalInfoPump.refreshNow()
   }
 
   /// Persist `overlaySettings` to the shared app group so the extension can load them.
