@@ -16,31 +16,55 @@ struct DesignTokens {
   // MARK: - Colors
   
   struct Colors {
-    // Brand & Primary
-    static let brandPrimary = Color(hex: "#118342ff") // Danny F brand color
+    // Brand & Primary - More vibrant and Mac-native
+    static let brandPrimary = Color(hex: "#00D2FF") // Vibrant cyan-blue
+    static let brandSecondary = Color(hex: "#3A7BD5") // Complementary blue
+    static let brandGradient = LinearGradient(
+      colors: [brandPrimary, brandSecondary],
+      startPoint: .topLeading,
+      endPoint: .bottomTrailing
+    )
     
-    // Surfaces
-    static let surface = Color(hex: "#111214")
-    static let surfaceAlt = Color(hex: "#1A1C1F")
-    static let stroke = Color.white.opacity(0.08)
+    // Surfaces with more depth
+    static let surface = Color(hex: "#0A0B0F") // Deeper black
+    static let surfaceAlt = Color(hex: "#16171D") // Rich dark
+    static let surfaceRaised = Color(hex: "#1E1F26") // Elevated surface
+    static let stroke = Color.white.opacity(0.12) // More visible strokes
     
-    // Text
-    static let textPrimary = Color.white.opacity(0.95)
-    static let textSecondary = Color.white.opacity(0.72)
-    static let textTertiary = Color.white.opacity(0.55)
+    // Text with better hierarchy
+    static let textPrimary = Color.white.opacity(0.98)
+    static let textSecondary = Color.white.opacity(0.78)
+    static let textTertiary = Color.white.opacity(0.58)
+    static let textQuaternary = Color.white.opacity(0.38)
     
-    // Semantic
-    static let success = Color(hex: "#2BD17E")
-    static let warning = Color(hex: "#FFB020")
-    static let danger = Color(hex: "#FF5C5C")
+    // Fun, energetic semantic colors
+    static let success = Color(hex: "#00E676") // Electric green
+    static let warning = Color(hex: "#FFB300") // Warm amber
+    static let danger = Color(hex: "#FF3D71") // Vibrant red
+    static let info = Color(hex: "#2196F3") // Material blue
     
-    // Accent
-    static let accent = Color(hex: "#7C8CF8")
-    static let accentMuted = Color(hex: "#7C8CF8").opacity(0.18)
-    static let onAccent = Color(hex: "#0B1020")
+    // Modern accent system
+    static let accent = Color(hex: "#7C4DFF") // Deep purple
+    static let accentLight = Color(hex: "#B39DDB") // Light purple
+    static let accentMuted = Color(hex: "#7C4DFF").opacity(0.2)
+    static let onAccent = Color.white
     
-    // Overlay
-    static let overlayBg = Color.black.opacity(0.55)
+    // Glass and blur effects
+    static let glass = Color.white.opacity(0.08)
+    static let glassStroke = Color.white.opacity(0.16)
+    static let overlayBg = Color.black.opacity(0.6)
+    
+    // Interactive states
+    static let hoverOverlay = Color.white.opacity(0.04)
+    static let pressedOverlay = Color.white.opacity(0.08)
+    static let selectedOverlay = Color.white.opacity(0.12)
+    
+    // Mac-native system colors
+    static let systemBlue = Color.accentColor
+    static let systemGreen = Color(NSColor.systemGreen)
+    static let systemRed = Color(NSColor.systemRed)
+    static let systemOrange = Color(NSColor.systemOrange)
+    static let systemPurple = Color(NSColor.systemPurple)
   }
   
   // MARK: - Radius
@@ -133,25 +157,26 @@ struct DesignTokens {
     
     struct Button {
       struct Primary {
-        static let background = Colors.brandPrimary
-        static let foreground = Color(hex: "#0B0F0C")
+        static let background = Colors.brandGradient
+        static let foreground = Colors.onAccent
         static let radius = Radius.lg
-        static let height: CGFloat = 36
+        static let height: CGFloat = 40
+        static let shadow = Colors.brandPrimary.opacity(0.3)
       }
       
       struct Secondary {
-        static let background = Colors.surfaceAlt
-        static let stroke = Colors.stroke
+        static let background = Colors.glass
+        static let stroke = Colors.glassStroke
         static let foreground = Colors.textPrimary
         static let radius = Radius.lg
-        static let height: CGFloat = 32
+        static let height: CGFloat = 36
       }
       
       struct Ghost {
         static let background = Color.clear
         static let foreground = Colors.textSecondary
-        static let hoverBackground = Color.white.opacity(0.06)
-        static let radius = Radius.lg
+        static let hoverBackground = Colors.hoverOverlay
+        static let radius = Radius.md
         static let height: CGFloat = 32
       }
     }
@@ -246,19 +271,31 @@ extension Color {
 
 extension DesignTokens {
   struct Animations {
-    static let springResponse: Double = 0.28
-    static let springDamping: Double = 0.9
-    static let overlayFadeDuration: Double = 0.18
-    static let transitionDuration: Double = 0.15
+    // Bouncy, delightful springs
+    static let bouncySpring = Animation.interactiveSpring(response: 0.3, dampingFraction: 0.65, blendDuration: 0.2)
+    static let gentleSpring = Animation.spring(response: 0.4, dampingFraction: 0.8)
+    static let snappySpring = Animation.spring(response: 0.2, dampingFraction: 0.9)
     
-    // Standard spring animation
-    static let spring = Animation.spring(response: springResponse, dampingFraction: springDamping)
+    // Smooth easing curves
+    static let smoothEase = Animation.easeInOut(duration: 0.25)
+    static let quickEase = Animation.easeOut(duration: 0.15)
+    static let slowEase = Animation.easeInOut(duration: 0.4)
     
-    // Quick fade
-    static let fade = Animation.easeInOut(duration: overlayFadeDuration)
+    // Playful animations
+    static let wiggle = Animation.easeInOut(duration: 0.1).repeatCount(3, autoreverses: true)
+    static let pulse = Animation.easeInOut(duration: 1.0).repeatForever(autoreverses: true)
+    static let breathe = Animation.easeInOut(duration: 2.0).repeatForever(autoreverses: true)
     
-    // Standard transition
-    static let transition = Animation.easeInOut(duration: transitionDuration)
+    // UI-specific animations
+    static let buttonPress = Animation.spring(response: 0.15, dampingFraction: 0.8)
+    static let cardHover = Animation.spring(response: 0.3, dampingFraction: 0.7)
+    static let overlayFade = Animation.easeInOut(duration: 0.2)
+    static let sheetTransition = Animation.spring(response: 0.5, dampingFraction: 0.85)
+    
+    // Fun micro-interactions
+    static let successPop = Animation.spring(response: 0.2, dampingFraction: 0.5)
+    static let errorShake = Animation.easeInOut(duration: 0.05).repeatCount(4, autoreverses: true)
+    static let loadingBounce = Animation.easeInOut(duration: 0.6).repeatForever(autoreverses: true)
   }
 }
 
