@@ -32,6 +32,9 @@ final class CameraOverlayRenderer: OverlayRenderer {
     
     // MARK: - Properties
     
+    /// Serial queue for thread-safe cache access
+    private let cacheQueue = DispatchQueue(label: "CameraOverlayRenderer.cache")
+    
     /// Core Image context for GPU-accelerated rendering
     private let ciContext: CIContext
     
@@ -48,29 +51,22 @@ final class CameraOverlayRenderer: OverlayRenderer {
     private let crossfadeDuration: CFTimeInterval = 0.25
     
     /// Deterministic cache key for overlay layouts.
-    /// Uses explicit field comparison instead of Swift's hashValue to ensure
-    /// cache stability across app launches.
+    /// Uses consolidated token signature for comprehensive invalidation.
     struct LayoutKey: Hashable {
         let presetID: String
-        let aspect: String // Use rawValue string for deterministic hashing
-        let displayName: String
-        let tagline: String
-        let accentColorHex: String
+        let aspect: String
+        let signature: String
         
         static func == (lhs: LayoutKey, rhs: LayoutKey) -> Bool {
             return lhs.presetID == rhs.presetID &&
                    lhs.aspect == rhs.aspect &&
-                   lhs.displayName == rhs.displayName &&
-                   lhs.tagline == rhs.tagline &&
-                   lhs.accentColorHex == rhs.accentColorHex
+                   lhs.signature == rhs.signature
         }
         
         func hash(into hasher: inout Hasher) {
             hasher.combine(presetID)
             hasher.combine(aspect)
-            hasher.combine(displayName)
-            hasher.combine(tagline)
-            hasher.combine(accentColorHex)
+            hasher.combine(signature)
         }
     }
     
@@ -83,20 +79,23 @@ final class CameraOverlayRenderer: OverlayRenderer {
     // MARK: - Initialization
     
     init() {
-        // Attempt to use Metal for best performance on Apple Silicon and modern GPUs
+        // Metal-first approach for best performance
         if let device = MTLCreateSystemDefaultDevice() {
-            self.ciContext = CIContext(mtlDevice: device, options: [
-                .workingColorSpace: colorSpace,      // Ensure consistent color space
-                .outputColorSpace: colorSpace,       // for input and output
-                .priorityRequestLow: false,          // High priority for real-time video
-                .cacheIntermediates: true            // Cache intermediate filter results
-            ])
+            self.ciContext = CIContext(
+                mtlDevice: device,
+                options: [
+                    .workingColorSpace: colorSpace,
+                    .outputColorSpace: colorSpace,
+                    .priorityRequestLow: false,
+                    .cacheIntermediates: true
+                ]
+            )
         } else {
-            // Fallback to OpenGL-based GPU acceleration if Metal unavailable
+            // CPU fallback when Metal is unavailable
             self.ciContext = CIContext(options: [
                 .workingColorSpace: colorSpace,
                 .outputColorSpace: colorSpace,
-                .useSoftwareRenderer: false          // Force GPU acceleration
+                .useSoftwareRenderer: true
             ])
         }
         
@@ -110,77 +109,91 @@ final class CameraOverlayRenderer: OverlayRenderer {
                 preset: OverlayPreset,
                 tokens: OverlayTokens,
                 previousFrame: CIImage?) -> CIImage {
-        
-        let base = CIImage(cvPixelBuffer: pixelBuffer, options: [.colorSpace: colorSpace])
-        
-        // Early return for no overlay
-        guard !preset.nodes.isEmpty else { return base }
-        
-        // Enrich tokens for personal preset
-        var enrichedTokens = tokens
-        if preset.id == "personal" {
-            enrichedTokens.city = enrichedTokens.city ?? personalInfoProvider.city()
-            enrichedTokens.localTime = enrichedTokens.localTime ?? personalInfoProvider.localTime()
-            enrichedTokens.weatherEmoji = enrichedTokens.weatherEmoji ?? personalInfoProvider.weatherEmoji()
-            enrichedTokens.weatherText = enrichedTokens.weatherText ?? personalInfoProvider.weatherText()
-        }
-        
-        let width = CGFloat(CVPixelBufferGetWidth(pixelBuffer))
-        let height = CGFloat(CVPixelBufferGetHeight(pixelBuffer))
-        let containerSize = CGSize(width: width, height: height)
-        
-        // Create deterministic cache key
-        let key = LayoutKey(
-            presetID: preset.id,
-            aspect: enrichedTokens.aspect.rawValue,
-            displayName: enrichedTokens.displayName,
-            tagline: enrichedTokens.tagline ?? "",
-            accentColorHex: enrichedTokens.accentColorHex
-        )
-        
-        // Check cache or build new overlay
-        let overlay: CIImage
-        if let cached = cache.value(forKey: key) {
-            overlay = cached
-        } else {
-            overlay = buildOverlayImage(preset: preset, tokens: enrichedTokens, size: containerSize)
-            cache.setValue(overlay, forKey: key)
-        }
-        
-        // Handle aspect change crossfade
-        if let prev = previousOverlay,
-           let start = crossfadeStart,
-           CACurrentMediaTime() - start < crossfadeDuration {
+        return autoreleasepool {
+            let base = CIImage(cvPixelBuffer: pixelBuffer, options: [.colorSpace: colorSpace])
             
-            let t = min((CACurrentMediaTime() - start) / crossfadeDuration, 1.0)
+            // Early return for no overlay
+            guard !preset.nodes.isEmpty else { return base }
             
-            // Use CIDissolveTransition for smooth, optimized crossfade
-            if let dissolveFilter = CIFilter(name: "CIDissolveTransition") {
-                dissolveFilter.setValue(prev, forKey: kCIInputImageKey)
-                dissolveFilter.setValue(overlay, forKey: kCIInputTargetImageKey)
-                dissolveFilter.setValue(t, forKey: kCIInputTimeKey)
-                
-                if let blended = dissolveFilter.outputImage {
-                    let composited = blended.composited(over: base)
-                    
-                    // Crossfade complete
-                    if t >= 1.0 {
-                        previousOverlay = overlay
-                        crossfadeStart = nil
-                    }
-                    
-                    return composited
+            // Enrich tokens for personal preset
+            var enrichedTokens = tokens
+            if preset.id == "personal" {
+                enrichedTokens.city = enrichedTokens.city ?? personalInfoProvider.city()
+                enrichedTokens.localTime = enrichedTokens.localTime ?? personalInfoProvider.localTime()
+                enrichedTokens.weatherEmoji = enrichedTokens.weatherEmoji ?? personalInfoProvider.weatherEmoji()
+                enrichedTokens.weatherText = enrichedTokens.weatherText ?? personalInfoProvider.weatherText()
+            }
+            
+            let width = CGFloat(CVPixelBufferGetWidth(pixelBuffer))
+            let height = CGFloat(CVPixelBufferGetHeight(pixelBuffer))
+            let containerSize = CGSize(width: width, height: height)
+            
+            // Create consolidated signature for cache key
+            let signature = [
+                enrichedTokens.displayName,
+                enrichedTokens.tagline ?? "",
+                enrichedTokens.accentColorHex,
+                enrichedTokens.city ?? "",
+                enrichedTokens.localTime ?? "",
+                enrichedTokens.weatherEmoji ?? "",
+                enrichedTokens.weatherText ?? ""
+            ].joined(separator: "|")
+            
+            let key = LayoutKey(
+                presetID: preset.id,
+                aspect: enrichedTokens.aspect.rawValue,
+                signature: signature
+            )
+            
+            // Thread-safe cache access
+            let overlay: CIImage = cacheQueue.sync {
+                if let cached = cache.value(forKey: key) {
+                    return cached
+                } else {
+                    let built = buildOverlayImage(preset: preset, tokens: enrichedTokens, size: containerSize)
+                    cache.setValue(built, forKey: key)
+                    return built
                 }
             }
-        }
-        
-        // Store current overlay for potential future crossfade
-        if previousOverlay == nil || (previousOverlay != nil && overlay.extent != previousOverlay?.extent) {
+            
+            // Auto-trigger crossfade if overlay extent changes
+            if previousOverlay?.extent != overlay.extent {
+                crossfadeStart = CACurrentMediaTime()
+            }
+            
+            // Handle crossfade animation
+            if let prev = previousOverlay,
+               let start = crossfadeStart,
+               CACurrentMediaTime() - start < crossfadeDuration {
+                
+                let t = min((CACurrentMediaTime() - start) / crossfadeDuration, 1.0)
+                
+                // Use CIDissolveTransition for smooth, optimized crossfade
+                if let dissolveFilter = CIFilter(name: "CIDissolveTransition") {
+                    dissolveFilter.setValue(prev, forKey: kCIInputImageKey)
+                    dissolveFilter.setValue(overlay, forKey: kCIInputTargetImageKey)
+                    dissolveFilter.setValue(t, forKey: kCIInputTimeKey)
+                    
+                    if let blended = dissolveFilter.outputImage {
+                        let composited = blended.composited(over: base)
+                        
+                        // Crossfade complete
+                        if t >= 1.0 {
+                            previousOverlay = overlay
+                            crossfadeStart = nil
+                        }
+                        
+                        return composited
+                    }
+                }
+            }
+            
+            // Store current overlay for potential future crossfade
             previousOverlay = overlay
+            
+            // Standard composition
+            return overlay.composited(over: base)
         }
-        
-        // Standard composition
-        return overlay.composited(over: base)
     }
     
     /// Notify renderer that aspect ratio is changing
@@ -231,7 +244,8 @@ final class CameraOverlayRenderer: OverlayRenderer {
                   placement.opacity > 0 else { continue }
             
             let node = preset.nodes[placement.index]
-            let frame = placement.frame.toCGRect(in: size)
+            // Apply pixel snapping for crisp edges
+            let frame = placement.frame.toCGRect(in: size).integral
             
             context.saveGState()
             context.setAlpha(placement.opacity)
@@ -257,6 +271,35 @@ final class CameraOverlayRenderer: OverlayRenderer {
     }
     
     // MARK: - Core Graphics Drawing (No AppKit)
+    
+    /// Create a Core Text font using system font with specified weight.
+    /// This avoids hardcoded font names and uses trait-based selection.
+    private func createSystemFont(size: CGFloat, weightName: String) -> CTFont {
+        let weight: CGFloat
+        switch weightName.lowercased() {
+        case "black":    weight = 0.62   // UIFontWeight.black equivalent
+        case "heavy":    weight = 0.56   // UIFontWeight.heavy equivalent
+        case "bold":     weight = 0.4    // UIFontWeight.bold equivalent
+        case "semibold": weight = 0.3    // UIFontWeight.semibold equivalent
+        case "medium":   weight = 0.23   // UIFontWeight.medium equivalent
+        case "regular":  weight = 0.0    // UIFontWeight.regular equivalent
+        case "light":    weight = -0.4   // UIFontWeight.light equivalent
+        case "thin":     weight = -0.6   // UIFontWeight.thin equivalent
+        case "ultralight": weight = -0.8 // UIFontWeight.ultraLight equivalent
+        default:         weight = 0.0     // Default to regular
+        }
+        
+        let traits: [CFString: Any] = [
+            kCTFontWeightTrait: weight
+        ]
+        
+        let attributes: [CFString: Any] = [
+            kCTFontTraitsAttribute: traits
+        ]
+        
+        let descriptor = CTFontDescriptorCreateWithAttributes(attributes as CFDictionary)
+        return CTFontCreateWithFontDescriptor(descriptor, size, nil)
+    }
     
     private func drawRect(_ node: RectNode, in frame: CGRect, tokens: OverlayTokens, context: CGContext) {
         guard let color = cgColor(from: node.colorHex.replacingTokens(with: tokens)) else { return }
@@ -304,9 +347,8 @@ final class CameraOverlayRenderer: OverlayRenderer {
         // Calculate font size
         let fontSize = frame.height * 0.7
         
-        // Create Core Text font (no NSFont)
-        let fontName = determineFontName(for: node.fontWeight)
-        let ctFont = CTFontCreateWithName(fontName as CFString, fontSize, nil)
+        // Create system font with weight traits
+        let ctFont = createSystemFont(size: fontSize, weightName: node.fontWeight)
         
         // Get color
         let color = cgColor(from: node.colorHex.replacingTokens(with: tokens)) ?? CGColor(gray: 1.0, alpha: 1.0)
@@ -342,16 +384,26 @@ final class CameraOverlayRenderer: OverlayRenderer {
         // Create framesetter and frame
         let framesetter = CTFramesetterCreateWithAttributedString(attributedString!)
         
-        // Core Text draws upside down in a standard CGContext, so we need to flip just for text
+        // Flip entire context once for text drawing (more efficient than per-text flipping)
         context.saveGState()
         
-        // Flip the coordinate system for this text
-        context.translateBy(x: frame.origin.x + frame.width/2, y: frame.origin.y + frame.height/2)
+        // Get context height for proper coordinate transformation
+        let contextHeight = CGFloat(context.height)
+        
+        // Flip Y axis once
+        context.translateBy(x: 0, y: contextHeight)
         context.scaleBy(x: 1.0, y: -1.0)
-        context.translateBy(x: -(frame.origin.x + frame.width/2), y: -(frame.origin.y + frame.height/2))
+        
+        // Mirror frame's Y coordinate in flipped space
+        let flippedFrame = CGRect(
+            x: frame.origin.x,
+            y: contextHeight - frame.maxY,
+            width: frame.width,
+            height: frame.height
+        )
         
         let path = CGMutablePath()
-        path.addRect(frame)
+        path.addRect(flippedFrame)
         
         let ctFrame = CTFramesetterCreateFrame(framesetter, CFRange(location: 0, length: 0), path, nil)
         CTFrameDraw(ctFrame, context)
@@ -389,16 +441,6 @@ final class CameraOverlayRenderer: OverlayRenderer {
         return CGColor(colorSpace: colorSpace, components: [r, g, b, a])
     }
     
-    private func determineFontName(for weight: String) -> String {
-        // Use SF Pro Display for better rendering at larger sizes
-        switch weight.lowercased() {
-        case "bold": return "SFProDisplay-Bold"
-        case "semibold": return "SFProDisplay-Semibold"
-        case "medium": return "SFProDisplay-Medium"
-        case "light": return "SFProDisplay-Light"
-        default: return "SFProDisplay-Regular"
-        }
-    }
 }
 
 // MARK: - LRU Cache
