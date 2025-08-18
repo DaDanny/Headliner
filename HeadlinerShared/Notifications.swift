@@ -6,6 +6,9 @@ enum NotificationName: String, CaseIterable {
   case stopStream
   case setCameraDevice
   case updateOverlaySettings
+  // New SwiftUI overlay system notifications
+  case overlayUpdated
+  case overlayCleared
   
   var rawValue: String {
     switch self {
@@ -17,12 +20,16 @@ enum NotificationName: String, CaseIterable {
       return "\(Identifiers.notificationPrefix).setCameraDevice"
     case .updateOverlaySettings:
       return "\(Identifiers.notificationPrefix).updateOverlaySettings"
+    case .overlayUpdated:
+      return "\(Identifiers.notificationPrefix).overlayUpdated"
+    case .overlayCleared:
+      return "\(Identifiers.notificationPrefix).overlayCleared"
     }
   }
   
   // Required for CaseIterable when we override rawValue
   static var allCases: [NotificationName] {
-    [.startStream, .stopStream, .setCameraDevice, .updateOverlaySettings]
+    [.startStream, .stopStream, .setCameraDevice, .updateOverlaySettings, .overlayUpdated, .overlayCleared]
   }
   
   // Support for initialization from string (used in CameraExtension)
@@ -81,6 +88,18 @@ final class NotificationManager {
       nil,
       true
     )
+  }
+  
+  // MARK: - SwiftUI Overlay System Notifications
+  
+  /// Post notification that a new SwiftUI overlay is available
+  class func postOverlayUpdated() {
+    postNotification(named: .overlayUpdated)
+  }
+  
+  /// Post notification that overlay has been cleared
+  class func postOverlayCleared() {
+    postNotification(named: .overlayCleared)
   }
 }
 

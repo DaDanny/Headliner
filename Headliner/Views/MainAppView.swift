@@ -66,9 +66,9 @@ struct MainAppView: View {
             cameraSettingsContent
           }
 
-          // Overlay Settings
+          // SwiftUI Overlay Settings
           GlassmorphicCard {
-            overlaySettingsContent
+            OverlayPickerView()
           }
 
           Spacer()
@@ -93,6 +93,7 @@ struct MainAppView: View {
       }
     )
     .sheet(isPresented: $appState.isShowingOverlaySettings) {
+      // Legacy overlay settings (kept for compatibility)
       OverlaySettingsView(appState: appState)
         .frame(width: 600, height: 700)
     }
