@@ -33,59 +33,6 @@ protocol OverlayRenderer {
                 previousFrame: CIImage?) -> CIImage
 }
 
-// MARK: - Personal Info Provider
-
-/// Protocol for providing personal information (location, time, weather).
-///
-/// This protocol abstracts the source of dynamic personal data used in overlays.
-/// The stub implementation provides sample data, but this can be replaced with
-/// real data sources (Core Location, Weather APIs) in the future.
-protocol PersonalInfoProvider {
-    /// Get the user's current city
-    func city() -> String?
-    
-    /// Get the current local time formatted for display
-    func localTime() -> String?
-    
-    /// Get an emoji representing current weather conditions
-    func weatherEmoji() -> String?
-    
-    /// Get a text description of current weather
-    func weatherText() -> String?
-}
-
-// MARK: - Personal Info Provider Stub
-
-/// Stub implementation returning sample data for personal information.
-///
-/// This implementation provides static sample data for testing and initial deployment.
-/// In production, this can be replaced with real implementations that:
-/// - Use Core Location for actual user location
-/// - Call weather APIs for real-time weather data
-/// - Format time based on user preferences
-class PersonalInfoProviderStub: PersonalInfoProvider {
-    func city() -> String? {
-        // TODO: Replace with Core Location implementation
-        return "Pittsburgh"
-    }
-    
-    func localTime() -> String? {
-        // Returns actual current time in 12-hour format
-        let formatter = DateFormatter()
-        formatter.dateFormat = "h:mm a"
-        return formatter.string(from: Date())
-    }
-    
-    func weatherEmoji() -> String? {
-        // TODO: Replace with weather API integration
-        return "☀️"
-    }
-    
-    func weatherText() -> String? {
-        // TODO: Replace with weather API integration
-        return "Sunny"
-    }
-}
 
 // MARK: - Overlay Preset Store
 

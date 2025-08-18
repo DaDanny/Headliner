@@ -73,8 +73,8 @@ final class CameraOverlayRenderer: OverlayRenderer {
     /// LRU cache for rendered overlay images to avoid redundant rendering
     private var cache = LRUCache<LayoutKey, CIImage>(capacity: 6)  // Reduced for MVP memory footprint
     
-    /// Provider for personal information (location, time, weather)
-    private let personalInfoProvider: PersonalInfoProvider
+    /// Reader for personal information from App Group storage
+    private let personalInfoReader = PersonalInfoReader()
     
     /// Track last layout key to detect content changes for crossfade
     private var lastKey: LayoutKey?
@@ -102,8 +102,7 @@ final class CameraOverlayRenderer: OverlayRenderer {
             ])
         }
         
-        // Use stub provider for now (will be replaced with real implementation)
-        self.personalInfoProvider = PersonalInfoProviderStub()
+        // PersonalInfoReader reads from App Group storage
     }
     
     // MARK: - Public Methods
@@ -121,10 +120,16 @@ final class CameraOverlayRenderer: OverlayRenderer {
             // Enrich tokens for personal preset
             var enrichedTokens = tokens
             if preset.id == "personal" {
-                enrichedTokens.city = enrichedTokens.city ?? personalInfoProvider.city()
-                enrichedTokens.localTime = enrichedTokens.localTime ?? personalInfoProvider.localTime()
-                enrichedTokens.weatherEmoji = enrichedTokens.weatherEmoji ?? personalInfoProvider.weatherEmoji()
-                enrichedTokens.weatherText = enrichedTokens.weatherText ?? personalInfoProvider.weatherText()
+                // Read personal info from App Group storage (updated by main app)
+                if let personalInfo = personalInfoReader.readPersonalInfo() {
+                    enrichedTokens.city = enrichedTokens.city ?? personalInfo.city
+                    enrichedTokens.localTime = enrichedTokens.localTime ?? personalInfo.localTime
+                    enrichedTokens.weatherEmoji = enrichedTokens.weatherEmoji ?? personalInfo.weatherEmoji
+                    enrichedTokens.weatherText = enrichedTokens.weatherText ?? personalInfo.weatherText
+                    
+                    // Debug log to see what values we're using
+                    print("[CameraOverlayRenderer] Personal tokens - city: \(enrichedTokens.city ?? "nil"), time: \(enrichedTokens.localTime ?? "nil"), weather: \(enrichedTokens.weatherEmoji ?? "nil")")
+                }
             }
             
             let width = CGFloat(CVPixelBufferGetWidth(pixelBuffer))
@@ -249,12 +254,23 @@ final class CameraOverlayRenderer: OverlayRenderer {
         let placements = preset.layout.placements(for: tokens.aspect)
             .sorted { $0.zIndex < $1.zIndex }
         
+        // Special handling for personal preset - don't render background if no data
+        let hasPersonalData = preset.id != "personal" || 
+            (tokens.city != nil && !tokens.city!.isEmpty) ||
+            (tokens.weatherEmoji != nil && !tokens.weatherEmoji!.isEmpty)
+        
         // Draw each node
         for placement in placements {
             guard placement.index < preset.nodes.count,
                   placement.opacity > 0 else { continue }
             
             let node = preset.nodes[placement.index]
+            
+            // Skip background rect for personal preset if no data
+            if preset.id == "personal" && placement.index == 0 && !hasPersonalData {
+                continue
+            }
+            
             // Apply pixel snapping for crisp edges
             let frame = placement.frame.toCGRect(in: size).integral
             
@@ -352,6 +368,14 @@ final class CameraOverlayRenderer: OverlayRenderer {
     }
     
     private func drawText(_ node: TextNode, in frame: CGRect, tokens: OverlayTokens, context: CGContext) {
+        // Special handling for personal preset - skip nodes with missing data
+        if node.text.contains("{city}") && (tokens.city == nil || tokens.city?.isEmpty == true) {
+            return // Skip city line if no city data
+        }
+        if node.text.contains("{weatherEmoji}") && (tokens.weatherEmoji == nil || tokens.weatherEmoji?.isEmpty == true) {
+            return // Skip weather line if no weather data
+        }
+        
         let text = node.text.replacingTokens(with: tokens).trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else { return }
         
