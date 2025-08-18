@@ -76,6 +76,15 @@ This comprehensive guide covers:
 - Performance optimizations
 - Troubleshooting guide
 
+📖 **[Personal Info Subsystem Documentation](docs/PERSONAL_INFO_SUBSYSTEM.md)**
+
+Details about the location and weather features:
+
+- Location services integration
+- Weather data providers (WeatherKit & Open-Meteo)
+- Automatic refresh system
+- App Group persistence for extension access
+
 ## Troubleshooting
 
 ### Extension Not Installing
@@ -140,7 +149,14 @@ For detailed component descriptions, see the [technical documentation](docs/CAME
 
 ## Privacy
 
-Headliner processes all video locally on your device. No video data is transmitted to external servers. Camera access is required for the virtual camera functionality and can be revoked at any time through System Settings > Privacy & Security > Camera.
+Headliner processes all video locally on your device. No video data is transmitted to external servers.
+
+**Required Permissions:**
+
+- **Camera**: Required for virtual camera functionality
+- **Location** (optional): Used for displaying city and local time in overlays
+
+Weather data is fetched from either Apple's WeatherKit service or the open-source Open-Meteo API. All permissions can be revoked at any time through System Settings > Privacy & Security.
 
 ## Current Status
 
@@ -154,11 +170,12 @@ Headliner processes all video locally on your device. No video data is transmitt
 - Beautiful modern UI with animations
 - Real-time preview with overlay
 - Smooth transitions between presets
+- Real location and weather data with automatic updates
+- Dual weather providers (WeatherKit + Open-Meteo fallback)
 
 🚧 **Known Limitations**:
 
 - App must be in `/Applications` folder for system extension
-- Weather/location data currently uses placeholder values
 - Color customization requires manual configuration
 
 ---
