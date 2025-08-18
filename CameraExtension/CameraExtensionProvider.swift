@@ -58,11 +58,15 @@ class CameraExtensionDeviceSource: NSObject, CMIOExtensionDeviceSource, AVCaptur
 	private var overlaySettings: OverlaySettings = OverlaySettings()
 	private let overlaySettingsLock = NSLock()
 	
-	// Preset system components
+	// Preset system components (legacy)
 	private var overlayRenderer: CameraOverlayRenderer?
 	private var overlayPresetStore: OverlayPresetStore?
 	private var lastRenderedOverlay: CIImage?
 	private var lastAspectRatio: OverlayAspect?
+	
+	// New SwiftUI overlay system
+	private var overlayCache: OverlayCache?
+	private var swiftUICompositor: SwiftUIOverlayCompositor?
 	
 	init(localizedName: String) {
 		
@@ -101,11 +105,25 @@ class CameraExtensionDeviceSource: NSObject, CMIOExtensionDeviceSource, AVCaptur
 		loadOverlaySettings()
 		extensionLogger.debug("✅ CameraExtensionDeviceSource init - overlay settings loaded")
 		
-		// Initialize preset system components
+		// Initialize preset system components (legacy)
 		// Use thread-safe renderer with Core frameworks only (no AppKit)
 		overlayRenderer = CameraOverlayRenderer()
 		overlayPresetStore = OverlayPresetStore()
 		extensionLogger.debug("✅ Initialized camera overlay renderer (thread-safe, Metal-backed)")
+		
+		// Initialize new SwiftUI overlay system
+		overlayCache = OverlayCache()
+		if let cache = overlayCache {
+			swiftUICompositor = SwiftUIOverlayCompositor(overlayCache: cache)
+			// Load any existing overlay on startup
+			cache.loadFromDiskIfChanged()
+			extensionLogger.debug("✅ Initialized SwiftUI overlay system")
+		} else {
+			extensionLogger.error("Failed to initialize SwiftUI overlay system")
+		}
+		
+		// Set up notification listeners for new overlay system
+		setupOverlayNotificationListeners()
 	}
 	
 	var availableProperties: Set<CMIOExtensionProperty> {
@@ -333,8 +351,13 @@ class CameraExtensionDeviceSource: NSObject, CMIOExtensionDeviceSource, AVCaptur
 		}
 		_cameraFrameLock.unlock()
 		
-		// Always use preset system for overlays
-		drawOverlaysWithPresetSystem(pixelBuffer: pixelBuffer, context: context, rect: rect)
+		// Use new SwiftUI overlay system if available, fallback to legacy preset system
+		if let compositor = swiftUICompositor {
+			drawSwiftUIOverlays(pixelBuffer: pixelBuffer, context: context, rect: rect)
+		} else {
+			// Fallback to legacy preset system
+			drawOverlaysWithPresetSystem(pixelBuffer: pixelBuffer, context: context, rect: rect)
+		}
 		
 		// Create and send CMSampleBuffer
 		var sampleBuffer: CMSampleBuffer?
@@ -707,6 +730,82 @@ class CameraExtensionDeviceSource: NSObject, CMIOExtensionDeviceSource, AVCaptur
 		
 		// Convert CIImage to CGImage and draw it
 		if let cgImage = CIContext().createCGImage(overlayImage, from: overlayImage.extent) {
+			context.draw(cgImage, in: rect)
+		}
+	}
+	
+	// MARK: SwiftUI Overlay System
+	
+	private func setupOverlayNotificationListeners() {
+		// Listen for overlay update notifications
+		CFNotificationCenterAddObserver(
+			CFNotificationCenterGetDarwinNotifyCenter(),
+			Unmanaged.passUnretained(self).toOpaque(),
+			{ (_, observer, name, _, _) in
+				guard let observer = observer,
+					  let name = name else { return }
+				
+				let extensionSource = Unmanaged<CameraExtensionDeviceSource>.fromOpaque(observer).takeUnretainedValue()
+				let notificationName = String(describing: name)
+				
+				DispatchQueue.main.async {
+					extensionSource.handleOverlayNotification(notificationName)
+				}
+			},
+			CFNotificationName(NotificationName.overlayUpdated.rawValue as CFString),
+			nil,
+			.deliverImmediately
+		)
+		
+		CFNotificationCenterAddObserver(
+			CFNotificationCenterGetDarwinNotifyCenter(),
+			Unmanaged.passUnretained(self).toOpaque(),
+			{ (_, observer, name, _, _) in
+				guard let observer = observer,
+					  let name = name else { return }
+				
+				let extensionSource = Unmanaged<CameraExtensionDeviceSource>.fromOpaque(observer).takeUnretainedValue()
+				let notificationName = String(describing: name)
+				
+				DispatchQueue.main.async {
+					extensionSource.handleOverlayNotification(notificationName)
+				}
+			},
+			CFNotificationName(NotificationName.overlayCleared.rawValue as CFString),
+			nil,
+			.deliverImmediately
+		)
+		
+		extensionLogger.debug("Set up SwiftUI overlay notification listeners")
+	}
+	
+	private func handleOverlayNotification(_ notificationName: String) {
+		guard let compositor = swiftUICompositor else { return }
+		
+		if notificationName.contains("overlayUpdated") {
+			compositor.handleOverlayUpdated()
+			extensionLogger.debug("Handled overlayUpdated notification")
+		} else if notificationName.contains("overlayCleared") {
+			compositor.handleOverlayCleared()
+			extensionLogger.debug("Handled overlayCleared notification")
+		}
+	}
+	
+	private func drawSwiftUIOverlays(pixelBuffer: CVPixelBuffer, context: CGContext, rect: CGRect) {
+		guard let compositor = swiftUICompositor else { return }
+		
+		// Create CIImage from current frame (camera + any graphics drawn so far)
+		let currentFrameImage = CIImage(cvPixelBuffer: pixelBuffer)
+		
+		// Composite overlay over the current frame
+		let compositedImage = compositor.compose(
+			cameraFrame: currentFrameImage,
+			frameSize: rect.size
+		)
+		
+		// Convert back to CGImage and draw
+		let ciContext = CIContext()
+		if let cgImage = ciContext.createCGImage(compositedImage, from: compositedImage.extent) {
 			context.draw(cgImage, in: rect)
 		}
 	}
