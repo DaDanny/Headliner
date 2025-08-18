@@ -117,6 +117,7 @@ open Headliner.xcodeproj
 # Build and run (⌘R)
 # Note: Configure signing with your Apple Developer account
 # The app must run from /Applications for the system extension to work
+# SwiftUI previews are included in each View file for development
 ```
 
 ### Project Structure
@@ -124,18 +125,22 @@ open Headliner.xcodeproj
 ```
 Headliner/
 ├── Headliner/              # Main application (SwiftUI)
-│   ├── Views/              # UI components
+│   ├── Views/              # UI components and their previews
 │   ├── Managers/           # App services
-│   └── AppState.swift      # State management
+│   ├── Services/           # Location, weather, and personal info services
+│   ├── ViewModels/         # View-specific state management
+│   └── AppState.swift      # Central state management
 ├── CameraExtension/        # System extension
 │   ├── CameraExtensionProvider.swift
 │   └── Rendering/          # Overlay renderer
-├── HeadlinerShared/        # Shared code
+├── HeadlinerShared/        # Shared code between app and extension
 │   ├── OverlayModels.swift
 │   ├── OverlayPresets.swift
-│   └── CaptureSessionManager.swift
+│   ├── CaptureSessionManager.swift
+│   └── PersonalInfoModels.swift
 └── docs/                   # Documentation
-    └── CAMERA_EXTENSION_AND_OVERLAYS.md
+    ├── CAMERA_EXTENSION_AND_OVERLAYS.md
+    └── PERSONAL_INFO_SUBSYSTEM.md
 ```
 
 For detailed component descriptions, see the [technical documentation](docs/CAMERA_EXTENSION_AND_OVERLAYS.md).
