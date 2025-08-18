@@ -131,6 +131,7 @@ struct MainAppView: View {
           .font(.system(size: 12, weight: .regular))
           .foregroundColor(.secondary)
 
+        // Settings button
         Button(action: { appState.isShowingSettings.toggle() }) {
           Image(systemName: "gear")
             .font(.system(size: 18, weight: .medium))
@@ -140,6 +141,21 @@ struct MainAppView: View {
             .overlay(Circle().stroke(.separator, lineWidth: 1))
         }
         .buttonStyle(ScaleButtonStyle())
+        .help("Open Settings")
+        
+        // Quick location permission button (temporary for testing)
+        if appState.locationPermissionStatus == .notDetermined {
+          Button(action: { appState.requestLocationPermission() }) {
+            Image(systemName: "location.fill")
+              .font(.system(size: 18, weight: .medium))
+              .foregroundColor(.orange)
+              .frame(width: 32, height: 32)
+              .background(Circle().fill(.background))
+              .overlay(Circle().stroke(Color.orange.opacity(0.5), lineWidth: 1))
+          }
+          .buttonStyle(ScaleButtonStyle())
+          .help("Request Location Permission")
+        }
       }
     }
     .padding(.horizontal, 24)

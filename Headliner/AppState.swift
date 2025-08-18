@@ -7,6 +7,7 @@
 
 import AVFoundation
 import Combine
+import CoreLocation
 import SwiftUI
 import SystemExtensions
 
@@ -35,6 +36,8 @@ class AppState: ObservableObject {
   @Published var overlaySettings: OverlaySettings = .init()
   /// Controls presentation of the overlay settings sheet.
   @Published var isShowingOverlaySettings: Bool = false
+  /// Current location authorization status
+  @Published var locationAuthorizationStatus: CLAuthorizationStatus = .notDetermined
 
   // MARK: - Dependencies
 
@@ -43,6 +46,7 @@ class AppState: ObservableObject {
   private let outputImageManager: OutputImageManager
   private let notificationManager = NotificationManager.self
   private let personalInfoPump = PersonalInfoPump()
+  let locationPermissionManager = LocationPermissionManager()
 
   // MARK: - Private Properties
 
@@ -51,6 +55,7 @@ class AppState: ObservableObject {
   private var captureSessionManager: CaptureSessionManager?
   private var devicePollTimer: Timer?
   private var didBecomeActiveObserver: NSObjectProtocol?
+  private var locationPermissionObserver: NSObjectProtocol?
   private let devicePollWindow: TimeInterval = 60 // seconds
   private let devicePollInterval: TimeInterval = 0.5
 
@@ -89,6 +94,9 @@ class AppState: ObservableObject {
     loadAvailableCameras()
     setupCaptureSession()
     startPersonalInfoPump()
+    
+    // Initialize location permission status
+    locationAuthorizationStatus = locationPermissionManager.authorizationStatus
 
     logger.debug("AppState initialization complete")
   }
@@ -100,6 +108,9 @@ class AppState: ObservableObject {
     personalInfoPump.stop()
     if let token = didBecomeActiveObserver {
       NSWorkspace.shared.notificationCenter.removeObserver(token)
+    }
+    if let token = locationPermissionObserver {
+      NotificationCenter.default.removeObserver(token)
     }
   }
 
@@ -331,6 +342,31 @@ class AppState: ObservableObject {
   func refreshPersonalInfoNow() {
     personalInfoPump.refreshNow()
   }
+  
+  /// Request location permission from the user
+  /// This can be called from any UI button or view
+  func requestLocationPermission() {
+      logger.debug("🟢 AppState: requestLocationPermission called")
+    logger.info("🟢 AppState: requestLocationPermission called")
+    logger.info("🟢 Current authorization status: \(self.locationPermissionManager.authorizationStatus.rawValue)")
+    logger.info("🟢 Is main thread: \(Thread.isMainThread)")
+    locationPermissionManager.requestLocationPermission()
+  }
+  
+  /// Get current location permission status
+  var locationPermissionStatus: CLAuthorizationStatus {
+    locationAuthorizationStatus
+  }
+  
+  /// Check if location is available
+  var isLocationAvailable: Bool {
+    locationPermissionManager.isLocationAvailable
+  }
+  
+  /// Open system settings for location permission
+  func openLocationSettings() {
+    locationPermissionManager.openSystemSettings()
+  }
 
   /// Persist `overlaySettings` to the shared app group so the extension can load them.
   private func saveOverlaySettings() {
@@ -413,6 +449,27 @@ class AppState: ObservableObject {
         }
       }
     }
+    
+    // Listen for location permission granted
+    locationPermissionObserver = NotificationCenter.default.addObserver(
+      forName: .locationPermissionGranted,
+      object: nil,
+      queue: .main
+    ) { [weak self] _ in
+      // Refresh personal info when location permission is granted
+      Task { @MainActor in
+        self?.refreshPersonalInfoNow()
+        logger.debug("Location permission granted - refreshing personal info")
+      }
+    }
+    
+    // Sync location permission status
+    locationPermissionManager.$authorizationStatus
+      .receive(on: DispatchQueue.main)
+      .sink { [weak self] status in
+        self?.locationAuthorizationStatus = status
+      }
+      .store(in: &cancellables)
   }
 
   /// Load persisted selections (camera ID, overlays) into memory.

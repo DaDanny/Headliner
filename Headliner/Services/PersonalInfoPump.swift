@@ -12,11 +12,15 @@ final class PersonalInfoPump {
     
     func start() {
         // Initial refresh
-        Task { await refresh() }
+        Task { @MainActor in
+            await refresh()
+        }
         
         // Set up timer for every 15 minutes
         timer = Timer.scheduledTimer(withTimeInterval: 15 * 60, repeats: true) { [weak self] _ in
-            Task { await self?.refresh() }
+            Task { @MainActor in
+                await self?.refresh()
+            }
         }
     }
     
@@ -26,7 +30,9 @@ final class PersonalInfoPump {
     }
     
     func refreshNow() {
-        Task { await refresh() }
+        Task { @MainActor in
+            await refresh()
+        }
     }
     
     private func persist(_ info: PersonalInfo) {

@@ -22,7 +22,7 @@ final class WeatherKitProvider: WeatherProvider {
         switch condition {
         case .clear:
             return ("☀️", "Sunny")
-        case .mostlyClear, .mostlySunny:
+        case .mostlyClear:
             return ("🌤️", "Mostly Sunny")
         case .partlyCloudy:
             return ("⛅️", "Partly Cloudy")
@@ -30,11 +30,11 @@ final class WeatherKitProvider: WeatherProvider {
             return ("☁️", "Cloudy")
         case .foggy, .haze, .smoky:
             return ("🌫️", "Foggy")
-        case .drizzle, .lightRain:
+        case .drizzle:
             return ("🌧️", "Light Rain")
-        case .heavyRain, .rain:
+        case .rain:
             return ("🌧️", "Rain")
-        case .isolatedThunderstorms, .scatteredThunderstorms, .strongStorms, .thunderstorms:
+        case .thunderstorms:
             return ("⛈️", "Stormy")
         case .snow, .blizzard, .blowingSnow, .flurries, .heavySnow, .sleet:
             return ("❄️", "Snow")
