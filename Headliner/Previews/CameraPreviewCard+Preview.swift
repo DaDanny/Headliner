@@ -4,8 +4,8 @@ import SwiftUI
 struct CameraPreviewCard_Previews: PreviewProvider {
   static var previews: some View {
     VStack(spacing: 20) {
-      CameraPreviewCard(previewImage: nil, isActive: true)
-      CameraPreviewCard(previewImage: nil, isActive: false)
+      CameraPreviewCard(previewImage: nil, isActive: true, isExtensionRunning: true)
+      CameraPreviewCard(previewImage: nil, isActive: false, isExtensionRunning: false)
     }
     .padding()
     .background(Color.gray.opacity(0.1))

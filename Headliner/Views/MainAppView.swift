@@ -25,7 +25,8 @@ struct MainAppView: View {
         VStack(spacing: 20) {
           CameraPreviewCard(
             previewImage: outputImageManager.videoExtensionStreamOutputImage,
-            isActive: appState.cameraStatus.isRunning
+            isActive: appState.cameraStatus.isRunning,
+            isExtensionRunning: appState.cameraStatus.isRunning  // Live preview when camera is running
           )
 
           // Camera Controls

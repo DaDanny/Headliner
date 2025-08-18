@@ -64,6 +64,12 @@ class CameraExtensionDeviceSource: NSObject, CMIOExtensionDeviceSource, AVCaptur
 	private var lastRenderedOverlay: CIImage?
 	private var lastAspectRatio: OverlayAspect?
 	
+	// Frame sharing service for live preview
+	private var frameSharingService: FrameSharingService?
+	
+	// Composition queue for thread safety
+	private let compositionQueue = DispatchQueue(label: "com.headliner.composition", qos: .userInteractive)
+	
 	init(localizedName: String) {
 		
 		super.init()
@@ -106,6 +112,10 @@ class CameraExtensionDeviceSource: NSObject, CMIOExtensionDeviceSource, AVCaptur
 		overlayRenderer = CameraOverlayRenderer()
 		overlayPresetStore = OverlayPresetStore()
 		extensionLogger.debug("✅ Initialized camera overlay renderer (thread-safe, Metal-backed)")
+		
+		// Initialize frame sharing service for live preview
+		frameSharingService = FrameSharingService()
+		extensionLogger.debug("✅ Initialized frame sharing service for live preview")
 	}
 	
 	var availableProperties: Set<CMIOExtensionProperty> {
@@ -190,6 +200,10 @@ class CameraExtensionDeviceSource: NSObject, CMIOExtensionDeviceSource, AVCaptur
 		_streamStateLock.unlock()
 		
 		stopCameraCapture()
+		
+		// Clear frame cache and notify main app
+		frameSharingService?.clearCache()
+		NotificationManager.postNotification(named: .streamStopped)
 	}
 	
 	private func startCameraCapture() {
@@ -255,6 +269,10 @@ class CameraExtensionDeviceSource: NSObject, CMIOExtensionDeviceSource, AVCaptur
 			
 			// Stop real camera capture session
 			stopCameraCapture()
+			
+			// Clear frame cache and notify main app
+			frameSharingService?.clearCache()
+			NotificationManager.postNotification(named: .streamStopped)
 			
 			// Also disable app-controlled streaming
 			_streamStateLock.lock()
@@ -359,6 +377,13 @@ class CameraExtensionDeviceSource: NSObject, CMIOExtensionDeviceSource, AVCaptur
 				discontinuity: [],
 				hostTimeInNanoseconds: UInt64(timingInfo.presentationTimeStamp.seconds * Double(NSEC_PER_SEC))
 			)
+			
+			// Cache frame for live preview in main app (zero-copy via IOSurface)
+			// IMPORTANT: Cache first, then notify to ensure frame is ready when fetched
+			frameSharingService?.cacheFrame(pixelBuffer: pixelBuffer, pts: timingInfo.presentationTimeStamp)
+			
+			// Notify main app that a new frame is available (after caching)
+			NotificationManager.postNotification(named: .frameAvailable)
 		} else {
 			extensionLogger.error("Failed to create sample buffer: \(err)")
 		}
@@ -956,6 +981,11 @@ class CameraExtensionProviderSource: NSObject, CMIOExtensionProviderSource {
         case .updateOverlaySettings:
             extensionLogger.debug("🎨 Overlay settings changed - updating now")
             deviceSource.updateOverlaySettings()
+        case .frameAvailable, .streamStopped:
+            // These notifications are sent BY the extension TO the main app
+            // The extension doesn't need to handle them, but we include them
+            // here to satisfy the exhaustive switch requirement
+            break
         }
     }
 

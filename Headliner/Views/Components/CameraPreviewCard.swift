@@ -10,6 +10,7 @@ import SwiftUI
 struct CameraPreviewCard: View {
   let previewImage: CGImage?
   let isActive: Bool
+  let isExtensionRunning: Bool
 
   var body: some View {
     ZStack {
@@ -17,7 +18,12 @@ struct CameraPreviewCard: View {
         .fill(.black)
         .frame(height: 300)
 
-      if let previewImage {
+      // Use live preview when extension is running, otherwise fall back to static preview
+      if isExtensionRunning {
+        LivePreviewLayer(isActive: .constant(isActive))
+          .frame(height: 300)
+          .cornerRadius(20)
+      } else if let previewImage {
         Image(previewImage, scale: 1.0, label: Text("Camera Preview"))
           .resizable()
           .aspectRatio(contentMode: .fill)
