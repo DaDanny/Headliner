@@ -15,7 +15,5 @@ included:
 excluded:
   - CameraExtension
   - .build
-  - Headliner/Previews
 analyzer_rules:
   - unused_import
-
