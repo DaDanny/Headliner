@@ -38,7 +38,7 @@ The build scheme includes a post-action that copies the built app to `/Applicati
 - **Custom CMIO Properties**: Extension property management via `CustomPropertyManager`
 
 ### Video Pipeline & Overlays
-- Container app captures preview using `CaptureSessionManager` (shared in `CameraExtension/Shared.swift`)
+- Container app captures preview using `CaptureSessionManager` (shared in `HeadlinerShared/`)
 - Extension streams to the virtual camera and reads overlay settings from the app group
 - Target output: 1280x720 to virtual camera device
 
@@ -47,13 +47,18 @@ The build scheme includes a post-action that copies the built app to `/Applicati
 - `SystemExtensionRequestManager`: Handles system extension install/uninstall and Darwin posts
 - `CustomPropertyManager`: CMIO/AVFoundation detection for extension presence and devices
 - `OutputImageManager`: AVCaptureVideoDataOutput delegate for preview frames
+- `PersonalInfoPump`: Manages location and weather data updates with automatic refresh
+- `LocationPermissionManager`: Handles location services permission and status tracking
 - `Logging`: Centralized `logger` (OSLog) in `Headliner/Managers/Logging.swift`
 
 ### SwiftUI View Structure
 - `ContentView`: Switches between onboarding and main app based on extension status
 - `MainAppView`: Main app layout
 - `OnboardingView`: System extension installation flow
-- `Components/`: Reusable UI components (CameraSelector, StatusCard, etc.)
+- `SettingsView`: General app settings including overlay configuration
+- `Components/`: Reusable UI components (CameraSelector, StatusCard, PersonalInfoView, etc.)
+- `Services/`: Location, weather, and personal info services
+- `ViewModels/`: View-specific state management
 - `Previews/`: DEBUG-only SwiftUI previews, excluded from Periphery/SwiftLint
 
 ## Development Guidelines
@@ -70,8 +75,10 @@ The build scheme includes a post-action that copies the built app to `/Applicati
 - Camera selection persisted in UserDefaults and shared with extension
 
 ### Overlays System
-- Overlay settings (`OverlaySettings`) live in `CameraExtension/Shared.swift` and are shared with the app
+- Overlay settings (`OverlaySettings`) and models (`OverlayModels`, `OverlayPresets`) live in `HeadlinerShared/`
+- Modern token-based preset system with `OverlayTokens` for dynamic data replacement
 - Settings are encoded to the app group by the container app and loaded by the extension on update
+- Supports preset switching, aspect ratio adaptation (16:9, 4:3), and dynamic personal info integration
 
 ### Testing
 - Unit tests: `HeadlinerTests.xctest`
@@ -83,6 +90,8 @@ The build scheme includes a post-action that copies the built app to `/Applicati
 The app uses App Group `378NGS49HA.com.dannyfrancken.Headliner` for container-extension communication. Settings shared include:
 - Selected camera device ID
 - Overlay settings (isEnabled, userName, position, colors)
+- Personal info data (location, weather, time) for dynamic overlays
+- Extension readiness status via `ExtensionProviderReady` flag
 
 ## Troubleshooting Notes
 
