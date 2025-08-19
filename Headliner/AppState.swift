@@ -86,19 +86,15 @@ class AppState: ObservableObject {
     self.propertyManager = propertyManager
     self.outputImageManager = outputImageManager
 
-    logger.debug("Initializing AppState...")
+    logger.debug("Initializing AppState with lazy loading...")
 
     setupBindings()
     loadUserPreferences()
-    checkExtensionStatus()
-    loadAvailableCameras()
-    setupCaptureSession()
-    startPersonalInfoPump()
     
-    // Initialize location permission status
+    // Initialize location permission status without starting services
     locationAuthorizationStatus = locationPermissionManager.authorizationStatus
 
-    logger.debug("AppState initialization complete")
+    logger.debug("AppState initialization complete (lazy mode)")
   }
 
   // MARK: Deinitialization
@@ -115,6 +111,14 @@ class AppState: ObservableObject {
   }
 
   // MARK: - Public Methods
+
+  /// Initialize app state for first time use - checks extension status and loads cameras
+  func initializeForUse() {
+    logger.debug("Initializing app state for first use...")
+    checkExtensionStatus()
+    loadAvailableCameras()
+    setupCaptureSession()
+  }
 
   /// Begin installation flow for the system extension and start device detection polling.
   func installExtension() {
@@ -330,6 +334,7 @@ class AppState: ObservableObject {
   
   /// Start personal info pump for weather and location updates
   func startPersonalInfoPump() {
+    logger.debug("Starting personal info pump for location and weather data")
     personalInfoPump.start()
   }
   
@@ -363,6 +368,16 @@ class AppState: ObservableObject {
     locationPermissionManager.isLocationAvailable
   }
   
+  /// Check if camera permission is granted
+  var hasCameraPermission: Bool {
+    AVCaptureDevice.authorizationStatus(for: .video) == .authorized
+  }
+  
+  /// Check if we need any permissions for basic functionality
+  var needsPermissions: Bool {
+    !hasCameraPermission
+  }
+  
   /// Open system settings for location permission
   func openLocationSettings() {
     locationPermissionManager.openSystemSettings()
@@ -388,8 +403,7 @@ class AppState: ObservableObject {
 
       // Verify the save worked by reading it back
       if let savedData = appGroupDefaults.data(forKey: OverlayUserDefaultsKeys.overlaySettings),
-         let verificationSettings = try? JSONDecoder().decode(OverlaySettings.self, from: savedData)
-      {
+         let verificationSettings = try? JSONDecoder().decode(OverlaySettings.self, from: savedData) {
         logger
           .debug(
             "✅ Verified saved settings: userName='\(verificationSettings.userName)', position=\(verificationSettings.namePosition.rawValue)"
@@ -456,10 +470,11 @@ class AppState: ObservableObject {
       object: nil,
       queue: .main
     ) { [weak self] _ in
-      // Refresh personal info when location permission is granted
+      // Start personal info services and refresh when location permission is granted
       Task { @MainActor in
+        self?.startPersonalInfoPump()
         self?.refreshPersonalInfoNow()
-        logger.debug("Location permission granted - refreshing personal info")
+        logger.debug("Location permission granted - starting personal info services")
       }
     }
     
@@ -487,8 +502,7 @@ class AppState: ObservableObject {
     }
 
     if let overlayData = appGroupDefaults.data(forKey: OverlayUserDefaultsKeys.overlaySettings),
-       let decodedSettings = try? JSONDecoder().decode(OverlaySettings.self, from: overlayData)
-    {
+       let decodedSettings = try? JSONDecoder().decode(OverlaySettings.self, from: overlayData) {
       self.overlaySettings = decodedSettings
       logger.debug("Loaded overlay settings: enabled=\(self.overlaySettings.isEnabled)")
     } else {
@@ -530,6 +544,15 @@ class AppState: ObservableObject {
 
   /// Discover all physical cameras (excluding the Headliner virtual camera) for selection.
   private func loadAvailableCameras() {
+    // Check if we have camera permissions before attempting to discover devices
+    let authStatus = AVCaptureDevice.authorizationStatus(for: .video)
+    
+    guard authStatus == .authorized else {
+      logger.debug("Camera permission not granted (\(authStatus.rawValue)), skipping camera discovery")
+      availableCameras = []
+      return
+    }
+    
     let discoverySession = AVCaptureDevice.DiscoverySession(
       deviceTypes: [.builtInWideAngleCamera, .external, .continuityCamera, .deskViewCamera],
       mediaType: .video,
@@ -558,6 +581,15 @@ class AppState: ObservableObject {
 
   /// Configure the local preview capture session and start it if possible.
   private func setupCaptureSession() {
+    // Check camera permissions before attempting to set up capture session
+    let authStatus = AVCaptureDevice.authorizationStatus(for: .video)
+    
+    guard authStatus == .authorized else {
+      logger.debug("Camera permission not granted (\(authStatus.rawValue)), skipping capture session setup")
+      captureSessionManager = nil
+      return
+    }
+    
     logger.debug("Setting up capture session for camera preview...")
     captureSessionManager = CaptureSessionManager(capturingHeadliner: false)
 
@@ -570,34 +602,40 @@ class AppState: ObservableObject {
         queue: manager.dataOutputQueue
       )
 
-      // Start the capture session for preview
-      if !manager.captureSession.isRunning {
+      // Start the capture session for preview only if we have cameras available
+      if !manager.captureSession.isRunning && !availableCameras.isEmpty {
         manager.captureSession.startRunning()
         logger.debug("Started preview capture session")
       }
     } else {
-      logger.warning("Failed to configure capture session - likely due to permissions or no camera found")
-
-      // Check authorization status and provide user feedback
-      let authStatus = AVCaptureDevice.authorizationStatus(for: .video)
-      switch authStatus {
-      case .notDetermined:
-        statusMessage = "Camera permission needed for preview"
-      case .denied:
-        statusMessage = "Camera access denied - enable in System Settings > Privacy & Security > Camera"
-      case .restricted:
-        statusMessage = "Camera access restricted"
-      case .authorized:
-        statusMessage = "No suitable camera found for preview"
-      @unknown default:
-        statusMessage = "Camera permission issue"
-      }
+      logger.warning("Failed to configure capture session - likely due to no camera found")
+      statusMessage = "No suitable camera found for preview"
     }
   }
 
+  /// Request camera permission explicitly
+  func requestCameraPermission() async -> Bool {
+    return await withCheckedContinuation { continuation in
+      AVCaptureDevice.requestAccess(for: .video) { granted in
+        DispatchQueue.main.async {
+          if granted {
+            logger.debug("Camera permission granted")
+            // Reload cameras and setup capture session now that we have permission
+            self.loadAvailableCameras()
+            self.setupCaptureSession()
+          } else {
+            logger.error("Camera permission denied")
+          }
+          continuation.resume(returning: granted)
+        }
+      }
+    }
+  }
+  
   /// Retry capture session configuration after permissions change.
   func retryCaptureSession() {
     logger.debug("Retrying capture session setup...")
+    loadAvailableCameras()
     setupCaptureSession()
   }
 
