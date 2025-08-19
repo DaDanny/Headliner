@@ -200,7 +200,7 @@ struct WelcomeStepView: View {
             .offset(y: isAnimating ? 0 : 20)
             .animation(.easeOut(duration: 0.6).delay(0.2), value: isAnimating)
 
-          Text("Your professional camera overlay companion")
+          Text("Your virtual camera companion for meetings")
             .font(.title2.weight(.medium))
             .foregroundStyle(.secondary)
             .multilineTextAlignment(.center)
@@ -213,7 +213,7 @@ struct WelcomeStepView: View {
         // Feature highlights
         VStack(spacing: 20) {
           FeatureRow(
-            icon: "clock.fill",
+            icon: "bolt.fill",
             color: .green,
             title: "Quick Setup",
             description: "Ready in 2 minutes"
@@ -223,20 +223,20 @@ struct WelcomeStepView: View {
           .animation(.easeOut(duration: 0.4).delay(0.4), value: showFeatures)
 
           FeatureRow(
-            icon: "video.badge.checkmark.fill",
+            icon: "rectangle.3.group.bubble.left.fill",
             color: .blue,
             title: "Works Everywhere",
-            description: "Zoom, Meet, Teams & more"
+            description: "Zoom, Meet, Slack & more"
           )
           .opacity(showFeatures ? 1 : 0)
           .offset(y: showFeatures ? 0 : 20)
           .animation(.easeOut(duration: 0.4).delay(0.5), value: showFeatures)
 
           FeatureRow(
-            icon: "sparkles.fill",
+            icon: "slider.horizontal.3",
             color: .purple,
-            title: "Professional Overlays",
-            description: "Look great in every meeting"
+            title: "Better Meetings & Interactions",
+            description: "Look polished, feel confident, every call."
           )
           .opacity(showFeatures ? 1 : 0)
           .offset(y: showFeatures ? 0 : 20)
@@ -777,11 +777,11 @@ struct PersonalizationStepView: View {
           .animation(.easeInOut(duration: 2.0).repeatForever(autoreverses: true), value: isAnimating)
         
         VStack(spacing: 12) {
-          Text("Personalize Your Experience")
+          Text("Personalize")
             .font(.system(size: 28, weight: .bold))
             .foregroundColor(.primary)
           
-          Text("Add your name and an optional title or tagline. You can also enable location to show your city and weather.")
+          Text("Add your name and an optional title or tagline.\n You can also enable location to show your city and weather.")
             .font(.system(size: 16))
             .foregroundColor(.secondary)
             .multilineTextAlignment(.center)
