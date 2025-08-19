@@ -13,11 +13,7 @@ import Foundation
 struct CompiledOverlays {
     
     /// All available overlay presets
-    static let allPresets: [OverlayPreset] = [        
-        // PersonalTemplate
-        PersonalTemplate.compile(),        
-        // ProfessionalTemplate
-        ProfessionalTemplate.compile(),    ]
+    static let allPresets: [OverlayPreset] = [    ]
     
     /// Get preset by ID
     static func preset(withId id: String) -> OverlayPreset? {
