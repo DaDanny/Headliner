@@ -47,23 +47,21 @@ struct OverlaySettingsView: View {
       
       ScrollView {
         VStack(spacing: 16) {
-          // Preset Selector
+          // Template Selector
           GlassmorphicCard {
             VStack(alignment: .leading, spacing: 16) {
-              Text("Overlay Preset")
+              Text("Overlay Template")
                 .font(.headline)
                 .foregroundColor(.white)
               
-              OverlayPresetGrid(
-                selectedPresetId: selectedPresetId == "none" ? "clean" : selectedPresetId,
-                onPresetSelected: { presetId in
-                  // Convert back from our component's naming
-                  selectedPresetId = presetId == "clean" ? "none" : presetId
-                },
-                columns: 2,
-                cardSize: CGSize(width: 140, height: 80),
-                spacing: 12,
-                showLabels: true
+              // Template selection using manifest
+              PresetSelectionView(
+                selectedPresetId: $selectedPresetId,
+                onSelectionChanged: { presetId in
+                  var updatedSettings = appState.overlaySettings
+                  updatedSettings.selectedPresetId = presetId
+                  appState.updateOverlaySettings(updatedSettings)
+                }
               )
             }
             .padding()
@@ -252,6 +250,10 @@ struct OverlaySettingsView: View {
       appState.updateOverlayTokens(tokens)
     }
   }
+  
+  // MARK: - Helper Functions
+  
+
 }
 
 // MARK: - Supporting Views

@@ -78,7 +78,7 @@ final class CameraOverlayRenderer: OverlayRenderer {
     
     /// Track last layout key to detect content changes for crossfade
     private var lastKey: LayoutKey?
-    
+
     // MARK: - Initialization
     
     init() {
@@ -119,7 +119,7 @@ final class CameraOverlayRenderer: OverlayRenderer {
             
             // Enrich tokens for personal preset
             var enrichedTokens = tokens
-            if preset.id == "personal" {
+            if preset.id == "personal" || preset.id == "personal-custom" {
                 // Read personal info from App Group storage (updated by main app)
                 if let personalInfo = personalInfoReader.readPersonalInfo() {
                     enrichedTokens.city = enrichedTokens.city ?? personalInfo.city
@@ -153,7 +153,7 @@ final class CameraOverlayRenderer: OverlayRenderer {
                 signature: signature
             )
             
-            // Thread-safe cache access
+            // Get overlay from cache or build it
             let overlay: CIImage = cacheQueue.sync {
                 if let cached = cache.value(forKey: key) {
                     return cached
@@ -163,47 +163,33 @@ final class CameraOverlayRenderer: OverlayRenderer {
                     return built
                 }
             }
-            
-            // Auto-trigger crossfade if content or extent changes
+
+            // Crossfade handling between cached node-built images
             if lastKey != key || previousOverlay?.extent != overlay.extent {
                 crossfadeStart = CACurrentMediaTime()
             }
             lastKey = key
-            
-            // Handle crossfade animation
+
             if let prev = previousOverlay,
                let start = crossfadeStart,
-               CACurrentMediaTime() - start < crossfadeDuration {
-                
+               CACurrentMediaTime() - start < crossfadeDuration,
+               let dissolveFilter = CIFilter(name: "CIDissolveTransition")
+            {
                 let t = min((CACurrentMediaTime() - start) / crossfadeDuration, 1.0)
-                
-                // Use CIDissolveTransition for smooth, optimized crossfade
-                if let dissolveFilter = CIFilter(name: "CIDissolveTransition") {
-                    dissolveFilter.setValue(prev, forKey: kCIInputImageKey)
-                    dissolveFilter.setValue(overlay, forKey: kCIInputTargetImageKey)
-                    dissolveFilter.setValue(t, forKey: kCIInputTimeKey)
-                    
-                    if let blended = dissolveFilter.outputImage {
-                        // Crop to base extent to prevent edge artifacts
-                        let composited = blended
-                            .cropped(to: base.extent)
-                            .composited(over: base)
-                        
-                        // Crossfade complete
-                        if t >= 1.0 {
-                            previousOverlay = overlay
-                            crossfadeStart = nil
-                        }
-                        
-                        return composited
+                dissolveFilter.setValue(prev, forKey: kCIInputImageKey)
+                dissolveFilter.setValue(overlay, forKey: kCIInputTargetImageKey)
+                dissolveFilter.setValue(t, forKey: kCIInputTimeKey)
+                if let blended = dissolveFilter.outputImage {
+                    let composited = blended.cropped(to: base.extent).composited(over: base)
+                    if t >= 1.0 {
+                        previousOverlay = overlay
+                        crossfadeStart = nil
                     }
+                    return composited
                 }
             }
-            
-            // Store current overlay for potential future crossfade
+
             previousOverlay = overlay
-            
-            // Standard composition
             return overlay.composited(over: base)
         }
     }
@@ -255,7 +241,7 @@ final class CameraOverlayRenderer: OverlayRenderer {
             .sorted { $0.zIndex < $1.zIndex }
         
         // Special handling for personal preset - don't render background if no data
-        let hasPersonalData = preset.id != "personal" || 
+        let hasPersonalData = (preset.id != "personal" && preset.id != "personal-custom") || 
             (tokens.city != nil && !tokens.city!.isEmpty) ||
             (tokens.weatherEmoji != nil && !tokens.weatherEmoji!.isEmpty)
         
@@ -267,7 +253,7 @@ final class CameraOverlayRenderer: OverlayRenderer {
             let node = preset.nodes[placement.index]
             
             // Skip background rect for personal preset if no data
-            if preset.id == "personal" && placement.index == 0 && !hasPersonalData {
+            if (preset.id == "personal" || preset.id == "personal-custom") && placement.index == 0 && !hasPersonalData {
                 continue
             }
             
@@ -393,7 +379,7 @@ final class CameraOverlayRenderer: OverlayRenderer {
         var alignmentSetting = CTParagraphStyleSetting(
             spec: .alignment,
             valueSize: MemoryLayout<CTTextAlignment>.size,
-            value: &alignment
+            value: withUnsafeBytes(of: alignment) { $0.baseAddress! }
         )
         let paragraphStyle = CTParagraphStyleCreate(&alignmentSetting, 1)
         

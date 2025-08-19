@@ -688,6 +688,9 @@ class CameraExtensionDeviceSource: NSObject, CMIOExtensionDeviceSource, AVCaptur
 		let currentAspect = settings.overlayAspect
 		let aspectChanged = lastAspectRatio != nil && lastAspectRatio != currentAspect
 		
+		// Update tokens with current aspect ratio from settings
+		tokens.aspect = currentAspect
+		
 		// Notify renderer about aspect change for optimized crossfade
 		if aspectChanged {
 			renderer.notifyAspectChanged()
@@ -971,6 +974,9 @@ class CameraExtensionProviderSource: NSObject, CMIOExtensionProviderSource {
             },
             notificationName.rawValue as CFString, nil, .deliverImmediately)
         }
+        
+        notificationListenerStarted = true
+        extensionLogger.debug("✅ Started notification listeners for \(NotificationName.allCases.count) notifications")
     }
 
     private func stopNotificationListeners() {

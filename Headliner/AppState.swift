@@ -10,6 +10,7 @@ import Combine
 import CoreLocation
 import SwiftUI
 import SystemExtensions
+import CoreGraphics
 
 /// Main application state.
 ///
@@ -36,6 +37,10 @@ class AppState: ObservableObject {
   @Published var overlaySettings: OverlaySettings = .init()
   /// Controls presentation of the overlay settings sheet.
   @Published var isShowingOverlaySettings: Bool = false
+  /// Currently selected overlay template ID
+  @Published var selectedTemplateId: String = "professional"
+
+
   /// Current location authorization status
   @Published var locationAuthorizationStatus: CLAuthorizationStatus = .notDetermined
 
@@ -47,6 +52,7 @@ class AppState: ObservableObject {
   private let notificationManager = NotificationManager.self
   private let personalInfoPump = PersonalInfoPump()
   let locationPermissionManager = LocationPermissionManager()
+
 
   // MARK: - Private Properties
 
@@ -320,6 +326,8 @@ class AppState: ObservableObject {
     }
     saveOverlaySettings()
     notificationManager.postNotification(named: .updateOverlaySettings, overlaySettings: overlaySettings)
+    
+
   }
   
   /// Get current preset ID
@@ -382,6 +390,8 @@ class AppState: ObservableObject {
   func openLocationSettings() {
     locationPermissionManager.openSystemSettings()
   }
+  
+
 
   /// Persist `overlaySettings` to the shared app group so the extension can load them.
   private func saveOverlaySettings() {
@@ -411,6 +421,7 @@ class AppState: ObservableObject {
       } else {
         logger.error("❌ Failed to verify saved overlay settings")
       }
+
     } catch {
       logger.error("Failed to encode overlay settings: \(error)")
     }
@@ -485,6 +496,9 @@ class AppState: ObservableObject {
         self?.locationAuthorizationStatus = status
       }
       .store(in: &cancellables)
+      
+    // Note: PersonalInfoPump doesn't have $lastUpdate property
+    // Overlay regeneration will happen when settings change instead
   }
 
   /// Load persisted selections (camera ID, overlays) into memory.

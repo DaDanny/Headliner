@@ -10,13 +10,13 @@ enum NotificationName: String, CaseIterable {
   var rawValue: String {
     switch self {
     case .startStream:
-      return "\(Identifiers.notificationPrefix).startStream"
+      return "\(Identifiers.appGroup).startStream"
     case .stopStream:
-      return "\(Identifiers.notificationPrefix).stopStream"
+      return "\(Identifiers.appGroup).stopStream"
     case .setCameraDevice:
-      return "\(Identifiers.notificationPrefix).setCameraDevice"
+      return "\(Identifiers.appGroup).setCameraDevice"
     case .updateOverlaySettings:
-      return "\(Identifiers.notificationPrefix).updateOverlaySettings"
+      return "\(Identifiers.appGroup).updateOverlaySettings"
     }
   }
   
@@ -39,18 +39,6 @@ enum NotificationName: String, CaseIterable {
 
 final class NotificationManager {
   private static let logger = HeadlinerLogger.logger(for: .notifications)
-
-  class func postNotification(named notificationName: String) {
-    let completeNotificationName = Identifiers.appGroup + "." + notificationName
-    logger.debug("Posting notification \(completeNotificationName)")
-    CFNotificationCenterPostNotification(
-      CFNotificationCenterGetDarwinNotifyCenter(),
-      CFNotificationName(completeNotificationName as NSString),
-      nil,
-      nil,
-      true
-    )
-  }
 
   class func postNotification(named notificationName: NotificationName) {
     logger.debug("Posting notification \(notificationName.rawValue)")

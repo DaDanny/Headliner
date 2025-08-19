@@ -1,0 +1,1 @@
+{"presets":[{"name":"Personal Custom","templateFile":"PersonalTemplate.swift","id":"personal-custom","description":"Auto-generated Personal overlay template"},{"id":"professional-custom","description":"Auto-generated Professional overlay template","templateFile":"ProfessionalTemplate.swift","name":"Professional Custom"}],"version":"1.0.0","generatedAt":"2025-08-19T16:39:33Z"}
