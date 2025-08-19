@@ -2,136 +2,62 @@
 //  PersonalInfoView.swift
 //  Headliner
 //
-//  Displays current personal information (location, time, weather) that will be used in overlays.
+//  Allows users to edit their display name and tagline that will appear in overlays.
 //
 
 import SwiftUI
 
-/// A reusable view for displaying current personal information
+/// A view for editing personal information (display name and tagline)
 struct PersonalInfoView: View {
-    @State private var currentInfo: PersonalInfo?
-    @State private var refreshTimer: Timer?
+    @ObservedObject var appState: AppState
+    @State private var displayName: String = ""
+    @State private var tagline: String = ""
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 16) {
             // Header
             HStack {
-                Image(systemName: "info.circle.fill")
+                Image(systemName: "person.circle.fill")
                     .font(.system(size: 14, weight: .medium))
                     .foregroundColor(.blue)
                 
-                Text("Current Data")
+                Text("Personal Information")
                     .font(.system(size: 14, weight: .semibold))
                 
                 Spacer()
-                
-                // Live indicator
-                if currentInfo != nil {
-                    HStack(spacing: 4) {
-                        Circle()
-                            .fill(Color.green)
-                            .frame(width: 6, height: 6)
-                        Text("Live")
-                            .font(.system(size: 10, weight: .medium))
-                            .foregroundColor(.green)
-                    }
-                }
             }
             
-            // Data display
-            if let info = currentInfo {
-                VStack(alignment: .leading, spacing: 8) {
-                    // Location
-                    HStack(spacing: 8) {
-                        Image(systemName: "location.fill")
-                            .font(.system(size: 11))
-                            .foregroundColor(.secondary)
-                            .frame(width: 16)
-                        
-                        Text(info.city ?? "Location not available")
-                            .font(.system(size: 12))
-                            .foregroundColor(info.city != nil ? .primary : .secondary)
-                        
-                        Spacer()
-                    }
-                    
-                    // Time
-                    HStack(spacing: 8) {
-                        Image(systemName: "clock.fill")
-                            .font(.system(size: 11))
-                            .foregroundColor(.secondary)
-                            .frame(width: 16)
-                        
-                        Text(info.localTime ?? "Time not available")
-                            .font(.system(size: 12))
-                            .foregroundColor(info.localTime != nil ? .primary : .secondary)
-                        
-                        Spacer()
-                    }
-                    
-                    // Weather
-                    HStack(spacing: 8) {
-                        if let emoji = info.weatherEmoji {
-                            Text(emoji)
-                                .font(.system(size: 11))
-                                .frame(width: 16)
-                        } else {
-                            Image(systemName: "cloud.fill")
-                                .font(.system(size: 11))
-                                .foregroundColor(.secondary)
-                                .frame(width: 16)
-                        }
-                        
-                        Text(info.weatherText ?? "Weather not available")
-                            .font(.system(size: 12))
-                            .foregroundColor(info.weatherText != nil ? .primary : .secondary)
-                        
-                        Spacer()
-                    }
-                }
-                .padding(12)
-                .background(
-                    RoundedRectangle(cornerRadius: 8)
-                        .fill(Color(NSColor.controlBackgroundColor))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 8)
-                                .stroke(Color.primary.opacity(0.1), lineWidth: 0.5)
-                        )
-                )
+            // Display Name Input
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Display Name")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundColor(.primary)
                 
-                Text("This data appears in your camera overlay")
-                    .font(.system(size: 11))
-                    .foregroundColor(.secondary)
-                    .italic()
-                
-            } else {
-                // No data yet
-                HStack(spacing: 8) {
-                    Image(systemName: "exclamationmark.triangle.fill")
-                        .font(.system(size: 12))
-                        .foregroundColor(.orange)
-                    
-                    Text("No personal data available yet")
-                        .font(.system(size: 12))
-                        .foregroundColor(.secondary)
-                    
-                    Spacer()
-                }
-                .padding(12)
-                .background(
-                    RoundedRectangle(cornerRadius: 8)
-                        .fill(Color.orange.opacity(0.1))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 8)
-                                .stroke(Color.orange.opacity(0.2), lineWidth: 0.5)
-                        )
-                )
-                
-                Text("Enable location access to see your data")
-                    .font(.system(size: 11))
-                    .foregroundColor(.secondary)
-                    .italic()
+                TextField("Your name", text: $displayName)
+                    .textFieldStyle(.roundedBorder)
+                    .onChange(of: displayName) {
+                        saveChanges()
+                    }
             }
+            
+            // Tagline Input
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Title or Tagline (Optional)")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundColor(.primary)
+                
+                TextField("e.g., Product Manager · NYC or 'Bagel Brigade'", text: $tagline)
+                    .textFieldStyle(.roundedBorder)
+                    .onChange(of: tagline) {
+                        saveChanges()
+                    }
+            }
+            
+            // Info text
+            Text("This information will appear in your camera overlays")
+                .font(.system(size: 11))
+                .foregroundColor(.secondary)
+                .italic()
         }
         .padding(16)
         .background(
@@ -143,38 +69,43 @@ struct PersonalInfoView: View {
                 )
         )
         .onAppear {
-            loadPersonalInfo()
-            startRefreshTimer()
-        }
-        .onDisappear {
-            stopRefreshTimer()
+            loadCurrentValues()
         }
     }
     
-    // MARK: - Data Loading
+    // MARK: - Data Management
     
-    private func loadPersonalInfo() {
-        guard let userDefaults = UserDefaults(suiteName: Identifiers.appGroup),
-              let data = userDefaults.data(forKey: "overlay.personalInfo.v1"),
-              let info = try? JSONDecoder().decode(PersonalInfo.self, from: data) else {
-            currentInfo = nil
-            return
+    private func loadCurrentValues() {
+        displayName = appState.overlaySettings.userName.isEmpty ? NSUserName() : appState.overlaySettings.userName
+        if let existingTagline = appState.overlaySettings.overlayTokens?.tagline {
+            tagline = existingTagline
+        }
+    }
+    
+    private func saveChanges() {
+        // Save display name
+        if !displayName.isEmpty {
+            appState.overlaySettings.userName = displayName
         }
         
-        currentInfo = info
-        logger.debug("PersonalInfoView: Loaded - city: \(info.city ?? "nil"), weather: \(info.weatherEmoji ?? "nil")")
-    }
-    
-    private func startRefreshTimer() {
-        // Refresh every 5 seconds to show latest data
-        refreshTimer = Timer.scheduledTimer(withTimeInterval: 5.0, repeats: true) { _ in
-            loadPersonalInfo()
+        // Save tagline
+        if !tagline.isEmpty {
+            if appState.overlaySettings.overlayTokens == nil {
+                appState.overlaySettings.overlayTokens = OverlayTokens(
+                    displayName: displayName,
+                    tagline: tagline,
+                    accentColorHex: "#007AFF",
+                    aspect: appState.overlaySettings.overlayAspect
+                )
+            } else {
+                appState.overlaySettings.overlayTokens?.tagline = tagline
+            }
+        } else {
+            // Clear tagline if empty
+            appState.overlaySettings.overlayTokens?.tagline = nil
         }
-    }
-    
-    private func stopRefreshTimer() {
-        refreshTimer?.invalidate()
-        refreshTimer = nil
+        
+        logger.debug("PersonalInfoView: Auto-saved changes - name: \(displayName), tagline: \(tagline)")
     }
 }
 
@@ -183,9 +114,13 @@ struct PersonalInfoView: View {
 #if DEBUG
 struct PersonalInfoView_Previews: PreviewProvider {
     static var previews: some View {
-        PersonalInfoView()
-            .frame(width: 400)
-            .padding()
+        PersonalInfoView(appState: AppState(
+            systemExtensionManager: SystemExtensionRequestManager(logText: ""),
+            propertyManager: CustomPropertyManager(),
+            outputImageManager: OutputImageManager()
+        ))
+        .frame(width: 400)
+        .padding()
     }
 }
 #endif

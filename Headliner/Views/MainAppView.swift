@@ -20,62 +20,68 @@ struct MainAppView: View {
       headerView
 
       // Main Content
-      HStack(spacing: 24) {
-        // Left Panel - Camera Preview
-        VStack(spacing: 20) {
-          CameraPreviewCard(
-            previewImage: outputImageManager.videoExtensionStreamOutputImage,
-            isActive: appState.cameraStatus.isRunning
-          )
+      if appState.needsPermissions {
+        // Permission request view
+        permissionRequestView
+      } else {
+        // Normal app content
+        HStack(spacing: 24) {
+          // Left Panel - Camera Preview
+          VStack(spacing: 20) {
+            CameraPreviewCard(
+              previewImage: outputImageManager.videoExtensionStreamOutputImage,
+              isActive: appState.cameraStatus.isRunning
+            )
 
-          // Camera Controls
-          cameraControls
-        }
-        .frame(maxWidth: 480)
+            // Camera Controls
+            cameraControls
+          }
+          .frame(maxWidth: 480)
 
-        // Right Panel - Settings & Effects
-        VStack(spacing: 20) {
-          // Status Cards
-          VStack(spacing: 12) {
-            GlassmorphicCard {
-              StatusCard(
-                title: "Extension Status",
-                status: appState.extensionStatus.displayText,
-                icon: statusIcon(for: appState.extensionStatus),
-                color: statusColor(for: appState.extensionStatus)
-              )
+          // Right Panel - Settings & Effects
+          VStack(spacing: 20) {
+            // Status Cards
+            VStack(spacing: 12) {
+              GlassmorphicCard {
+                StatusCard(
+                  title: "Extension Status",
+                  status: appState.extensionStatus.displayText,
+                  icon: statusIcon(for: appState.extensionStatus),
+                  color: statusColor(for: appState.extensionStatus)
+                )
+              }
+
+              GlassmorphicCard {
+                StatusCard(
+                  title: "Camera Status",
+                  status: appState.cameraStatus.displayText,
+                  icon: cameraStatusIcon(for: appState.cameraStatus),
+                  color: cameraStatusColor(for: appState.cameraStatus)
+                )
+              }
             }
 
+            // Camera Selection
             GlassmorphicCard {
-              StatusCard(
-                title: "Camera Status",
-                status: appState.cameraStatus.displayText,
-                icon: cameraStatusIcon(for: appState.cameraStatus),
-                color: cameraStatusColor(for: appState.cameraStatus)
-              )
+              CameraSelector(appState: appState)
             }
-          }
 
-          // Camera Selection
-          GlassmorphicCard {
-            CameraSelector(appState: appState)
-          }
+            // Camera Settings
+            GlassmorphicCard {
+              cameraSettingsContent
+            }
 
-          // Camera Settings
-          GlassmorphicCard {
-            cameraSettingsContent
-          }
+            // Overlay Settings
+            GlassmorphicCard {
+              overlaySettingsContent
+            }
 
-          // Overlay Settings
-          GlassmorphicCard {
-            overlaySettingsContent
+            Spacer()
           }
-
-          Spacer()
+          .frame(width: 320)
         }
-        .frame(width: 320)
+        .padding(24)
       }
-      .padding(24)
     }
     .background(
       ZStack {
@@ -102,6 +108,54 @@ struct MainAppView: View {
     .onAppear {
       // Basic setup
     }
+  }
+  
+  // MARK: - Permission Request View
+  
+  private var permissionRequestView: some View {
+    VStack(spacing: 32) {
+      Spacer()
+      
+      VStack(spacing: 24) {
+        Image(systemName: "camera.fill")
+          .font(.system(size: 64, weight: .medium))
+          .foregroundColor(.blue)
+        
+        VStack(spacing: 12) {
+          Text("Camera Access Required")
+            .font(.system(size: 24, weight: .bold))
+            .foregroundColor(.primary)
+          
+          Text("Headliner needs camera access to provide video streaming and preview functionality.")
+            .font(.system(size: 16, weight: .medium))
+            .foregroundColor(.secondary)
+            .multilineTextAlignment(.center)
+            .padding(.horizontal, 40)
+        }
+        
+        VStack(spacing: 16) {
+          PulsingButton(
+            title: "Grant Camera Access",
+            icon: "camera.fill",
+            color: .blue,
+            isActive: false
+          ) {
+            Task {
+              await appState.requestCameraPermission()
+            }
+          }
+          
+          Button("Open System Settings") {
+            NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Camera")!)
+          }
+          .font(.system(size: 14, weight: .medium))
+          .foregroundColor(.secondary)
+        }
+      }
+      
+      Spacer()
+    }
+    .padding(24)
   }
 
   private var appVersionText: String {
@@ -142,20 +196,6 @@ struct MainAppView: View {
         }
         .buttonStyle(ScaleButtonStyle())
         .help("Open Settings")
-        
-        // Quick location permission button (temporary for testing)
-        if appState.locationPermissionStatus == .notDetermined {
-          Button(action: { appState.requestLocationPermission() }) {
-            Image(systemName: "location.fill")
-              .font(.system(size: 18, weight: .medium))
-              .foregroundColor(.orange)
-              .frame(width: 32, height: 32)
-              .background(Circle().fill(.background))
-              .overlay(Circle().stroke(Color.orange.opacity(0.5), lineWidth: 1))
-          }
-          .buttonStyle(ScaleButtonStyle())
-          .help("Request Location Permission")
-        }
       }
     }
     .padding(.horizontal, 24)

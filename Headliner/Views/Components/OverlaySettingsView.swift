@@ -49,39 +49,22 @@ struct OverlaySettingsView: View {
         VStack(spacing: 16) {
           // Preset Selector
           GlassmorphicCard {
-            VStack(alignment: .leading, spacing: 12) {
+            VStack(alignment: .leading, spacing: 16) {
               Text("Overlay Preset")
                 .font(.headline)
                 .foregroundColor(.white)
               
-              VStack(spacing: 8) {
-                PresetButton(
-                  preset: OverlayPresets.professional,
-                  isSelected: selectedPresetId == "professional",
-                  description: "Lower third with name and title",
-                  icon: "person.text.rectangle"
-                ) {
-                  selectedPresetId = "professional"
-                }
-                
-                PresetButton(
-                  preset: OverlayPresets.personal,
-                  isSelected: selectedPresetId == "personal",
-                  description: "Location, time, and weather info",
-                  icon: "location.circle"
-                ) {
-                  selectedPresetId = "personal"
-                }
-                
-                PresetButton(
-                  preset: OverlayPresets.none,
-                  isSelected: selectedPresetId == "none",
-                  description: "Clean video without overlays",
-                  icon: "video"
-                ) {
-                  selectedPresetId = "none"
-                }
-              }
+              OverlayPresetGrid(
+                selectedPresetId: selectedPresetId == "none" ? "clean" : selectedPresetId,
+                onPresetSelected: { presetId in
+                  // Convert back from our component's naming
+                  selectedPresetId = presetId == "clean" ? "none" : presetId
+                },
+                columns: 2,
+                cardSize: CGSize(width: 140, height: 80),
+                spacing: 12,
+                showLabels: true
+              )
             }
             .padding()
           }
@@ -273,54 +256,7 @@ struct OverlaySettingsView: View {
 
 // MARK: - Supporting Views
 
-struct PresetButton: View {
-  let preset: OverlayPreset
-  let isSelected: Bool
-  let description: String
-  let icon: String
-  let action: () -> Void
-  
-  var body: some View {
-    Button(action: action) {
-      HStack(spacing: 12) {
-        Image(systemName: icon)
-          .font(.title2)
-          .foregroundColor(isSelected ? .white : .white.opacity(0.6))
-          .frame(width: 32)
-        
-        VStack(alignment: .leading, spacing: 2) {
-          Text(preset.name)
-            .font(.subheadline)
-            .fontWeight(isSelected ? .semibold : .regular)
-            .foregroundColor(.white)
-          
-          Text(description)
-            .font(.caption)
-            .foregroundColor(.white.opacity(0.6))
-        }
-        
-        Spacer()
-        
-        if isSelected {
-          Image(systemName: "checkmark.circle.fill")
-            .foregroundColor(.white)
-        }
-      }
-      .padding()
-      .background(
-        isSelected
-          ? Color.white.opacity(0.15)
-          : Color.white.opacity(0.05)
-      )
-      .cornerRadius(8)
-      .overlay(
-        RoundedRectangle(cornerRadius: 8)
-          .stroke(isSelected ? Color.white.opacity(0.3) : Color.clear, lineWidth: 1)
-      )
-    }
-    .buttonStyle(PlainButtonStyle())
-  }
-}
+
 
 struct ColorButton: View {
   let hex: String
