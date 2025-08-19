@@ -2,7 +2,7 @@
 //  OverlaySettingsView.swift
 //  Headliner
 //
-//  Created by AI Assistant on 8/2/25.
+//  Modern overlay settings with live preview
 //
 
 import SwiftUI
@@ -14,11 +14,9 @@ struct OverlaySettingsView: View {
   @State private var tagline: String = ""
   @State private var accentColorHex: String = "#007AFF"
   @State private var selectedAspect: OverlayAspect = .widescreen
-  @State private var showColorPicker = false
   
   init(appState: AppState) {
     self.appState = appState
-    // Initialize state from current settings
     self._selectedPresetId = State(initialValue: appState.currentPresetId)
     self._displayName = State(initialValue: appState.overlaySettings.overlayTokens?.displayName ?? appState.overlaySettings.userName)
     self._tagline = State(initialValue: appState.overlaySettings.overlayTokens?.tagline ?? "")
@@ -55,80 +53,92 @@ struct OverlaySettingsView: View {
                 .foregroundColor(.white)
               
               VStack(spacing: 8) {
-                PresetButton(
-                  preset: OverlayPresets.professional,
-                  isSelected: selectedPresetId == "professional",
-                  description: "Lower third with name and title",
-                  icon: "person.text.rectangle"
-                ) {
-                  selectedPresetId = "professional"
-                }
-                
-                PresetButton(
-                  preset: OverlayPresets.personal,
-                  isSelected: selectedPresetId == "personal",
-                  description: "Location, time, and weather info",
-                  icon: "location.circle"
-                ) {
-                  selectedPresetId = "personal"
-                }
-                
-                PresetButton(
-                  preset: OverlayPresets.none,
-                  isSelected: selectedPresetId == "none",
-                  description: "Clean video without overlays",
-                  icon: "video"
-                ) {
-                  selectedPresetId = "none"
-                }
-              }
-            }
-            .padding()
-          }
-          
-          // Aspect Ratio Selector
-          GlassmorphicCard {
-            VStack(alignment: .leading, spacing: 12) {
-              Text("Aspect Ratio")
-                .font(.headline)
-                .foregroundColor(.white)
-              
-              HStack(spacing: 12) {
-                ForEach(OverlayAspect.allCases, id: \.self) { aspect in
-                  Button(action: {
-                    selectedAspect = aspect
-                  }) {
-                    VStack(spacing: 4) {
-                      Image(systemName: aspect == .widescreen ? "rectangle.ratio.16.to.9" : "rectangle.ratio.4.to.3")
-                        .font(.title2)
-                      Text(aspect.displayName)
-                        .font(.caption)
-                    }
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 12)
-                    .background(
-                      selectedAspect == aspect
-                        ? Color.white.opacity(0.2)
-                        : Color.white.opacity(0.05)
-                    )
-                    .cornerRadius(8)
-                    .overlay(
-                      RoundedRectangle(cornerRadius: 8)
-                        .stroke(
-                          selectedAspect == aspect ? Color.white : Color.clear,
-                          lineWidth: 1
-                        )
-                    )
+                // Modern Presets
+                Group {
+                  Text("Modern Overlays")
+                    .font(.caption)
+                    .foregroundColor(.white.opacity(0.6))
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.top, 8)
+                  
+                  PresetButton(
+                    preset: OverlayPresets.modernProfessional,
+                    isSelected: selectedPresetId == "modern_professional",
+                    description: "Enhanced lower third with modern styling",
+                    icon: "person.text.rectangle.fill"
+                  ) {
+                    selectedPresetId = "modern_professional"
                   }
-                  .buttonStyle(PlainButtonStyle())
-                  .foregroundColor(.white)
+                  
+                  PresetButton(
+                    preset: OverlayPresets.modernPersonal,
+                    isSelected: selectedPresetId == "modern_personal",
+                    description: "Elegant info pill with enhanced design",
+                    icon: "location.circle.fill"
+                  ) {
+                    selectedPresetId = "modern_personal"
+                  }
+                  
+                  PresetButton(
+                    preset: OverlayPresets.modernSideAccent,
+                    isSelected: selectedPresetId == "modern_side_accent",
+                    description: "Side accent bar with modern typography",
+                    icon: "rectangle.leadinghalf.filled"
+                  ) {
+                    selectedPresetId = "modern_side_accent"
+                  }
+                  
+                  PresetButton(
+                    preset: OverlayPresets.modernMinimal,
+                    isSelected: selectedPresetId == "modern_minimal",
+                    description: "Clean minimal design with subtle background",
+                    icon: "capsule.fill"
+                  ) {
+                    selectedPresetId = "modern_minimal"
+                  }
+                }
+                
+                // Classic Presets
+                Group {
+                  Text("Classic Overlays")
+                    .font(.caption)
+                    .foregroundColor(.white.opacity(0.6))
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.top, 16)
+                  
+                  PresetButton(
+                    preset: OverlayPresets.professional,
+                    isSelected: selectedPresetId == "professional",
+                    description: "Classic lower third design",
+                    icon: "person.text.rectangle"
+                  ) {
+                    selectedPresetId = "professional"
+                  }
+                  
+                  PresetButton(
+                    preset: OverlayPresets.personal,
+                    isSelected: selectedPresetId == "personal",
+                    description: "Basic location and weather info",
+                    icon: "location.circle"
+                  ) {
+                    selectedPresetId = "personal"
+                  }
+                  
+                  PresetButton(
+                    preset: OverlayPresets.none,
+                    isSelected: selectedPresetId == "none",
+                    description: "Clean video without overlays",
+                    icon: "video"
+                  ) {
+                    selectedPresetId = "none"
+                  }
                 }
               }
             }
             .padding()
           }
           
-          // Customization Options (based on selected preset)
+          // Customization Options
           if selectedPresetId != "none" {
             GlassmorphicCard {
               VStack(alignment: .leading, spacing: 16) {
@@ -144,12 +154,10 @@ struct OverlaySettingsView: View {
                   
                   TextField("Enter your name", text: $displayName)
                     .textFieldStyle(RoundedBorderTextFieldStyle())
-                    .background(Color.white.opacity(0.1))
-                    .cornerRadius(6)
                 }
                 
-                // Tagline (Professional preset only)
-                if selectedPresetId == "professional" {
+                // Tagline (for professional presets)
+                if selectedPresetId == "professional" || selectedPresetId == "modern_professional" || selectedPresetId == "modern_side_accent" {
                   VStack(alignment: .leading, spacing: 8) {
                     Text("Tagline")
                       .font(.subheadline)
@@ -157,31 +165,15 @@ struct OverlaySettingsView: View {
                     
                     TextField("e.g., Senior Developer", text: $tagline)
                       .textFieldStyle(RoundedBorderTextFieldStyle())
-                      .background(Color.white.opacity(0.1))
-                      .cornerRadius(6)
                   }
                 }
                 
                 // Accent Color
                 VStack(alignment: .leading, spacing: 8) {
-                  HStack {
-                    Text("Accent Color")
-                      .font(.subheadline)
-                      .foregroundColor(.white.opacity(0.8))
-                    
-                    Spacer()
-                    
-                    // Color preview
-                    RoundedRectangle(cornerRadius: 4)
-                      .fill(Color(hex: accentColorHex) ?? Color.blue)
-                      .frame(width: 60, height: 24)
-                      .overlay(
-                        RoundedRectangle(cornerRadius: 4)
-                          .stroke(Color.white.opacity(0.3), lineWidth: 1)
-                      )
-                  }
+                  Text("Accent Color")
+                    .font(.subheadline)
+                    .foregroundColor(.white.opacity(0.8))
                   
-                  // Quick color presets
                   HStack(spacing: 8) {
                     ColorButton(hex: "#007AFF", label: "Blue") { accentColorHex = $0 }
                     ColorButton(hex: "#34C759", label: "Green") { accentColorHex = $0 }
@@ -190,21 +182,6 @@ struct OverlaySettingsView: View {
                     ColorButton(hex: "#AF52DE", label: "Purple") { accentColorHex = $0 }
                   }
                 }
-              }
-              .padding()
-            }
-          }
-          
-          // Preview Info
-          if selectedPresetId != "none" {
-            GlassmorphicCard {
-              HStack {
-                Image(systemName: "info.circle")
-                  .foregroundColor(.white.opacity(0.6))
-                Text("Your overlay will appear in video conferencing apps when using the Headliner camera")
-                  .font(.caption)
-                  .foregroundColor(.white.opacity(0.6))
-                  .multilineTextAlignment(.leading)
               }
               .padding()
             }
@@ -242,7 +219,6 @@ struct OverlaySettingsView: View {
         .clipShape(RoundedRectangle(cornerRadius: 20))
     )
     .onAppear {
-      // Refresh state from current settings
       selectedPresetId = appState.currentPresetId
       displayName = appState.overlaySettings.overlayTokens?.displayName ?? appState.overlaySettings.userName
       tagline = appState.overlaySettings.overlayTokens?.tagline ?? ""
@@ -252,17 +228,13 @@ struct OverlaySettingsView: View {
   }
   
   private func applySettings() {
-    // Apply preset selection
     appState.selectPreset(selectedPresetId)
-    
-    // Apply aspect ratio
     appState.selectAspectRatio(selectedAspect)
     
-    // Update tokens if not "none" preset
     if selectedPresetId != "none" {
       let tokens = OverlayTokens(
         displayName: displayName.isEmpty ? NSUserName() : displayName,
-        tagline: tagline.isEmpty ? nil : tagline,  // Always save tagline if not empty
+        tagline: tagline.isEmpty ? nil : tagline,
         accentColorHex: accentColorHex,
         aspect: selectedAspect
       )

@@ -225,11 +225,36 @@ struct OverlayPreset: Identifiable, Codable, Equatable {
     var nodes: [OverlayNode]  // Ordered list of nodes
     var layout: OverlayLayout  // Placement for each aspect ratio
     
+    // SwiftUI support
+    var isSwiftUIBased: Bool = false
+    var swiftUIPresetType: String? // Maps to SwiftUIOverlayPresetType
+    
     init(id: String, name: String, nodes: [OverlayNode], layout: OverlayLayout) {
         self.id = id
         self.name = name
         self.nodes = nodes
         self.layout = layout
+        self.isSwiftUIBased = false
+        self.swiftUIPresetType = nil
+    }
+    
+    // SwiftUI-based preset initializer
+    init(id: String, name: String, swiftUIPresetType: String) {
+        self.id = id
+        self.name = name
+        self.nodes = [] // Empty for SwiftUI-based presets
+        self.layout = OverlayLayout(widescreen: [], fourThree: [])
+        self.isSwiftUIBased = true
+        self.swiftUIPresetType = swiftUIPresetType
+    }
+    
+    static func == (lhs: OverlayPreset, rhs: OverlayPreset) -> Bool {
+        return lhs.id == rhs.id && 
+               lhs.name == rhs.name && 
+               lhs.nodes == rhs.nodes && 
+               lhs.layout == rhs.layout &&
+               lhs.isSwiftUIBased == rhs.isSwiftUIBased &&
+               lhs.swiftUIPresetType == rhs.swiftUIPresetType
     }
 }
 

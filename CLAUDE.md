@@ -38,9 +38,10 @@ The build scheme includes a post-action that copies the built app to `/Applicati
 - **Custom CMIO Properties**: Extension property management via `CustomPropertyManager`
 
 ### Video Pipeline & Overlays
-- Container app captures preview using `CaptureSessionManager` (shared in `CameraExtension/Shared.swift`)
+- Container app captures preview using `CaptureSessionManager` (shared in `HeadlinerShared/`)
 - Extension streams to the virtual camera and reads overlay settings from the app group
-- Target output: 1280x720 to virtual camera device
+- Target output: 1080p @ 60 FPS to virtual camera device
+- Shared overlay models and presets in `HeadlinerShared/OverlayModels.swift` and `OverlayPresets.swift`
 
 ### Key Managers
 - `AppState`: Main state coordination and camera management
@@ -49,12 +50,27 @@ The build scheme includes a post-action that copies the built app to `/Applicati
 - `OutputImageManager`: AVCaptureVideoDataOutput delegate for preview frames
 - `Logging`: Centralized `logger` (OSLog) in `Headliner/Managers/Logging.swift`
 
+### Services
+- `LocationService`: Core Location integration for city and coordinates
+- `WeatherProviderWeatherKit`: Apple WeatherKit integration for weather data
+- `WeatherProviderOpenMeteo`: Open-Meteo fallback weather provider
+- `PersonalInfoLive`: Coordinates location and weather services
+- `PersonalInfoPump`: Manages automatic refresh of personal info data
+
 ### SwiftUI View Structure
 - `ContentView`: Switches between onboarding and main app based on extension status
-- `MainAppView`: Main app layout
+- `MainAppView`: Main app layout with camera preview and overlay controls
 - `OnboardingView`: System extension installation flow
-- `Components/`: Reusable UI components (CameraSelector, StatusCard, etc.)
-- `Previews/`: DEBUG-only SwiftUI previews, excluded from Periphery/SwiftLint
+- `SettingsView`: App configuration and personal info settings
+- `Components/`: Reusable UI components (CameraSelector, StatusCard, GlassmorphicCard, etc.)
+
+### Shared Module (`HeadlinerShared/`)
+- `OverlayModels.swift`: Data structures for overlay configuration
+- `OverlayPresets.swift`: Predefined overlay configurations (Professional, Personal, None)
+- `PersonalInfoModels.swift`: Location and weather data structures
+- `CaptureSessionManager.swift`: Shared camera capture logic
+- `OverlayRenderer.swift`: Core overlay rendering functionality
+- `Identifiers.swift`, `Notifications.swift`: Shared constants and communication
 
 ## Development Guidelines
 
@@ -70,8 +86,9 @@ The build scheme includes a post-action that copies the built app to `/Applicati
 - Camera selection persisted in UserDefaults and shared with extension
 
 ### Overlays System
-- Overlay settings (`OverlaySettings`) live in `CameraExtension/Shared.swift` and are shared with the app
+- Overlay settings (`OverlaySettings`) live in `HeadlinerShared/OverlaySettings.swift` and are shared between app and extension
 - Settings are encoded to the app group by the container app and loaded by the extension on update
+- Three overlay presets: Professional (lower third), Personal (info pill with location/weather), None (clean feed)
 
 ### Testing
 - Unit tests: `HeadlinerTests.xctest`
@@ -82,7 +99,8 @@ The build scheme includes a post-action that copies the built app to `/Applicati
 
 The app uses App Group `378NGS49HA.com.dannyfrancken.Headliner` for container-extension communication. Settings shared include:
 - Selected camera device ID
-- Overlay settings (isEnabled, userName, position, colors)
+- Overlay settings (isEnabled, userName, tagline, preset, colors)
+- Personal info data (location, weather) for overlay display
 
 ## Troubleshooting Notes
 
@@ -93,6 +111,13 @@ The app uses App Group `378NGS49HA.com.dannyfrancken.Headliner` for container-ex
 
 ## Developer Utilities
 
-- Format: `swiftformat Headliner`
-- Lint: `swiftlint lint --quiet`
-- Dead code: `periphery scan --project Headliner.xcodeproj --schemes Headliner`
+- **Format**: `swiftformat Headliner`
+- **Lint**: `swiftlint lint --quiet`  
+- **Dead code**: `periphery scan --project Headliner.xcodeproj --schemes Headliner`
+
+## Documentation
+
+Comprehensive technical documentation is available in the `docs/` directory:
+
+- **[CAMERA_EXTENSION_AND_OVERLAYS.md](docs/CAMERA_EXTENSION_AND_OVERLAYS.md)**: System architecture and overlay implementation
+- **[PERSONAL_INFO_SUBSYSTEM.md](docs/PERSONAL_INFO_SUBSYSTEM.md)**: Location and weather services documentation

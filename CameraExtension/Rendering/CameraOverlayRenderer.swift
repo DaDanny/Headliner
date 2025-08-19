@@ -114,7 +114,9 @@ final class CameraOverlayRenderer: OverlayRenderer {
         return autoreleasepool {
             let base = CIImage(cvPixelBuffer: pixelBuffer, options: [.colorSpace: colorSpace])
             
-            // Early return for no overlay
+            // All presets now use Core Graphics rendering
+            
+            // Early return for no overlay (legacy Core Graphics)
             guard !preset.nodes.isEmpty else { return base }
             
             // Enrich tokens for personal preset
@@ -212,6 +214,8 @@ final class CameraOverlayRenderer: OverlayRenderer {
     func notifyAspectChanged() {
         crossfadeStart = CACurrentMediaTime()
     }
+    
+    // All overlays now use the enhanced Core Graphics rendering system
     
     // MARK: - Private Methods
     
