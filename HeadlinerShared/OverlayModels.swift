@@ -166,11 +166,30 @@ struct GradientNode: Codable, Equatable {
     }
 }
 
+/// Image node configuration
+struct ImageNode: Codable, Equatable {
+    var imageName: String     // Name of image in app bundle
+    var contentMode: String   // "fit", "fill", "stretch"
+    var opacity: CGFloat      // 0.0-1.0
+    var cornerRadius: CGFloat // 0.0-0.5 (0.5 = circle)
+    
+    init(imageName: String,
+         contentMode: String = "fit",
+         opacity: CGFloat = 1.0,
+         cornerRadius: CGFloat = 0.0) {
+        self.imageName = imageName
+        self.contentMode = contentMode
+        self.opacity = opacity
+        self.cornerRadius = cornerRadius
+    }
+}
+
 /// Union type for overlay nodes
 enum OverlayNode: Codable, Equatable {
     case text(TextNode)
     case rect(RectNode)
     case gradient(GradientNode)
+    case image(ImageNode)
     
     // Custom coding to handle enum with associated values
     enum CodingKeys: String, CodingKey {
@@ -179,7 +198,7 @@ enum OverlayNode: Codable, Equatable {
     }
     
     enum NodeType: String, Codable {
-        case text, rect, gradient
+        case text, rect, gradient, image
     }
     
     init(from decoder: Decoder) throws {
@@ -196,6 +215,9 @@ enum OverlayNode: Codable, Equatable {
         case .gradient:
             let node = try container.decode(GradientNode.self, forKey: .data)
             self = .gradient(node)
+        case .image:
+            let node = try container.decode(ImageNode.self, forKey: .data)
+            self = .image(node)
         }
     }
     
@@ -211,6 +233,9 @@ enum OverlayNode: Codable, Equatable {
             try container.encode(node, forKey: .data)
         case .gradient(let node):
             try container.encode(NodeType.gradient, forKey: .type)
+            try container.encode(node, forKey: .data)
+        case .image(let node):
+            try container.encode(NodeType.image, forKey: .type)
             try container.encode(node, forKey: .data)
         }
     }

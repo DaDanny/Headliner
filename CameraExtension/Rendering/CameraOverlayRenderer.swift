@@ -93,6 +93,9 @@ final class CameraOverlayRenderer: OverlayRenderer {
     
     /// Color cache to avoid repeated hex parsing
     private var colorCache: [String: CGColor] = [:]
+    
+    /// Image cache to avoid repeated disk reads
+    private var imageCache: [String: CGImage] = [:]
 
     // MARK: - Initialization
     
@@ -228,6 +231,16 @@ final class CameraOverlayRenderer: OverlayRenderer {
         lastPersonalInfoUpdate = CACurrentMediaTime()
     }
     
+    /// Clear all caches (call when memory pressure or app backgrounding)
+    func clearCaches() {
+        cacheQueue.sync {
+            cache.removeAll()
+        }
+        fontCache.removeAll()
+        colorCache.removeAll()
+        imageCache.removeAll()
+    }
+    
     /// Get cached font, creating if needed
     private func getCachedFont(size: CGFloat, weightName: String) -> CTFont {
         let key = "\(size)_\(weightName)"
@@ -313,6 +326,8 @@ final class CameraOverlayRenderer: OverlayRenderer {
                 drawGradient(gradientNode, in: frame, tokens: tokens, context: context)
             case .text(let textNode):
                 drawText(textNode, in: frame, tokens: tokens, context: context)
+            case .image(let imageNode):
+                drawImage(imageNode, in: frame, tokens: tokens, context: context)
             }
             
             context.restoreGState()
@@ -451,6 +466,100 @@ final class CameraOverlayRenderer: OverlayRenderer {
         CTFrameDraw(ctFrame, context)
 
         context.restoreGState()
+    }
+    
+    private func drawImage(_ node: ImageNode, in frame: CGRect, tokens: OverlayTokens, context: CGContext) {
+        // Try to load image from app bundle
+        guard let image = loadImage(named: node.imageName) else {
+            // Fallback: draw a placeholder rectangle
+            let placeholderColor = CGColor(gray: 0.5, alpha: 0.5)
+            context.setFillColor(placeholderColor)
+            context.fill(frame)
+            return
+        }
+        
+        // Calculate image rect based on content mode
+        let imageRect = calculateImageRect(image: image, in: frame, contentMode: node.contentMode)
+        
+        // Apply corner radius if needed
+        if node.cornerRadius > 0 {
+            let radius = min(frame.width, frame.height) * node.cornerRadius
+            let path = CGPath(roundedRect: frame, cornerWidth: radius, cornerHeight: radius, transform: nil)
+            context.addPath(path)
+            context.clip()
+        }
+        
+        // Draw the image
+        context.draw(image, in: imageRect)
+    }
+    
+    /// Load image from app bundle (cached for performance)
+    private func loadImage(named imageName: String) -> CGImage? {
+        // Check cache first
+        if let cached = imageCache[imageName] {
+            return cached
+        }
+        
+        // Load from bundle
+        var loadedImage: CGImage?
+        
+        // Try to load from main bundle first, then from shared bundle
+        if let url = Bundle.main.url(forResource: imageName, withExtension: nil),
+           let imageSource = CGImageSourceCreateWithURL(url as CFURL, nil),
+           let image = CGImageSourceCreateImageAtIndex(imageSource, 0, nil) {
+            loadedImage = image
+        } else {
+            // Try common image extensions
+            for ext in ["png", "jpg", "jpeg"] {
+                if let url = Bundle.main.url(forResource: imageName, withExtension: ext),
+                   let imageSource = CGImageSourceCreateWithURL(url as CFURL, nil),
+                   let image = CGImageSourceCreateImageAtIndex(imageSource, 0, nil) {
+                    loadedImage = image
+                    break
+                }
+            }
+        }
+        
+        // Cache the result (even if nil to avoid repeated failed lookups)
+        if let image = loadedImage {
+            imageCache[imageName] = image
+        }
+        
+        return loadedImage
+    }
+    
+    /// Calculate image rect based on content mode
+    private func calculateImageRect(image: CGImage, in frame: CGRect, contentMode: String) -> CGRect {
+        let imageSize = CGSize(width: image.width, height: image.height)
+        let frameSize = frame.size
+        
+        switch contentMode.lowercased() {
+        case "fill":
+            // Scale to fill frame (may crop)
+            let scale = max(frameSize.width / imageSize.width, frameSize.height / imageSize.height)
+            let scaledSize = CGSize(width: imageSize.width * scale, height: imageSize.height * scale)
+            return CGRect(
+                x: frame.midX - scaledSize.width / 2,
+                y: frame.midY - scaledSize.height / 2,
+                width: scaledSize.width,
+                height: scaledSize.height
+            )
+            
+        case "stretch":
+            // Stretch to exactly fit frame
+            return frame
+            
+        default: // "fit"
+            // Scale to fit within frame (no cropping)
+            let scale = min(frameSize.width / imageSize.width, frameSize.height / imageSize.height)
+            let scaledSize = CGSize(width: imageSize.width * scale, height: imageSize.height * scale)
+            return CGRect(
+                x: frame.midX - scaledSize.width / 2,
+                y: frame.midY - scaledSize.height / 2,
+                width: scaledSize.width,
+                height: scaledSize.height
+            )
+        }
     }
     
     // MARK: - Helper Methods

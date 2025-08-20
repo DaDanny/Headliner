@@ -469,27 +469,31 @@ enum OverlayPresets {
                 )
             ],
             fourThree: [
+                // Card (centered for 4:3 - moved from bottom-left to center)
                 OverlayNodePlacement(
                     index: 0,
-                    frame: NRect(x: 0.03, y: 0.7, w: 0.4, h: 0.25),
+                    frame: NRect(x: 0.3, y: 0.4, w: 0.4, h: 0.25), // CENTERED: x: 0.03→0.3, y: 0.7→0.4
                     zIndex: 0,
                     opacity: 0.95
                 ),
+                // Accent bar (centered to match card) - THICKER for 4:3 to see difference
                 OverlayNodePlacement(
                     index: 1,
-                    frame: NRect(x: 0.03, y: 0.7, w: 0.4, h: 0.02),
+                    frame: NRect(x: 0.3, y: 0.4, w: 0.4, h: 0.04), // CENTERED + THICKER: h: 0.02→0.04
                     zIndex: 1,
                     opacity: 1.0
                 ),
+                // Name (centered)
                 OverlayNodePlacement(
                     index: 2,
-                    frame: NRect(x: 0.05, y: 0.74, w: 0.36, h: 0.1),
+                    frame: NRect(x: 0.32, y: 0.44, w: 0.36, h: 0.1), // CENTERED: x: 0.05→0.32, y: 0.74→0.44
                     zIndex: 2,
                     opacity: 1.0
                 ),
+                // Tagline (centered)
                 OverlayNodePlacement(
                     index: 3,
-                    frame: NRect(x: 0.05, y: 0.85, w: 0.36, h: 0.06),
+                    frame: NRect(x: 0.32, y: 0.55, w: 0.36, h: 0.06), // CENTERED: x: 0.05→0.32, y: 0.85→0.55
                     zIndex: 2,
                     opacity: 0.9
                 )
@@ -732,12 +736,94 @@ enum OverlayPresets {
         )
     )
 
+    /// Company branding preset with logo
+    private static let companyBrandingPreset = OverlayPreset(
+        id: "company-branding",
+        name: "Company Branding",
+        nodes: [
+            // Company logo
+            .image(ImageNode(
+                imageName: "company-logo", // Add your logo to app bundle as "company-logo.png"
+                contentMode: "fit",
+                opacity: 0.9,
+                cornerRadius: 0.1
+            )),
+            
+            // Company name
+            .text(TextNode(
+                text: "{displayName}",
+                fontSize: 0.04,
+                fontWeight: "bold",
+                colorHex: "#ffffff",
+                alignment: "left"
+            )),
+            
+            // Role/title
+            .text(TextNode(
+                text: "{tagline}",
+                fontSize: 0.03,
+                fontWeight: "medium",
+                colorHex: "#cccccc",
+                alignment: "left"
+            ))
+        ],
+        layout: OverlayLayout(
+            widescreen: [
+                // Logo (top-right corner)
+                OverlayNodePlacement(
+                    index: 0,
+                    frame: NRect(x: 0.85, y: 0.1, w: 0.12, h: 0.12),
+                    zIndex: 2,
+                    opacity: 1.0
+                ),
+                // Name (bottom-left)
+                OverlayNodePlacement(
+                    index: 1,
+                    frame: NRect(x: 0.05, y: 0.8, w: 0.4, h: 0.08),
+                    zIndex: 1,
+                    opacity: 1.0
+                ),
+                // Title (bottom-left, below name)
+                OverlayNodePlacement(
+                    index: 2,
+                    frame: NRect(x: 0.05, y: 0.88, w: 0.4, h: 0.05),
+                    zIndex: 1,
+                    opacity: 0.9
+                )
+            ],
+            fourThree: [
+                // Logo (top-right corner)
+                OverlayNodePlacement(
+                    index: 0,
+                    frame: NRect(x: 0.8, y: 0.1, w: 0.15, h: 0.15),
+                    zIndex: 2,
+                    opacity: 1.0
+                ),
+                // Name (bottom-left)
+                OverlayNodePlacement(
+                    index: 1,
+                    frame: NRect(x: 0.05, y: 0.75, w: 0.5, h: 0.1),
+                    zIndex: 1,
+                    opacity: 1.0
+                ),
+                // Title (bottom-left, below name)
+                OverlayNodePlacement(
+                    index: 2,
+                    frame: NRect(x: 0.05, y: 0.85, w: 0.5, h: 0.06),
+                    zIndex: 1,
+                    opacity: 0.9
+                )
+            ]
+        )
+    )
+
     /// Built-in presets as fallback
     private static let builtInPresets: [OverlayPreset] = [
         modernCardPreset,
         glassPillPreset,
         minimalCleanPreset,
         vibrantCreativePreset,
+        companyBrandingPreset,
         professionalPreset,
         personalPreset,
         professionalCustomPreset,

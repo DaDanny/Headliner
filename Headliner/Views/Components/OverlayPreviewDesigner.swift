@@ -12,7 +12,9 @@ import SwiftUI
 struct OverlayPreviewDesigner: View {
     @State private var selectedPresetIndex = 0
     @State private var selectedAspectRatio: CGFloat = 16.0/9.0
+    @State private var selectedAspectType: String = "widescreen"
     @State private var showGrid = true
+    @State private var showCoordinates = true
     
     // Sample data for preview
     @State private var displayName = "Sarah Chen"
@@ -33,11 +35,19 @@ struct OverlayPreviewDesigner: View {
     }
     
     private var sampleTokens: OverlayTokens {
-        OverlayTokens(
+        // More explicit aspect ratio calculation
+        let aspect: OverlayAspect
+        if selectedAspectRatio > 1.5 { // 16:9 = 1.777, 4:3 = 1.333
+            aspect = .widescreen
+        } else {
+            aspect = .fourThree
+        }
+        
+        return OverlayTokens(
             displayName: displayName,
             tagline: tagline.isEmpty ? nil : tagline,
             accentColorHex: accentColor,
-            aspect: abs(selectedAspectRatio - 16.0/9.0) < 0.01 ? .widescreen : .fourThree,
+            aspect: aspect,
             city: city.isEmpty ? nil : city,
             localTime: localTime.isEmpty ? nil : localTime,
             weatherEmoji: weatherEmoji.isEmpty ? nil : weatherEmoji,
@@ -80,14 +90,19 @@ struct OverlayPreviewDesigner: View {
                 VStack(alignment: .leading) {
                     Text("Aspect Ratio:")
                         .font(.headline)
-                    Picker("Aspect", selection: $selectedAspectRatio) {
-                        Text("16:9 Widescreen").tag(16.0/9.0)
-                        Text("4:3 Standard").tag(4.0/3.0)
+                    Picker("Aspect", selection: $selectedAspectType) {
+                        Text("16:9 Widescreen").tag("widescreen")
+                        Text("4:3 Standard").tag("fourThree")
                     }
                     .pickerStyle(SegmentedPickerStyle())
+                    .onChange(of: selectedAspectType) { _, newValue in
+                        selectedAspectRatio = newValue == "widescreen" ? 16.0/9.0 : 4.0/3.0
+                    }
                 }
                 
                 Toggle("Show Grid", isOn: $showGrid)
+                
+                Toggle("Show Coordinates", isOn: $showCoordinates)
                 
                 Spacer()
                 
@@ -99,18 +114,39 @@ struct OverlayPreviewDesigner: View {
                     Text("\(currentPreset.nodes.count) nodes")
                         .font(.caption)
                         .foregroundColor(.secondary)
+                    Text("Using: \(sampleTokens.aspect.rawValue)")
+                        .font(.caption2)
+                        .foregroundColor(.blue)
+                        .fontWeight(.medium)
                 }
             }
             .padding(.horizontal)
             
-            // Visual Preview
-            SimpleOverlayPreview(
-                preset: currentPreset,
-                tokens: sampleTokens,
-                aspectRatio: selectedAspectRatio,
-                showGrid: showGrid
-            )
-            .frame(maxWidth: 1000, maxHeight: 700)
+            // Visual Preview with Coordinate Panel
+            HStack(spacing: 20) {
+                // Main preview
+                SimpleOverlayPreview(
+                    preset: currentPreset,
+                    tokens: sampleTokens,
+                    aspectRatio: selectedAspectRatio,
+                    aspectType: selectedAspectType,
+                    showGrid: showGrid,
+                    showCoordinates: false // Remove individual labels
+                )
+                .frame(maxWidth: 800, maxHeight: 600)
+                .id("\(currentPreset.id)_\(selectedAspectType)") // Force refresh on aspect change
+                
+                // Coordinate panel (if enabled)
+                if showCoordinates {
+                    CoordinatePanel(
+                        preset: currentPreset,
+                        aspectType: selectedAspectType,
+                        tokens: sampleTokens
+                    )
+                    .frame(width: 280)
+                    .id("\(currentPreset.id)_\(selectedAspectType)_coords") // Force refresh on aspect change
+                }
+            }
             
             // Sample Data Controls
             GroupBox("Sample Data (adjust to see how your overlay responds)") {
@@ -184,7 +220,9 @@ struct SimpleOverlayPreview: View {
     let preset: OverlayPreset
     let tokens: OverlayTokens
     let aspectRatio: CGFloat
+    let aspectType: String
     let showGrid: Bool
+    let showCoordinates: Bool
     
     var body: some View {
         GeometryReader { geometry in
@@ -207,11 +245,27 @@ struct SimpleOverlayPreview: View {
                         .frame(width: frameWidth, height: frameHeight)
                 }
                 
-                // Render the actual overlay nodes
-                let isWidescreen = abs(aspectRatio - 16.0/9.0) < 0.01
-                let placements = isWidescreen ? preset.layout.widescreen : preset.layout.fourThree
+                // Render the actual overlay nodes using the correct aspect ratio
+                // Use string-based aspect selection for reliability
+                let placements = aspectType == "widescreen" ? preset.layout.widescreen : preset.layout.fourThree
                 
-                ForEach(Array(placements.enumerated()), id: \.offset) { _, placement in
+                // Debug: Show which layout we're using
+                VStack(alignment: .leading) {
+                    Text("Ratio: \(String(format: "%.2f", aspectRatio))")
+                        .font(.caption2)
+                        .foregroundColor(.yellow)
+                    Text("Layout: \(aspectType)")
+                        .font(.caption2)
+                        .foregroundColor(.yellow)
+                    Text("Placements: \(placements.count)")
+                        .font(.caption2)
+                        .foregroundColor(.yellow)
+                }
+                .padding(4)
+                .background(Color.black.opacity(0.7))
+                .position(x: 80, y: 40)
+                
+                ForEach(Array(placements.enumerated()), id: \.offset) { index, placement in
                     if placement.index < preset.nodes.count {
                         let node = preset.nodes[placement.index]
                         // Convert to Core Graphics coordinates (bottom-left origin)
@@ -246,6 +300,10 @@ struct SimpleOverlayPreview: View {
             }
         }
         .cornerRadius(12)
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(aspectRatio > 1.5 ? Color.blue : Color.orange, lineWidth: 3)
+        )
         .shadow(radius: 10)
     }
     
@@ -299,6 +357,26 @@ struct SimpleNodeView: View {
                 
                 LinearGradient(colors: [startColor, endColor], startPoint: startPoint, endPoint: endPoint)
                     .frame(width: frame.width, height: frame.height)
+                    
+            case .image(let imageNode):
+                if let nsImage = NSImage(named: imageNode.imageName) {
+                    Image(nsImage: nsImage)
+                        .resizable()
+                        .aspectRatio(contentMode: imageContentMode(imageNode.contentMode))
+                        .opacity(imageNode.opacity)
+                        .clipShape(RoundedRectangle(cornerRadius: imageNode.cornerRadius * frame.height))
+                        .frame(width: frame.width, height: frame.height)
+                } else {
+                    // Placeholder for missing image
+                    RoundedRectangle(cornerRadius: imageNode.cornerRadius * frame.height)
+                        .fill(Color.gray.opacity(0.5))
+                        .overlay(
+                            Image(systemName: "photo")
+                                .foregroundColor(.white)
+                                .font(.system(size: frame.height * 0.3))
+                        )
+                        .frame(width: frame.width, height: frame.height)
+                }
             }
         }
         .position(x: frame.midX, y: frame.midY)
@@ -339,6 +417,136 @@ struct SimpleNodeView: View {
         case "left": return .leading
         case "right": return .trailing
         default: return .center
+        }
+    }
+    
+    private func imageContentMode(_ mode: String) -> ContentMode {
+        switch mode.lowercased() {
+        case "fill": return .fill
+        case "stretch": return .fill // SwiftUI doesn't have stretch, use fill
+        default: return .fit
+        }
+    }
+}
+
+/// Clean coordinate panel showing all placements
+struct CoordinatePanel: View {
+    let preset: OverlayPreset
+    let aspectType: String
+    let tokens: OverlayTokens
+    
+    private var currentPlacements: [OverlayNodePlacement] {
+        return aspectType == "widescreen" ? preset.layout.widescreen : preset.layout.fourThree
+    }
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            // Header
+            VStack(alignment: .leading, spacing: 8) {
+                Text("📐 Coordinates")
+                    .font(.headline)
+                    .fontWeight(.bold)
+                
+                Text("Layout: \(aspectType == "widescreen" ? "16:9 Widescreen" : "4:3 Standard")")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                
+                Text("Copy these values to OverlayPresets.swift")
+                    .font(.caption2)
+                    .foregroundColor(.blue)
+                    .fontWeight(.medium)
+            }
+            
+            ScrollView {
+                VStack(alignment: .leading, spacing: 12) {
+                    ForEach(Array(currentPlacements.enumerated()), id: \.offset) { _, placement in
+                        if placement.index < preset.nodes.count {
+                            let node = preset.nodes[placement.index]
+                            
+                            VStack(alignment: .leading, spacing: 4) {
+                                // Node info
+                                HStack {
+                                    Text("Node \(placement.index)")
+                                        .font(.caption)
+                                        .fontWeight(.bold)
+                                        .foregroundColor(.yellow)
+                                    
+                                    Spacer()
+                                    
+                                    Text(nodeTypeDescription(node))
+                                        .font(.caption2)
+                                        .foregroundColor(.secondary)
+                                }
+                                
+                                // Coordinates
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text("NRect(")
+                                        .font(.system(.caption2, design: .monospaced))
+                                        .foregroundColor(.white)
+                                    
+                                    Text("  x: \(String(format: "%.3f", placement.frame.x)),")
+                                        .font(.system(.caption2, design: .monospaced))
+                                        .foregroundColor(.white)
+                                    
+                                    Text("  y: \(String(format: "%.3f", placement.frame.y)),")
+                                        .font(.system(.caption2, design: .monospaced))
+                                        .foregroundColor(.white)
+                                    
+                                    Text("  w: \(String(format: "%.3f", placement.frame.w)),")
+                                        .font(.system(.caption2, design: .monospaced))
+                                        .foregroundColor(.white)
+                                    
+                                    Text("  h: \(String(format: "%.3f", placement.frame.h))")
+                                        .font(.system(.caption2, design: .monospaced))
+                                        .foregroundColor(.white)
+                                    
+                                    Text(")")
+                                        .font(.system(.caption2, design: .monospaced))
+                                        .foregroundColor(.white)
+                                }
+                                
+                                // Additional info
+                                HStack {
+                                    Text("z: \(placement.zIndex)")
+                                        .font(.caption2)
+                                        .foregroundColor(.secondary)
+                                    
+                                    Text("opacity: \(String(format: "%.1f", placement.opacity))")
+                                        .font(.caption2)
+                                        .foregroundColor(.secondary)
+                                }
+                            }
+                            .padding(8)
+                            .background(
+                                RoundedRectangle(cornerRadius: 6)
+                                    .fill(Color.black.opacity(0.6))
+                                    .stroke(Color.white.opacity(0.2), lineWidth: 1)
+                            )
+                        }
+                    }
+                }
+            }
+            
+            Spacer()
+        }
+        .padding()
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(Color.black.opacity(0.8))
+                .stroke(Color.white.opacity(0.3), lineWidth: 1)
+        )
+    }
+    
+    private func nodeTypeDescription(_ node: OverlayNode) -> String {
+        switch node {
+        case .text(let textNode):
+            return "Text: \(textNode.text.prefix(20))..."
+        case .rect(_):
+            return "Rectangle"
+        case .gradient(_):
+            return "Gradient"
+        case .image(let imageNode):
+            return "Image: \(imageNode.imageName)"
         }
     }
 }
