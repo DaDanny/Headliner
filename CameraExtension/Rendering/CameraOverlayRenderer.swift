@@ -78,6 +78,21 @@ final class CameraOverlayRenderer: OverlayRenderer {
     
     /// Track last layout key to detect content changes for crossfade
     private var lastKey: LayoutKey?
+    
+    /// Cached personal info to avoid disk reads on every frame
+    private var cachedPersonalInfo: PersonalInfo?
+    
+    /// Timestamp of last personal info cache update
+    private var lastPersonalInfoUpdate: TimeInterval = 0
+    
+    /// Cache refresh interval (5 seconds to balance freshness vs performance)
+    private let personalInfoCacheInterval: TimeInterval = 5.0
+    
+    /// Font cache to avoid repeated Core Text font creation
+    private var fontCache: [String: CTFont] = [:]
+    
+    /// Color cache to avoid repeated hex parsing
+    private var colorCache: [String: CGColor] = [:]
 
     // MARK: - Initialization
     
@@ -117,35 +132,22 @@ final class CameraOverlayRenderer: OverlayRenderer {
             // Early return for no overlay
             guard !preset.nodes.isEmpty else { return base }
             
-            // Enrich tokens for personal preset
+            // Always enrich tokens with cached personal data (fast lookup)
             var enrichedTokens = tokens
-            if preset.id == "personal" || preset.id == "personal-custom" {
-                // Read personal info from App Group storage (updated by main app)
-                if let personalInfo = personalInfoReader.readPersonalInfo() {
-                    enrichedTokens.city = enrichedTokens.city ?? personalInfo.city
-                    enrichedTokens.localTime = enrichedTokens.localTime ?? personalInfo.localTime
-                    enrichedTokens.weatherEmoji = enrichedTokens.weatherEmoji ?? personalInfo.weatherEmoji
-                    enrichedTokens.weatherText = enrichedTokens.weatherText ?? personalInfo.weatherText
-                    
-                    // Debug log to see what values we're using
-                    print("[CameraOverlayRenderer] Personal tokens - city: \(enrichedTokens.city ?? "nil"), time: \(enrichedTokens.localTime ?? "nil"), weather: \(enrichedTokens.weatherEmoji ?? "nil")")
-                }
+            let personalInfo = getCachedPersonalInfo()
+            if let personalInfo = personalInfo {
+                enrichedTokens.city = enrichedTokens.city ?? personalInfo.city
+                enrichedTokens.localTime = enrichedTokens.localTime ?? personalInfo.localTime
+                enrichedTokens.weatherEmoji = enrichedTokens.weatherEmoji ?? personalInfo.weatherEmoji
+                enrichedTokens.weatherText = enrichedTokens.weatherText ?? personalInfo.weatherText
             }
             
             let width = CGFloat(CVPixelBufferGetWidth(pixelBuffer))
             let height = CGFloat(CVPixelBufferGetHeight(pixelBuffer))
             let containerSize = CGSize(width: width, height: height)
             
-            // Create consolidated signature for cache key
-            let signature = [
-                enrichedTokens.displayName,
-                enrichedTokens.tagline ?? "",
-                enrichedTokens.accentColorHex,
-                enrichedTokens.city ?? "",
-                enrichedTokens.localTime ?? "",
-                enrichedTokens.weatherEmoji ?? "",
-                enrichedTokens.weatherText ?? ""
-            ].joined(separator: "|")
+            // Create consolidated signature for cache key (optimized)
+            let signature = "\(enrichedTokens.displayName)|\(enrichedTokens.tagline ?? "")|\(enrichedTokens.accentColorHex)|\(enrichedTokens.city ?? "")|\(enrichedTokens.localTime ?? "")|\(enrichedTokens.weatherEmoji ?? "")|\(enrichedTokens.weatherText ?? "")"
             
             let key = LayoutKey(
                 presetID: preset.id,
@@ -201,6 +203,57 @@ final class CameraOverlayRenderer: OverlayRenderer {
     
     // MARK: - Private Methods
     
+
+    
+    /// Get cached personal info, refreshing if needed
+    private func getCachedPersonalInfo() -> PersonalInfo? {
+        let now = CACurrentMediaTime()
+        
+        // Check if cache is still valid
+        if let cached = cachedPersonalInfo, 
+           now - lastPersonalInfoUpdate < personalInfoCacheInterval {
+            return cached
+        }
+        
+        // Cache is stale or empty, refresh it
+        cachedPersonalInfo = personalInfoReader.readPersonalInfo()
+        lastPersonalInfoUpdate = now
+        
+        return cachedPersonalInfo
+    }
+    
+    /// Force refresh the personal info cache (call when data changes)
+    func refreshPersonalInfoCache() {
+        cachedPersonalInfo = personalInfoReader.readPersonalInfo()
+        lastPersonalInfoUpdate = CACurrentMediaTime()
+    }
+    
+    /// Get cached font, creating if needed
+    private func getCachedFont(size: CGFloat, weightName: String) -> CTFont {
+        let key = "\(size)_\(weightName)"
+        
+        if let cached = fontCache[key] {
+            return cached
+        }
+        
+        let font = createSystemFont(size: size, weightName: weightName)
+        fontCache[key] = font
+        return font
+    }
+    
+    /// Get cached color, parsing if needed
+    private func getCachedColor(from hex: String) -> CGColor? {
+        if let cached = colorCache[hex] {
+            return cached
+        }
+        
+        let color = cgColor(from: hex)
+        if let color = color {
+            colorCache[hex] = color
+        }
+        return color
+    }
+    
     /// Build the overlay image by rendering all nodes to a Core Graphics context.
     ///
     /// This method is only called when the cache doesn't contain the requested overlay,
@@ -240,22 +293,12 @@ final class CameraOverlayRenderer: OverlayRenderer {
         let placements = preset.layout.placements(for: tokens.aspect)
             .sorted { $0.zIndex < $1.zIndex }
         
-        // Special handling for personal preset - don't render background if no data
-        let hasPersonalData = (preset.id != "personal" && preset.id != "personal-custom") || 
-            (tokens.city != nil && !tokens.city!.isEmpty) ||
-            (tokens.weatherEmoji != nil && !tokens.weatherEmoji!.isEmpty)
-        
-        // Draw each node
+        // Draw each node (personal data is already cached and enriched in tokens)
         for placement in placements {
             guard placement.index < preset.nodes.count,
                   placement.opacity > 0 else { continue }
             
             let node = preset.nodes[placement.index]
-            
-            // Skip background rect for personal preset if no data
-            if (preset.id == "personal" || preset.id == "personal-custom") && placement.index == 0 && !hasPersonalData {
-                continue
-            }
             
             // Apply pixel snapping for crisp edges
             let frame = placement.frame.toCGRect(in: size).integral
@@ -315,7 +358,7 @@ final class CameraOverlayRenderer: OverlayRenderer {
     }
     
     private func drawRect(_ node: RectNode, in frame: CGRect, tokens: OverlayTokens, context: CGContext) {
-        guard let color = cgColor(from: node.colorHex.replacingTokens(with: tokens)) else { return }
+        guard let color = getCachedColor(from: node.colorHex.replacingTokens(with: tokens)) else { return }
         
         let radius = min(frame.width, frame.height) * node.cornerRadius
         let path = CGPath(roundedRect: frame, cornerWidth: radius, cornerHeight: radius, transform: nil)
@@ -326,8 +369,8 @@ final class CameraOverlayRenderer: OverlayRenderer {
     }
     
     private func drawGradient(_ node: GradientNode, in frame: CGRect, tokens: OverlayTokens, context: CGContext) {
-        guard let startColor = cgColor(from: node.startColorHex.replacingTokens(with: tokens)),
-              let endColor = cgColor(from: node.endColorHex.replacingTokens(with: tokens)),
+        guard let startColor = getCachedColor(from: node.startColorHex.replacingTokens(with: tokens)),
+              let endColor = getCachedColor(from: node.endColorHex.replacingTokens(with: tokens)),
               let gradient = CGGradient(
                 colorsSpace: colorSpace,
                 colors: [startColor, endColor] as CFArray,
@@ -354,20 +397,26 @@ final class CameraOverlayRenderer: OverlayRenderer {
     }
     
     private func drawText(_ node: TextNode, in frame: CGRect, tokens: OverlayTokens, context: CGContext) {
-        // Special handling for personal preset - skip nodes with missing data
+        // Skip text nodes with missing personal data tokens
         if node.text.contains("{city}") && (tokens.city == nil || tokens.city?.isEmpty == true) {
             return // Skip city line if no city data
         }
         if node.text.contains("{weatherEmoji}") && (tokens.weatherEmoji == nil || tokens.weatherEmoji?.isEmpty == true) {
             return // Skip weather line if no weather data
         }
+        if node.text.contains("{localTime}") && (tokens.localTime == nil || tokens.localTime?.isEmpty == true) {
+            return // Skip time line if no time data
+        }
+        if node.text.contains("{weatherText}") && (tokens.weatherText == nil || tokens.weatherText?.isEmpty == true) {
+            return // Skip weather text if no weather data
+        }
         
         let text = node.text.replacingTokens(with: tokens).trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else { return }
         
         let fontSize = frame.height * 0.7
-        let ctFont = createSystemFont(size: fontSize, weightName: node.fontWeight)
-        let color = cgColor(from: node.colorHex.replacingTokens(with: tokens)) ?? CGColor(gray: 1.0, alpha: 1.0)
+        let ctFont = getCachedFont(size: fontSize, weightName: node.fontWeight)
+        let color = getCachedColor(from: node.colorHex.replacingTokens(with: tokens)) ?? CGColor(gray: 1.0, alpha: 1.0)
         
         var alignment: CTTextAlignment = .center
         switch node.alignment.lowercased() {
