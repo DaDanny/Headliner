@@ -249,21 +249,21 @@ struct SimpleOverlayPreview: View {
                 // Use string-based aspect selection for reliability
                 let placements = aspectType == "widescreen" ? preset.layout.widescreen : preset.layout.fourThree
                 
-                // Debug: Show which layout we're using
-                VStack(alignment: .leading) {
-                    Text("Ratio: \(String(format: "%.2f", aspectRatio))")
-                        .font(.caption2)
-                        .foregroundColor(.yellow)
-                    Text("Layout: \(aspectType)")
-                        .font(.caption2)
-                        .foregroundColor(.yellow)
-                    Text("Placements: \(placements.count)")
-                        .font(.caption2)
-                        .foregroundColor(.yellow)
-                }
-                .padding(4)
-                .background(Color.black.opacity(0.7))
-                .position(x: 80, y: 40)
+//                // Debug: Show which layout we're using
+//                VStack(alignment: .leading) {
+//                    Text("Ratio: \(String(format: "%.2f", aspectRatio))")
+//                        .font(.caption2)
+//                        .foregroundColor(.yellow)
+//                    Text("Layout: \(aspectType)")
+//                        .font(.caption2)
+//                        .foregroundColor(.yellow)
+//                    Text("Placements: \(placements.count)")
+//                        .font(.caption2)
+//                        .foregroundColor(.yellow)
+//                }
+//                .padding(4)
+//                .background(Color.black.opacity(0.7))
+//                .position(x: 80, y: 40)
                 
                 ForEach(Array(placements.enumerated()), id: \.offset) { index, placement in
                     if placement.index < preset.nodes.count {

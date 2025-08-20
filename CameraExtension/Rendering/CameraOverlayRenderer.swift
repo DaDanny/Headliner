@@ -29,26 +29,28 @@ import QuartzCore
 /// - Deterministic cache keys for stable performance
 /// - sRGB color management throughout the pipeline
 final class CameraOverlayRenderer: OverlayRenderer {
+    // MARK: - Queues
+    private let renderQueue = DispatchQueue(label: "CameraOverlayRenderer.render")
+    private let cacheQueue = DispatchQueue(label: "CameraOverlayRenderer.cache")
+
+    // MARK: - Core Image
+    private let ciContext: CIContext
+    private let colorSpace = CGColorSpace(name: CGColorSpace.sRGB)!
+
+    // Reused filters
+    private let dissolve = CIFilter(name: "CIDissolveTransition")!
+
+    // Bundles
+    private lazy var extensionBundle: Bundle = { Bundle(for: CameraOverlayRenderer.self) }()
+
+    // Crossfade state
+    private var previousOverlay: CIImage?
+    private var crossfadeStart: CFTimeInterval?
+    private let crossfadeDuration: CFTimeInterval = 0.25
+
+    // Caches & state (unchanged below)...
     
     // MARK: - Properties
-    
-    /// Serial queue for thread-safe cache access
-    private let cacheQueue = DispatchQueue(label: "CameraOverlayRenderer.cache")
-    
-    /// Core Image context for GPU-accelerated rendering
-    private let ciContext: CIContext
-    
-    /// sRGB color space used throughout the rendering pipeline for consistency
-    private let colorSpace = CGColorSpace(name: CGColorSpace.sRGB)!
-    
-    /// Previous overlay image used for smooth crossfade transitions
-    private var previousOverlay: CIImage?
-    
-    /// Timestamp when crossfade animation started
-    private var crossfadeStart: CFTimeInterval?
-    
-    /// Duration of crossfade animation in seconds
-    private let crossfadeDuration: CFTimeInterval = 0.25
     
     /// Deterministic cache key for overlay layouts.
     /// Uses consolidated token signature for comprehensive invalidation.
@@ -121,6 +123,20 @@ final class CameraOverlayRenderer: OverlayRenderer {
         }
         
         // PersonalInfoReader reads from App Group storage
+        
+        // Observe memory/thermal pressure and clear caches if needed
+        let source = DispatchSource.makeMemoryPressureSource(eventMask: [.warning, .critical], queue: .main)
+        source.setEventHandler { [weak self] in self?.clearCaches() }
+        source.resume()
+
+        NotificationCenter.default.addObserver(
+          forName: ProcessInfo.thermalStateDidChangeNotification,
+          object: nil,
+          queue: .main
+        ) { [weak self] _ in
+          let state = ProcessInfo.processInfo.thermalState
+          if state == .serious || state == .critical { self?.clearCaches() }
+        }
     }
     
     // MARK: - Public Methods
@@ -129,73 +145,74 @@ final class CameraOverlayRenderer: OverlayRenderer {
                 preset: OverlayPreset,
                 tokens: OverlayTokens,
                 previousFrame: CIImage?) -> CIImage {
-        return autoreleasepool {
-            let base = CIImage(cvPixelBuffer: pixelBuffer, options: [.colorSpace: colorSpace])
-            
-            // Early return for no overlay
-            guard !preset.nodes.isEmpty else { return base }
-            
-            // Always enrich tokens with cached personal data (fast lookup)
-            var enrichedTokens = tokens
-            let personalInfo = getCachedPersonalInfo()
-            if let personalInfo = personalInfo {
-                enrichedTokens.city = enrichedTokens.city ?? personalInfo.city
-                enrichedTokens.localTime = enrichedTokens.localTime ?? personalInfo.localTime
-                enrichedTokens.weatherEmoji = enrichedTokens.weatherEmoji ?? personalInfo.weatherEmoji
-                enrichedTokens.weatherText = enrichedTokens.weatherText ?? personalInfo.weatherText
-            }
-            
-            let width = CGFloat(CVPixelBufferGetWidth(pixelBuffer))
-            let height = CGFloat(CVPixelBufferGetHeight(pixelBuffer))
-            let containerSize = CGSize(width: width, height: height)
-            
-            // Create consolidated signature for cache key (optimized)
-            let signature = "\(enrichedTokens.displayName)|\(enrichedTokens.tagline ?? "")|\(enrichedTokens.accentColorHex)|\(enrichedTokens.city ?? "")|\(enrichedTokens.localTime ?? "")|\(enrichedTokens.weatherEmoji ?? "")|\(enrichedTokens.weatherText ?? "")"
-            
-            let key = LayoutKey(
-                presetID: preset.id,
-                aspect: enrichedTokens.aspect.rawValue,
-                signature: signature
-            )
-            
-            // Get overlay from cache or build it
-            let overlay: CIImage = cacheQueue.sync {
-                if let cached = cache.value(forKey: key) {
-                    return cached
-                } else {
-                    let built = buildOverlayImage(preset: preset, tokens: enrichedTokens, size: containerSize)
-                    cache.setValue(built, forKey: key)
-                    return built
+        return renderQueue.sync {
+            return autoreleasepool {
+                let base = CIImage(cvPixelBuffer: pixelBuffer, options: [.colorSpace: colorSpace])
+                guard !preset.nodes.isEmpty else { return base }
+
+                var enrichedTokens = tokens
+                if let personalInfo = getCachedPersonalInfo() {
+                    enrichedTokens.city = enrichedTokens.city ?? personalInfo.city
+                    enrichedTokens.localTime = enrichedTokens.localTime ?? personalInfo.localTime
+                    enrichedTokens.weatherEmoji = enrichedTokens.weatherEmoji ?? personalInfo.weatherEmoji
+                    enrichedTokens.weatherText = enrichedTokens.weatherText ?? personalInfo.weatherText
                 }
-            }
 
-            // Crossfade handling between cached node-built images
-            if lastKey != key || previousOverlay?.extent != overlay.extent {
-                crossfadeStart = CACurrentMediaTime()
-            }
-            lastKey = key
+                let size = CGSize(width: CGFloat(CVPixelBufferGetWidth(pixelBuffer)),
+                                  height: CGFloat(CVPixelBufferGetHeight(pixelBuffer)))
 
-            if let prev = previousOverlay,
-               let start = crossfadeStart,
-               CACurrentMediaTime() - start < crossfadeDuration,
-               let dissolveFilter = CIFilter(name: "CIDissolveTransition")
-            {
-                let t = min((CACurrentMediaTime() - start) / crossfadeDuration, 1.0)
-                dissolveFilter.setValue(prev, forKey: kCIInputImageKey)
-                dissolveFilter.setValue(overlay, forKey: kCIInputTargetImageKey)
-                dissolveFilter.setValue(t, forKey: kCIInputTimeKey)
-                if let blended = dissolveFilter.outputImage {
-                    let composited = blended.cropped(to: base.extent).composited(over: base)
-                    if t >= 1.0 {
-                        previousOverlay = overlay
+                let signature = "\(enrichedTokens.displayName)|\(enrichedTokens.tagline ?? "")|\(enrichedTokens.accentColorHex)|\(enrichedTokens.city ?? "")|\(enrichedTokens.localTime ?? "")|\(enrichedTokens.weatherEmoji ?? "")|\(enrichedTokens.weatherText ?? "")"
+
+                let key = LayoutKey(presetID: preset.id,
+                                    aspect: enrichedTokens.aspect.rawValue,
+                                    signature: signature)
+
+                // Fast path: unchanged key and we already have previousOverlay
+                if lastKey == key, let prevOverlay = previousOverlay {
+                    let overlayCropped = prevOverlay.cropped(to: base.extent)
+                    return overlayCropped.composited(over: base)
+                }
+
+                // Build or fetch overlay image
+                let overlay: CIImage = cacheQueue.sync {
+                    if let cached = cache.value(forKey: key) {
+                        return cached
+                    } else {
+                        let built = buildOverlayImage(preset: preset, tokens: enrichedTokens, size: size)
+                        cache.setValue(built, forKey: key)
+                        return built
+                    }
+                }
+
+                // Crossfade if key changed
+                if lastKey != key || previousOverlay?.extent != overlay.extent {
+                    crossfadeStart = CACurrentMediaTime()
+                }
+                lastKey = key
+
+                let overlayCropped = overlay.cropped(to: base.extent)
+
+                if let prev = previousOverlay,
+                   let start = crossfadeStart {
+                    let elapsed = CACurrentMediaTime() - start
+                    if elapsed < crossfadeDuration {
+                        let t = min(elapsed / crossfadeDuration, 1.0)
+                        dissolve.setValue(prev, forKey: kCIInputImageKey)
+                        dissolve.setValue(overlayCropped, forKey: kCIInputTargetImageKey)
+                        dissolve.setValue(t, forKey: kCIInputTimeKey)
+                        if let blended = dissolve.outputImage {
+                            if t >= 1.0 { crossfadeStart = nil }
+                            previousOverlay = lightweightCopy(overlayCropped)
+                            return blended.cropped(to: base.extent).composited(over: base)
+                        }
+                    } else {
                         crossfadeStart = nil
                     }
-                    return composited
                 }
-            }
 
-            previousOverlay = overlay
-            return overlay.composited(over: base)
+                previousOverlay = lightweightCopy(overlayCropped)
+                return overlayCropped.composited(over: base)
+            }
         }
     }
     
@@ -493,43 +510,59 @@ final class CameraOverlayRenderer: OverlayRenderer {
         context.draw(image, in: imageRect)
     }
     
-    /// Load image from app bundle (cached for performance)
     private func loadImage(named imageName: String) -> CGImage? {
-        // Check cache first
-        if let cached = imageCache[imageName] {
-            return cached
+        if let cached = imageCache[imageName] { return cached }
+
+        func load(from bundle: Bundle, name: String) -> CGImage? {
+            if let url = bundle.url(forResource: name, withExtension: nil),
+               let src = CGImageSourceCreateWithURL(url as CFURL, nil),
+               let img = CGImageSourceCreateImageAtIndex(src, 0, nil) { return img }
+            for ext in ["png", "jpg", "jpeg"] {
+                if let url = bundle.url(forResource: name, withExtension: ext),
+                   let src = CGImageSourceCreateWithURL(url as CFURL, nil),
+                   let img = CGImageSourceCreateImageAtIndex(src, 0, nil) { return img }
+            }
+            return nil
+        }
+
+        let img = load(from: extensionBundle, name: imageName)
+              ?? load(from: Bundle.main, name: imageName)
+              ?? self.load(fromAppGroup: imageName)
+
+        if let img { imageCache[imageName] = img }
+        return img
+    }
+    
+    private func load(fromAppGroup name: String) -> CGImage? {
+        // Load from App Group container (for user-uploaded images)
+        guard let containerURL = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: "group.com.dannyfrancken.Headliner") else {
+            return nil
         }
         
-        // Load from bundle
-        var loadedImage: CGImage?
+        let imageURL = containerURL.appendingPathComponent("Images").appendingPathComponent(name)
         
-        // Try to load from main bundle first, then from shared bundle
-        if let url = Bundle.main.url(forResource: imageName, withExtension: nil),
-           let imageSource = CGImageSourceCreateWithURL(url as CFURL, nil),
-           let image = CGImageSourceCreateImageAtIndex(imageSource, 0, nil) {
-            loadedImage = image
-        } else {
-            // Try common image extensions
-            for ext in ["png", "jpg", "jpeg"] {
-                if let url = Bundle.main.url(forResource: imageName, withExtension: ext),
-                   let imageSource = CGImageSourceCreateWithURL(url as CFURL, nil),
-                   let image = CGImageSourceCreateImageAtIndex(imageSource, 0, nil) {
-                    loadedImage = image
-                    break
-                }
+        // Try with and without common extensions
+        let urls = [
+            imageURL,
+            imageURL.appendingPathExtension("png"),
+            imageURL.appendingPathExtension("jpg"),
+            imageURL.appendingPathExtension("jpeg")
+        ]
+        
+        for url in urls {
+            if let imageSource = CGImageSourceCreateWithURL(url as CFURL, nil),
+               let image = CGImageSourceCreateImageAtIndex(imageSource, 0, nil) {
+                return image
             }
         }
         
-        // Cache the result (even if nil to avoid repeated failed lookups)
-        if let image = loadedImage {
-            imageCache[imageName] = image
-        }
-        
-        return loadedImage
+        return nil
     }
     
     /// Calculate image rect based on content mode
     private func calculateImageRect(image: CGImage, in frame: CGRect, contentMode: String) -> CGRect {
+        // Minor helper for half-pixel alignment if desired (optional)
+        // func aligned(_ v: CGFloat) -> CGFloat { (v * 2.0).rounded() / 2.0 }
         let imageSize = CGSize(width: image.width, height: image.height)
         let frameSize = frame.size
         
@@ -565,31 +598,38 @@ final class CameraOverlayRenderer: OverlayRenderer {
     // MARK: - Helper Methods
     
     private func cgColor(from hex: String) -> CGColor? {
-        var hexSanitized = hex.trimmingCharacters(in: .whitespacesAndNewlines)
-        if hexSanitized.hasPrefix("#") {
-            hexSanitized.removeFirst()
+        var s = hex.trimmingCharacters(in: .whitespacesAndNewlines)
+        if s.lowercased().hasPrefix("0x") { s.removeFirst(2) }
+        if s.hasPrefix("#") { s.removeFirst() }
+
+        func expand(_ short: String) -> String {
+            // RGB -> RRGGBB, RGBA -> RRGGBBAA
+            return short.map { "\($0)\($0)" }.joined()
         }
-        
-        guard let value = UInt64(hexSanitized, radix: 16),
-              hexSanitized.count == 6 || hexSanitized.count == 8 else {
-            return nil
-        }
-        
+
+        if s.count == 3 || s.count == 4 { s = expand(s) }
+        guard s.count == 6 || s.count == 8, let v = UInt64(s, radix: 16) else { return nil }
+
         let r, g, b, a: CGFloat
-        
-        if hexSanitized.count == 6 {
-            r = CGFloat((value >> 16) & 0xFF) / 255.0
-            g = CGFloat((value >> 8) & 0xFF) / 255.0
-            b = CGFloat(value & 0xFF) / 255.0
+        if s.count == 6 {
+            r = CGFloat((v >> 16) & 0xFF) / 255.0
+            g = CGFloat((v >> 8) & 0xFF) / 255.0
+            b = CGFloat(v & 0xFF) / 255.0
             a = 1.0
         } else {
-            r = CGFloat((value >> 24) & 0xFF) / 255.0
-            g = CGFloat((value >> 16) & 0xFF) / 255.0
-            b = CGFloat((value >> 8) & 0xFF) / 255.0
-            a = CGFloat(value & 0xFF) / 255.0
+            r = CGFloat((v >> 24) & 0xFF) / 255.0
+            g = CGFloat((v >> 16) & 0xFF) / 255.0
+            b = CGFloat((v >> 8) & 0xFF) / 255.0
+            a = CGFloat(v & 0xFF) / 255.0
         }
-        
         return CGColor(colorSpace: colorSpace, components: [r, g, b, a])
+    }
+    
+    // Lightweight copy for previousOverlay to reduce memory retention
+    private func lightweightCopy(_ img: CIImage) -> CIImage {
+        img
+          .clampedToExtent()
+          .premultiplyingAlpha()
     }
     
 }

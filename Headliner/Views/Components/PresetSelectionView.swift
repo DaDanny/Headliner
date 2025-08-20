@@ -16,16 +16,30 @@ struct PresetSelectionView: View {
         return OverlayPresets.allPresets
     }
     
-    // Group presets by category
+    // Group presets by category (truly dynamic)
     private var modernPresets: [OverlayPreset] {
         return allPresets.filter { 
-            ["modern-card", "glass-pill", "minimal-clean", "vibrant-creative"].contains($0.id) 
+            // Modern presets: anything with modern styling or new features
+            ["modern-card", "glass-pill", "minimal-clean", "vibrant-creative", "company-branding"].contains($0.id) ||
+            $0.id.contains("modern") || $0.id.contains("glass") || $0.id.contains("minimal") || 
+            $0.id.contains("vibrant") || $0.id.contains("company") || $0.id.contains("branding")
         }
     }
     
     private var classicPresets: [OverlayPreset] {
         return allPresets.filter { 
-            ["professional", "personal", "professional-custom", "personal-custom"].contains($0.id) 
+            // Classic presets: traditional business/personal styles
+            ["professional", "personal", "professional-custom", "personal-custom"].contains($0.id) ||
+            $0.id.contains("professional") || $0.id.contains("personal")
+        }
+    }
+    
+    private var otherPresets: [OverlayPreset] {
+        // Any presets that don't fit in modern or classic categories
+        let modernIds = Set(modernPresets.map { $0.id })
+        let classicIds = Set(classicPresets.map { $0.id })
+        return allPresets.filter { 
+            !modernIds.contains($0.id) && !classicIds.contains($0.id) && $0.id != "fallback"
         }
     }
     
@@ -88,6 +102,40 @@ struct PresetSelectionView: View {
                         GridItem(.flexible())
                     ], spacing: 12) {
                         ForEach(classicPresets, id: \.id) { preset in
+                            ClassicPresetCard(
+                                preset: preset,
+                                isSelected: selectedPresetId == preset.id
+                            ) {
+                                selectedPresetId = preset.id
+                                onSelectionChanged(preset.id)
+                            }
+                        }
+                    }
+                }
+            }
+            
+            // Other Presets Section (for any presets that don't fit other categories)
+            if !otherPresets.isEmpty {
+                VStack(alignment: .leading, spacing: 16) {
+                    HStack {
+                        Image(systemName: "ellipsis.circle")
+                            .foregroundColor(.gray)
+                            .font(.caption)
+                        Text("Other Styles")
+                            .font(.headline)
+                            .foregroundColor(.white)
+                            .fontWeight(.semibold)
+                    }
+                    
+                    Text("Additional overlay styles and custom designs")
+                        .font(.caption)
+                        .foregroundColor(.white.opacity(0.7))
+                    
+                    LazyVGrid(columns: [
+                        GridItem(.flexible()),
+                        GridItem(.flexible())
+                    ], spacing: 12) {
+                        ForEach(otherPresets, id: \.id) { preset in
                             ClassicPresetCard(
                                 preset: preset,
                                 isSelected: selectedPresetId == preset.id
@@ -181,6 +229,8 @@ struct ModernPresetCard: View {
             return LinearGradient(colors: [Color.gray.opacity(0.6), Color.black.opacity(0.4)], startPoint: .topLeading, endPoint: .bottomTrailing)
         case "vibrant-creative":
             return LinearGradient(colors: [Color.red.opacity(0.7), Color.teal.opacity(0.6)], startPoint: .topLeading, endPoint: .bottomTrailing)
+        case "company-branding":
+            return LinearGradient(colors: [Color.green.opacity(0.7), Color.blue.opacity(0.5)], startPoint: .topLeading, endPoint: .bottomTrailing)
         default:
             return LinearGradient(colors: [Color.blue.opacity(0.6), Color.purple.opacity(0.4)], startPoint: .topLeading, endPoint: .bottomTrailing)
         }
@@ -192,6 +242,7 @@ struct ModernPresetCard: View {
         case "glass-pill": return "capsule.fill"
         case "minimal-clean": return "minus"
         case "vibrant-creative": return "paintbrush.fill"
+        case "company-branding": return "building.2.fill"
         default: return "sparkles"
         }
     }
@@ -202,6 +253,7 @@ struct ModernPresetCard: View {
         case "glass-pill": return "Glassmorphic pill design"
         case "minimal-clean": return "Ultra-minimal name display"
         case "vibrant-creative": return "Bold gradients & decorations"
+        case "company-branding": return "Logo & branding in corners"
         default: return "Custom overlay design"
         }
     }

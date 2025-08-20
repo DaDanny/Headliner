@@ -743,7 +743,7 @@ enum OverlayPresets {
         nodes: [
             // Company logo
             .image(ImageNode(
-                imageName: "company-logo", // Add your logo to app bundle as "company-logo.png"
+                imageName: "Bonusly-Logo", // Will try .png, .jpg, .jpeg automatically
                 contentMode: "fit",
                 opacity: 0.9,
                 cornerRadius: 0.1
@@ -817,6 +817,124 @@ enum OverlayPresets {
         )
     )
 
+    /// Bonusly Branded – crisp lower-third with logo + brand bar
+    private static let bonuslyBrandedPreset = OverlayPreset(
+        id: "bonusly-branded",
+        name: "Bonusly Branded",
+        nodes: [
+            // 0) Card background
+            .rect(RectNode(
+                colorHex: "#ffffff",
+                cornerRadius: 0.035
+            )),
+            // 1) Brand bar (gradient) – sits at bottom of the card
+            .gradient(GradientNode(
+                startColorHex: "#118342",
+                endColorHex: "#0E6D35",
+                angle: 0 // left→right
+            )),
+            // 2) Company logo (square asset recommended)
+            .image(ImageNode(
+                imageName: "Bonusly-Logo",
+                contentMode: "fit",
+                opacity: 1.0,
+                cornerRadius: 0.12
+            )),
+            // 3) Display name
+            .text(TextNode(
+                text: "{displayName}",
+                fontSize: 0.045,
+                fontWeight: "bold",
+                colorHex: "#0f172a", // slate-900-ish
+                alignment: "left"
+            )),
+            // 4) Tagline / title
+            .text(TextNode(
+                text: "{tagline}",
+                fontSize: 0.030,
+                fontWeight: "medium",
+                colorHex: "#475569", // slate-600-ish
+                alignment: "left"
+            ))
+        ],
+        layout: OverlayLayout(
+            widescreen: [
+                // CARD — bottom-left
+                OverlayNodePlacement(
+                    index: 0,
+                    frame: NRect(x: 0.05, y: 0.72, w: 0.50, h: 0.22),
+                    zIndex: 0,
+                    opacity: 0.97
+                ),
+                // BRAND BAR — hugs the bottom of card
+                OverlayNodePlacement(
+                    index: 1,
+                    frame: NRect(x: 0.05, y: 0.922, w: 0.50, h: 0.018),
+                    zIndex: 1,
+                    opacity: 1.0
+                ),
+                // LOGO — left column inside the card
+                OverlayNodePlacement(
+                    index: 2,
+                    frame: NRect(x: 0.065, y: 0.74, w: 0.065, h: 0.065),
+                    zIndex: 2,
+                    opacity: 1.0
+                ),
+                // NAME — to the right of logo
+                OverlayNodePlacement(
+                    index: 3,
+                    frame: NRect(x: 0.14, y: 0.742, w: 0.39, h: 0.085),
+                    zIndex: 2,
+                    opacity: 1.0
+                ),
+                // TAGLINE — under name
+                OverlayNodePlacement(
+                    index: 4,
+                    frame: NRect(x: 0.14, y: 0.825, w: 0.39, h: 0.065),
+                    zIndex: 2,
+                    opacity: 0.95
+                )
+            ],
+            fourThree: [
+                // CARD — top-left, larger for 4:3
+                OverlayNodePlacement(
+                    index: 0,
+                    frame: NRect(x: 0.06, y: 0.06, w: 0.60, h: 0.26),
+                    zIndex: 0,
+                    opacity: 0.97
+                ),
+                // BRAND BAR
+                OverlayNodePlacement(
+                    index: 1,
+                    frame: NRect(x: 0.06, y: 0.302, w: 0.60, h: 0.022),
+                    zIndex: 1,
+                    opacity: 1.0
+                ),
+                // LOGO
+                OverlayNodePlacement(
+                    index: 2,
+                    frame: NRect(x: 0.075, y: 0.078, w: 0.075, h: 0.075),
+                    zIndex: 2,
+                    opacity: 1.0
+                ),
+                // NAME
+                OverlayNodePlacement(
+                    index: 3,
+                    frame: NRect(x: 0.165, y: 0.080, w: 0.48, h: 0.10),
+                    zIndex: 2,
+                    opacity: 1.0
+                ),
+                // TAGLINE
+                OverlayNodePlacement(
+                    index: 4,
+                    frame: NRect(x: 0.165, y: 0.165, w: 0.48, h: 0.08),
+                    zIndex: 2,
+                    opacity: 0.95
+                )
+            ]
+        )
+    )
+
     /// Built-in presets as fallback
     private static let builtInPresets: [OverlayPreset] = [
         modernCardPreset,
@@ -828,6 +946,7 @@ enum OverlayPresets {
         personalPreset,
         professionalCustomPreset,
         personalCustomPreset,
+        bonuslyBrandedPreset,
         fallbackPreset
     ]
 }
