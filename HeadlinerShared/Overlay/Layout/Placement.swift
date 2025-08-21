@@ -1,4 +1,5 @@
-@available(*, deprecated, message: "Legacy CoreGraphics overlay path. Prefer SwiftUI overlays.")
+// DEPRECATED: Legacy CoreGraphics overlay path. Prefer SwiftUI overlays.
+//@available(*, deprecated, message: "Legacy CoreGraphics overlay path. Prefer SwiftUI overlays.")
 // swiftlint:disable file_length
 //
 //  Placement.swift
