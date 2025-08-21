@@ -33,6 +33,9 @@ protocol OverlayRenderer {
                 preset: OverlayPreset,
                 tokens: OverlayTokens,
                 previousFrame: CIImage?) -> CIImage
+    
+    /// Notify renderer that aspect ratio is changing (for smooth transitions)
+    func notifyAspectChanged()
 }
 
 
