@@ -365,19 +365,13 @@ class AppState: ObservableObject {
   
   /// Map preset IDs to SwiftUI view providers
   private func swiftUIProvider(for presetId: String) -> (any OverlayViewProviding)? {
-    // TESTING: Always use StandardLowerThird for consistent testing
-    return StandardLowerThird()
+    // Look up the SwiftUI preset in the registry
+    return SwiftUIPresetRegistry.preset(withId: presetId)?.provider
   }
   
-  /// Get all available presets including SwiftUI ones (main app only)
-  var availablePresets: [OverlayPreset] {
-    var presets = OverlayPresets.allPresets
-    
-    // Add SwiftUI presets (only available in main app)
-    presets.append(.swiftUIDemo)
-    presets.append(.swiftUIDemo2)
-    
-    return presets
+  /// Get all available SwiftUI presets (new system)
+  var availableSwiftUIPresets: [SwiftUIPresetInfo] {
+    return SwiftUIPresetRegistry.allPresets
   }
   
   /// Get current preset ID

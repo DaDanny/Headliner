@@ -820,53 +820,7 @@ enum OverlayPresets {
         )
     )
 
-    /// Ultra-clean preset using high-level components
-    private static let componentDemoPreset: OverlayPreset = {
-        var nodes: [OverlayNode] = []
-        var widePlacements: [OverlayNodePlacement] = []
-        var fourPlacements: [OverlayNodePlacement] = []
-        
-        // --- Super simple component definitions ---
-        let timeChip = TimeChip(placement: .topLeft)
-        let locationCard = LocationCard(placement: .topRight)
-        let bottomBar = BottomBar(includeLogo: true, addBrandStrip: true)
-        
-        // --- Build for both aspects ---
-        func buildForAspect(_ aspect: Aspect) -> [OverlayNodePlacement] {
-            var tempNodes: [OverlayNode] = []
-            var placements: [OverlayNodePlacement] = []
-            var idx = 0
-            
-            placements += timeChip.build(nodes: &tempNodes, startIndex: idx, aspect: aspect)
-            idx = tempNodes.count
-            
-            placements += locationCard.build(nodes: &tempNodes, startIndex: idx, aspect: aspect)
-            idx = tempNodes.count
-            
-            placements += bottomBar.build(nodes: &tempNodes, startIndex: idx, aspect: aspect)
-            idx = tempNodes.count
-            
-            return placements
-        }
-        
-        // Build widescreen (populates nodes)
-        widePlacements = buildForAspect(.widescreen16x9)
-        
-        // Extract nodes
-        var tempNodes: [OverlayNode] = []
-        _ = buildForAspect(.widescreen16x9)
-        nodes = tempNodes
-        
-        // Build 4:3 placements
-        fourPlacements = buildForAspect(.fourThree)
-        
-        return OverlayPreset(
-            id: "component-demo",
-            name: "Component Demo",
-            nodes: nodes,
-            layout: OverlayLayout(widescreen: widePlacements, fourThree: fourPlacements)
-        )
-    }()
+    // componentDemoPreset removed - deprecated with old component system
 
 
 

@@ -54,15 +54,14 @@ struct OverlaySettingsView: View {
                 .font(.headline)
                 .foregroundColor(.white)
               
-              // Template selection using manifest
-              PresetSelectionView(
+              // Template selection using new SwiftUI registry
+              SwiftUIPresetSelectionView(
                 selectedPresetId: $selectedPresetId,
                 onSelectionChanged: { presetId in
                   var updatedSettings = appState.overlaySettings
                   updatedSettings.selectedPresetId = presetId
                   appState.updateOverlaySettings(updatedSettings)
-                },
-                appState: appState
+                }
               )
             }
             .padding()
