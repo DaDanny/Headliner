@@ -1,3 +1,5 @@
+@available(*, deprecated, message: "Legacy CoreGraphics overlay path. Prefer SwiftUI overlays.")
+// swiftlint:disable file_length
 //
 //  GamerVibes.swift
 //  HeadlinerShared

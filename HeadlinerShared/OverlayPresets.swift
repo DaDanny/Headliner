@@ -1,3 +1,5 @@
+@available(*, deprecated, message: "Legacy CoreGraphics overlay path. Prefer SwiftUI overlays.")
+// swiftlint:disable file_length
 //
 //  OverlayPresets.swift
 //  HeadlinerShared
@@ -881,8 +883,11 @@ enum OverlayPresets {
         .bonuslyBranded,  // Original template-based preset
         componentDemoPreset,  // Demo of component approach
         .gamerVibes,  // Fun gaming-themed preset
+        // SwiftUI presets removed from here to avoid CameraExtension compilation issues
         fallbackPreset
     ]
 }
+
+// SwiftUI Demo Presets moved to main app target to avoid CameraExtension compilation issues
 
 
