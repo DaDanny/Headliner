@@ -129,18 +129,16 @@ struct OverlaySettingsView: View {
                     .cornerRadius(6)
                 }
                 
-                // Tagline (Professional preset only)
-                if selectedPresetId == "professional" {
-                  VStack(alignment: .leading, spacing: 8) {
-                    Text("Tagline")
-                      .font(.subheadline)
-                      .foregroundColor(.white.opacity(0.8))
-                    
-                    TextField("e.g., Senior Developer", text: $tagline)
-                      .textFieldStyle(RoundedBorderTextFieldStyle())
-                      .background(Color.white.opacity(0.1))
-                      .cornerRadius(6)
-                  }
+                // Tagline (Available for all presets)
+                VStack(alignment: .leading, spacing: 8) {
+                  Text("Tagline")
+                    .font(.subheadline)
+                    .foregroundColor(.white.opacity(0.8))
+                  
+                  TextField("e.g., Senior Developer, Product Manager", text: $tagline)
+                    .textFieldStyle(RoundedBorderTextFieldStyle())
+                    .background(Color.white.opacity(0.1))
+                    .cornerRadius(6)
                 }
                 
                 // Accent Color
@@ -284,34 +282,7 @@ struct ColorButton: View {
   }
 }
 
-// MARK: - Color Extension
-
-extension Color {
-  init?(hex: String) {
-    var hexSanitized = hex.trimmingCharacters(in: .whitespacesAndNewlines)
-    hexSanitized = hexSanitized.replacingOccurrences(of: "#", with: "")
-    
-    var rgb: UInt64 = 0
-    
-    guard Scanner(string: hexSanitized).scanHexInt64(&rgb) else { return nil }
-    
-    let length = hexSanitized.count
-    if length == 6 {
-      let r = Double((rgb & 0xFF0000) >> 16) / 255.0
-      let g = Double((rgb & 0x00FF00) >> 8) / 255.0
-      let b = Double(rgb & 0x0000FF) / 255.0
-      self.init(red: r, green: g, blue: b)
-    } else if length == 8 {
-      let r = Double((rgb & 0xFF000000) >> 24) / 255.0
-      let g = Double((rgb & 0x00FF0000) >> 16) / 255.0
-      let b = Double((rgb & 0x0000FF00) >> 8) / 255.0
-      let a = Double(rgb & 0x000000FF) / 255.0
-      self.init(red: r, green: g, blue: b, opacity: a)
-    } else {
-      return nil
-    }
-  }
-}
+// MARK: - Note: Color+Hex extension is now in shared Extensions/Color+Hex.swift
 
 #if DEBUG
 struct OverlaySettingsView_Previews: PreviewProvider {

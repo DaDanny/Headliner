@@ -8,6 +8,7 @@
 import SwiftUI
 import CoreImage
 import CoreGraphics
+import Foundation
 
 /// Render SwiftUI overlays into CGImages with correct sizing, transparency, and caching.
 /// NOTE: ImageRenderer requires main-thread. We isolate main-thread work and keep the API async.
@@ -77,7 +78,26 @@ public final class SwiftUIOverlayRenderer {
         size: CGSize,
         scale: CGFloat = 1.0  // Use 1.0 for runtime (size already in pixels), 2.0 for previews
     ) async -> CGImage? {
-        let key = cacheKey(tokens: tokens, size: size, scale: scale, presetId: P.presetId)
+        // Enrich tokens with PersonalInfo data (same as CameraOverlayRenderer)
+        var enrichedTokens = tokens
+        if let personalInfo = getPersonalInfo() {
+            // Merge personal info into extras dictionary
+            var extras = enrichedTokens.extras ?? [:]
+            extras["location"] = extras["location"] ?? personalInfo.city
+            extras["weatherEmoji"] = extras["weatherEmoji"] ?? personalInfo.weatherEmoji
+            extras["weatherText"] = extras["weatherText"] ?? personalInfo.weatherText
+            
+            enrichedTokens = OverlayTokens(
+                displayName: enrichedTokens.displayName,
+                tagline: enrichedTokens.tagline,
+                accentColorHex: enrichedTokens.accentColorHex,
+                localTime: enrichedTokens.localTime ?? personalInfo.localTime,
+                logoText: enrichedTokens.logoText,
+                extras: extras
+            )
+        }
+        
+        let key = cacheKey(tokens: enrichedTokens, size: size, scale: scale, presetId: P.presetId)
         
         logger.debug("🎨 [SwiftUIRenderer] Starting render for \(P.presetId) at \(Int(size.width))x\(Int(size.height))")
 
@@ -96,7 +116,7 @@ public final class SwiftUIOverlayRenderer {
         // Main-thread render (ImageRenderer requirement)
         return await MainActor.run {
             let canvas = OverlayCanvas(size: size) {
-                provider.makeView(tokens: tokens)
+                provider.makeView(tokens: enrichedTokens)
             }
 
             let renderer = ImageRenderer(content: canvas)
@@ -142,5 +162,15 @@ public final class SwiftUIOverlayRenderer {
         // Note: NSCache doesn't support enumeration, so we rely on lazy expiration during access
         // This is a placeholder for potential future enhancement with a different cache implementation
         logger.debug("🧹 [SwiftUIRenderer] Expired cache cleanup (lazy expiration active)")
+    }
+    
+    /// Get PersonalInfo from App Group storage (same as CameraOverlayRenderer)
+    private func getPersonalInfo() -> PersonalInfo? {
+        guard let userDefaults = UserDefaults(suiteName: Identifiers.appGroup),
+              let data = userDefaults.data(forKey: "overlay.personalInfo.v1"),
+              let info = try? JSONDecoder().decode(PersonalInfo.self, from: data) else {
+            return nil
+        }
+        return info
     }
 }

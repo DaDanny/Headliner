@@ -39,19 +39,19 @@ public enum SwiftUIPresetCategory: String, CaseIterable {
     
     var icon: String {
         switch self {
-        case .standard: return "text.below.photo"
-        case .branded: return "building.2.fill"
-        case .creative: return "paintbrush.fill" 
-        case .minimal: return "minus"
+            case .standard: return "text.below.photo"
+            case .branded: return "building.2.fill"
+            case .creative: return "paintbrush.fill"
+            case .minimal: return "minus"
         }
     }
     
     var color: Color {
         switch self {
-        case .standard: return .blue
-        case .branded: return .green
-        case .creative: return .purple
-        case .minimal: return .gray
+            case .standard: return .blue
+            case .branded: return .green
+            case .creative: return .purple
+            case .minimal: return .gray
         }
     }
 }
@@ -86,6 +86,48 @@ public enum SwiftUIPresetRegistry {
             description: "Dynamic metrics display with animated chips",
             category: .creative,
             provider: MetricChipBar()
+        ),
+        
+        // Neo Lower Third
+        SwiftUIPresetInfo(
+            id: "swiftui.neo.lowerthird",
+            name: "Neo Lower Third",
+            description: "Cut clean lower third with sharp edges",
+            category: .creative,
+            provider: NeoLowerThird()
+        ),
+        
+        // Company Cropped - Optimized for 4:3 presentations
+        SwiftUIPresetInfo(
+            id: "company-cropped",
+            name: "Company Cropped",
+            description: "4:3 optimized overlay perfect for meeting presentations",
+            category: .branded,
+            provider: CompanyCropped()
+        ),
+        
+        SwiftUIPresetInfo(
+            id: "company-cropped-v2",
+            name: "Company Cropped V2",
+            description: "V2 4:3 optimized overlay perfect for meeting presentations",
+            category: .branded,
+            provider: CompanyCroppedV2()
+        ),
+        
+        SwiftUIPresetInfo(
+            id: "swiftui.aspectratio.test",
+            name: "Aspect Ratio Test",
+            description: "Aspect Ratio Test",
+            category: .branded,
+            provider: AspectRatioTest()
+        ),
+        
+        SwiftUIPresetInfo(
+            id: "swiftui.aspectratio.test-v2",
+            name: "Aspect Ratio Test V2",
+            description: "Aspect Ratio Test V2",
+            category: .branded,
+            provider: AspectRatioTestV2()
         )
         
         // Add new presets here! 🎨
