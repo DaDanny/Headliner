@@ -9,6 +9,19 @@ public final class OverlayRenderBroker {
     public static let shared = OverlayRenderBroker()
     private let logger = HeadlinerLogger.logger(for: .overlays)
     private init() {}
+    
+    /// Get cached camera dimensions from App Group, falling back to default if unavailable
+    private func getCachedCameraDimensions() -> CGSize {
+        guard let userDefaults = UserDefaults(suiteName: Identifiers.appGroup),
+              let data = userDefaults.data(forKey: OverlayUserDefaultsKeys.overlaySettings),
+              let settings = try? JSONDecoder().decode(OverlaySettings.self, from: data) else {
+            logger.debug("📐 [OverlayBroker] No cached camera dimensions, using default 1920x1080")
+            return CGSize(width: 1920, height: 1080)
+        }
+        
+        logger.debug("📐 [OverlayBroker] Using cached camera dimensions: \(Int(settings.cameraDimensions.width))x\(Int(settings.cameraDimensions.height))")
+        return settings.cameraDimensions
+    }
 
     /// Render once (scale = 1.0 for pixel-true; pass exact pixel size), write to App Group, post notify.
     public func updateOverlay<P: OverlayViewProviding>(
@@ -36,6 +49,15 @@ public final class OverlayRenderBroker {
         } catch {
             logger.debug("❌ [OverlayBroker] Write failed: \(error)")
         }
+    }
+    
+    /// Convenience method that automatically uses cached camera dimensions
+    public func updateOverlay<P: OverlayViewProviding>(
+        provider: P,
+        tokens: OverlayTokens
+    ) async {
+        let dimensions = getCachedCameraDimensions()
+        await updateOverlay(provider: provider, tokens: tokens, pixelSize: dimensions)
     }
     
     /// Clear the current overlay

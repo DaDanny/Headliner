@@ -73,6 +73,9 @@ class CameraExtensionDeviceSource: NSObject, CMIOExtensionDeviceSource, AVCaptur
 		let dims = CMVideoDimensions(width: 1920, height: 1080)
 		CMVideoFormatDescriptionCreate(allocator: kCFAllocatorDefault, codecType: kCVPixelFormatType_32BGRA, width: dims.width, height: dims.height, extensions: nil, formatDescriptionOut: &_videoDescription)
 		
+		// Cache actual camera dimensions in App Group for overlay rendering sync
+		cacheCameraDimensions(width: Int(dims.width), height: Int(dims.height))
+		
 		let pixelBufferAttributes: NSDictionary = [
 			kCVPixelBufferWidthKey: dims.width,
 			kCVPixelBufferHeightKey: dims.height,
@@ -759,6 +762,37 @@ class CameraExtensionDeviceSource: NSObject, CMIOExtensionDeviceSource, AVCaptur
 	}
 	
 
+	
+	// MARK: - Camera Dimensions Caching
+	
+	/// Cache the actual camera dimensions in App Group for overlay rendering sync
+	private func cacheCameraDimensions(width: Int, height: Int) {
+		guard let userDefaults = UserDefaults(suiteName: Identifiers.appGroup) else {
+			extensionLogger.error("Failed to access App Group UserDefaults for caching camera dimensions")
+			return
+		}
+		
+		// Read current settings or create default
+		var settings: OverlaySettings
+		if let data = userDefaults.data(forKey: OverlayUserDefaultsKeys.overlaySettings),
+		   let decoded = try? JSONDecoder().decode(OverlaySettings.self, from: data) {
+			settings = decoded
+		} else {
+			settings = OverlaySettings()
+		}
+		
+		// Update camera dimensions
+		settings.cameraDimensions = CGSize(width: width, height: height)
+		
+		// Write back to App Group
+		if let encoded = try? JSONEncoder().encode(settings) {
+			userDefaults.set(encoded, forKey: OverlayUserDefaultsKeys.overlaySettings)
+			userDefaults.synchronize()
+			extensionLogger.debug("📐 Cached camera dimensions: \(width)x\(height) to App Group")
+		} else {
+			extensionLogger.error("Failed to encode OverlaySettings with camera dimensions")
+		}
+	}
 	
 	// MARK: AVCaptureVideoDataOutputSampleBufferDelegate
 	

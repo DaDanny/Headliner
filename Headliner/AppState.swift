@@ -354,8 +354,7 @@ class AppState: ObservableObject {
       Task { @MainActor in
         await OverlayRenderBroker.shared.updateOverlay(
           provider: provider,
-          tokens: tokens,
-          pixelSize: CGSize(width: 1280, height: 720) // Standard overlay size
+          tokens: tokens
         )
       }
     } else {

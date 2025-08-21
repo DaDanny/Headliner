@@ -9,7 +9,7 @@ Headliner is a modern virtual camera application for macOS that adds professiona
 ✨ **Real-time Video Streaming**: Low-latency camera pipeline with real-time preview
 🎥 **Full HD Quality**: Stream in 1080p @ 60 FPS to any compatible application  
 🔄 **Multiple Camera Sources**: Support for built-in cameras, external webcams, and Continuity Camera
-📝 **Professional Overlays**: Add customizable lower thirds, info pills, and more to your video
+📝 **SwiftUI Overlays**: Modern, real-time SwiftUI overlays with live rendering and App Group sync
 🎨 **Modern UI**: Beautiful SwiftUI interface with animated backgrounds and glassmorphic design
 🛠 **Guided Onboarding**: Step-by-step setup process with automatic system extension installation
 📍 **Location & Weather**: Real-time city and weather data in overlays (optional)
@@ -153,9 +153,23 @@ Headliner/
 │   └── Rendering/          # Overlay renderer
 ├── HeadlinerShared/        # Shared code between app and extension
 │   ├── OverlayModels.swift
-│   ├── OverlayPresets.swift
+│   ├── OverlayPresets.swift      # Legacy CoreGraphics presets (fallback)
+│   ├── Overlay/
+│   │   └── SharedOverlayStore.swift  # App Group overlay storage
 │   ├── CaptureSessionManager.swift
 │   └── PersonalInfoModels.swift
+├── Headliner/Overlay/      # SwiftUI overlay system (main app only)
+│   ├── SwiftUIPresetRegistry.swift   # Modern overlay preset registry
+│   ├── SwiftUIOverlayRenderer.swift  # SwiftUI → CGImage renderer
+│   ├── OverlayRenderBroker.swift     # App Group publishing
+│   ├── SwiftUI/            # SwiftUI overlay framework
+│   │   ├── OverlayViewProviding.swift # Protocol for overlay views
+│   │   ├── OverlayCanvas.swift        # SwiftUI render container
+│   │   └── OverlayPreviewUtils.swift  # Development utilities
+│   └── Presets/SwiftUI/    # SwiftUI overlay implementations
+│       ├── StandardLowerThird.swift
+│       ├── BrandRibbon.swift
+│       └── MetricChipBar.swift
 └── docs/                   # Documentation
     ├── CAMERA_EXTENSION_AND_OVERLAYS.md
     └── PERSONAL_INFO_SUBSYSTEM.md
@@ -165,8 +179,12 @@ For detailed component descriptions, see the [technical documentation](docs/CAME
 
 ### Key Technologies
 
-- **SwiftUI**: Modern declarative UI framework with comprehensive previews
-- **CoreMediaIO**: Camera extension APIs
+- **SwiftUI**: Modern declarative UI framework with real-time overlay rendering via `ImageRenderer`
+- **App Groups**: Inter-process communication for sharing rendered overlays and camera dimensions
+- **Darwin Notifications**: Lightweight IPC for real-time overlay updates
+- **CoreImage**: GPU-accelerated image processing and compositing pipeline
+- **Dimension Synchronization**: Automatic caching of actual camera pixel buffer size (1920x1080) for perfect overlay scaling
+- **CoreMediaIO**: Camera extension APIs for virtual camera integration
 - **AVFoundation**: Camera capture and video processing
 - **SystemExtensions**: System extension management
 - **CoreLocation**: Location services for weather overlays
