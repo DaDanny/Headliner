@@ -10,6 +10,7 @@ import Combine
 import CoreLocation
 import SwiftUI
 import SystemExtensions
+import CoreGraphics
 
 /// Main application state.
 ///
@@ -36,6 +37,10 @@ class AppState: ObservableObject {
   @Published var overlaySettings: OverlaySettings = .init()
   /// Controls presentation of the overlay settings sheet.
   @Published var isShowingOverlaySettings: Bool = false
+  /// Currently selected overlay template ID
+  @Published var selectedTemplateId: String = "professional"
+
+
   /// Current location authorization status
   @Published var locationAuthorizationStatus: CLAuthorizationStatus = .notDetermined
 
@@ -45,8 +50,10 @@ class AppState: ObservableObject {
   private let propertyManager: CustomPropertyManager
   private let outputImageManager: OutputImageManager
   private let notificationManager = NotificationManager.self
+  private let logger = HeadlinerLogger.logger(for: .appState)
   private let personalInfoPump = PersonalInfoPump()
   let locationPermissionManager = LocationPermissionManager()
+
 
   // MARK: - Private Properties
 
@@ -86,7 +93,7 @@ class AppState: ObservableObject {
     self.propertyManager = propertyManager
     self.outputImageManager = outputImageManager
 
-    logger.debug("Initializing AppState with lazy loading...")
+    self.logger.debug("Initializing AppState with lazy loading...")
 
     setupBindings()
     loadUserPreferences()
@@ -94,7 +101,7 @@ class AppState: ObservableObject {
     // Initialize location permission status without starting services
     locationAuthorizationStatus = locationPermissionManager.authorizationStatus
 
-    logger.debug("AppState initialization complete (lazy mode)")
+    self.logger.debug("AppState initialization complete (lazy mode)")
   }
 
   // MARK: Deinitialization
@@ -114,7 +121,7 @@ class AppState: ObservableObject {
 
   /// Initialize app state for first time use - checks extension status and loads cameras
   func initializeForUse() {
-    logger.debug("Initializing app state for first use...")
+    self.logger.debug("Initializing app state for first use...")
     checkExtensionStatus()
     loadAvailableCameras()
     setupCaptureSession()
@@ -135,7 +142,7 @@ class AppState: ObservableObject {
   /// and starts the local `AVCaptureSession` when ready.
   func startCamera() {
     guard extensionStatus == .installed else {
-      logger.debug("Cannot start camera - extension not installed")
+      self.logger.debug("Cannot start camera - extension not installed")
       return
     }
 
@@ -147,41 +154,41 @@ class AppState: ObservableObject {
       proceedWithCameraStart()
     case .notDetermined:
       // Request permission
-      logger.debug("Requesting camera permission...")
+      self.logger.debug("Requesting camera permission...")
       statusMessage = "Requesting camera permission..."
       AVCaptureDevice.requestAccess(for: .video) { [weak self] granted in
         DispatchQueue.main.async {
           if granted {
-            logger.debug("Camera permission granted, retrying capture session setup...")
+            self?.logger.debug("Camera permission granted, retrying capture session setup...")
             // Retry capture session setup with new permissions
             self?.retryCaptureSession()
             self?.proceedWithCameraStart()
           } else {
             self?.cameraStatus = .error("Camera permission denied")
             self?.statusMessage = "Camera access denied - enable in System Settings > Privacy & Security > Camera"
-            logger.error("Camera permission denied by user")
+            self?.logger.error("Camera permission denied by user")
           }
         }
       }
     case .denied:
       cameraStatus = .error("Camera permission denied")
       statusMessage = "Camera access denied - enable in System Settings > Privacy & Security > Camera"
-      logger.error("Camera access denied - user needs to enable in System Settings")
+      self.logger.error("Camera access denied - user needs to enable in System Settings")
     case .restricted:
       cameraStatus = .error("Camera access restricted")
       statusMessage = "Camera access restricted by system policy"
-      logger.error("Camera access restricted by system policy")
+      self.logger.error("Camera access restricted by system policy")
     @unknown default:
       cameraStatus = .error("Unknown camera permission status")
       statusMessage = "Camera permission issue"
-      logger.error("Unknown camera authorization status")
+      self.logger.error("Unknown camera authorization status")
     }
   }
 
   /// Complete startup once permissions are satisfied; idempotent if already running.
   private func proceedWithCameraStart() {
     guard cameraStatus != .running && cameraStatus != .starting else { return }
-    logger.debug("Starting camera...")
+    self.logger.debug("Starting camera...")
     cameraStatus = .starting
     statusMessage = "Starting camera..."
     notificationManager.postNotification(named: .startStream)
@@ -192,14 +199,14 @@ class AppState: ObservableObject {
     // Start the capture session for preview
     if let manager = captureSessionManager, !manager.captureSession.isRunning {
       manager.captureSession.startRunning()
-      logger.debug("Started preview capture session")
+      self.logger.debug("Started preview capture session")
     }
 
     // Simulate camera start completion
     DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
       self.cameraStatus = .running
       self.statusMessage = "Camera is running"
-      logger.debug("Camera status updated to running")
+      self.logger.debug("Camera status updated to running")
     }
   }
 
@@ -212,7 +219,7 @@ class AppState: ObservableObject {
     // Stop the capture session for preview
     if let manager = captureSessionManager, manager.captureSession.isRunning {
       manager.captureSession.stopRunning()
-      logger.debug("Stopped preview capture session")
+      self.logger.debug("Stopped preview capture session")
     }
 
     // Clear the preview image
@@ -264,6 +271,9 @@ class AppState: ObservableObject {
 
     // Notify extension about overlay settings change with the actual settings data
     notificationManager.postNotification(named: .updateOverlaySettings, overlaySettings: newSettings)
+    
+    // Trigger SwiftUI rendering if needed
+    triggerSwiftUIRenderingIfNeeded()
   }
   
   // MARK: - Preset Management (Reusable by any view)
@@ -280,22 +290,23 @@ class AppState: ObservableObject {
       overlaySettings.overlayTokens = OverlayTokens(
         displayName: overlaySettings.userName.isEmpty ? NSUserName() : overlaySettings.userName,
         tagline: existingTokens?.tagline,  // Preserve tagline
-        accentColorHex: "#34C759",
-        aspect: overlaySettings.overlayAspect
+        accentColorHex: "#34C759"
       )
     } else if overlaySettings.overlayTokens == nil {
       // Initialize tokens for other presets
       overlaySettings.overlayTokens = OverlayTokens(
         displayName: overlaySettings.userName.isEmpty ? NSUserName() : overlaySettings.userName,
         tagline: presetId == "professional" ? "Senior Developer" : nil,
-        accentColorHex: "#007AFF",
-        aspect: overlaySettings.overlayAspect
+        accentColorHex: "#007AFF"
       )
     }
     // Note: If tokens already exist, they are preserved (including tagline)
     
     saveOverlaySettings()
     notificationManager.postNotification(named: .updateOverlaySettings, overlaySettings: overlaySettings)
+    
+    // Trigger SwiftUI rendering if needed
+    triggerSwiftUIRenderingIfNeeded()
   }
   
   /// Update overlay tokens (display name, tagline, colors, etc.)
@@ -304,22 +315,62 @@ class AppState: ObservableObject {
     overlaySettings.userName = tokens.displayName // Keep legacy field in sync
     saveOverlaySettings()
     notificationManager.postNotification(named: .updateOverlaySettings, overlaySettings: overlaySettings)
+    
+    // Trigger SwiftUI rendering if needed
+    triggerSwiftUIRenderingIfNeeded()
   }
   
   /// Switch aspect ratio
   func selectAspectRatio(_ aspect: OverlayAspect) {
     overlaySettings.overlayAspect = aspect
-    if overlaySettings.overlayTokens != nil {
-      overlaySettings.overlayTokens?.aspect = aspect
-    } else {
+    if overlaySettings.overlayTokens == nil {
       overlaySettings.overlayTokens = OverlayTokens(
         displayName: overlaySettings.userName.isEmpty ? NSUserName() : overlaySettings.userName,
-        accentColorHex: "#007AFF",
-        aspect: aspect
+        accentColorHex: "#007AFF"
       )
     }
     saveOverlaySettings()
     notificationManager.postNotification(named: .updateOverlaySettings, overlaySettings: overlaySettings)
+    
+
+  }
+  
+  // MARK: - SwiftUI Overlay Rendering
+  
+  /// Trigger SwiftUI overlay rendering if the current preset is SwiftUI-based
+  private func triggerSwiftUIRenderingIfNeeded() {
+    let presetId = overlaySettings.selectedPresetId
+    
+    guard let tokens = overlaySettings.overlayTokens else { 
+      self.logger.debug("🔍 [SwiftUI] No overlay tokens available for preset '\(presetId)' - skipping SwiftUI rendering")
+      return 
+    }
+    
+    self.logger.debug("🔍 [SwiftUI] Checking SwiftUI rendering for preset '\(presetId)' with tokens: \(tokens.displayName)")
+    
+    // Check if this is a SwiftUI preset and get the appropriate provider
+    if let provider = swiftUIProvider(for: presetId) {
+      self.logger.debug("🎨 [SwiftUI] Triggering SwiftUI rendering for preset '\(presetId)'")
+      Task { @MainActor in
+        await OverlayRenderBroker.shared.updateOverlay(
+          provider: provider,
+          tokens: tokens
+        )
+      }
+    } else {
+      self.logger.debug("⚠️ [SwiftUI] No SwiftUI provider found for preset '\(presetId)'")
+    }
+  }
+  
+  /// Map preset IDs to SwiftUI view providers
+  private func swiftUIProvider(for presetId: String) -> (any OverlayViewProviding)? {
+    // Look up the SwiftUI preset in the registry
+    return SwiftUIPresetRegistry.preset(withId: presetId)?.provider
+  }
+  
+  /// Get all available SwiftUI presets (new system)
+  var availableSwiftUIPresets: [SwiftUIPresetInfo] {
+    return SwiftUIPresetRegistry.allPresets
   }
   
   /// Get current preset ID
@@ -334,7 +385,7 @@ class AppState: ObservableObject {
   
   /// Start personal info pump for weather and location updates
   func startPersonalInfoPump() {
-    logger.debug("Starting personal info pump for location and weather data")
+    self.logger.debug("Starting personal info pump for location and weather data")
     personalInfoPump.start()
   }
   
@@ -351,10 +402,10 @@ class AppState: ObservableObject {
   /// Request location permission from the user
   /// This can be called from any UI button or view
   func requestLocationPermission() {
-      logger.debug("🟢 AppState: requestLocationPermission called")
-    logger.info("🟢 AppState: requestLocationPermission called")
-    logger.info("🟢 Current authorization status: \(self.locationPermissionManager.authorizationStatus.rawValue)")
-    logger.info("🟢 Is main thread: \(Thread.isMainThread)")
+      self.logger.debug("🟢 AppState: requestLocationPermission called")
+    self.logger.info("🟢 AppState: requestLocationPermission called")
+    self.logger.info("🟢 Current authorization status: \(self.locationPermissionManager.authorizationStatus.rawValue)")
+    self.logger.info("🟢 Is main thread: \(Thread.isMainThread)")
     locationPermissionManager.requestLocationPermission()
   }
   
@@ -382,12 +433,14 @@ class AppState: ObservableObject {
   func openLocationSettings() {
     locationPermissionManager.openSystemSettings()
   }
+  
+
 
   /// Persist `overlaySettings` to the shared app group so the extension can load them.
   private func saveOverlaySettings() {
     // Save to app group defaults for extension access
     guard let appGroupDefaults = UserDefaults(suiteName: Identifiers.appGroup) else {
-      logger.error("Failed to access app group UserDefaults for saving overlay settings")
+      self.logger.error("Failed to access app group UserDefaults for saving overlay settings")
       return
     }
 
@@ -409,10 +462,11 @@ class AppState: ObservableObject {
             "✅ Verified saved settings: userName='\(verificationSettings.userName)', position=\(verificationSettings.namePosition.rawValue)"
           )
       } else {
-        logger.error("❌ Failed to verify saved overlay settings")
+        self.logger.error("❌ Failed to verify saved overlay settings")
       }
+
     } catch {
-      logger.error("Failed to encode overlay settings: \(error)")
+      self.logger.error("Failed to encode overlay settings: \(error)")
     }
   }
 
@@ -474,7 +528,7 @@ class AppState: ObservableObject {
       Task { @MainActor in
         self?.startPersonalInfoPump()
         self?.refreshPersonalInfoNow()
-        logger.debug("Location permission granted - starting personal info services")
+        self?.logger.debug("Location permission granted - starting personal info services")
       }
     }
     
@@ -485,6 +539,9 @@ class AppState: ObservableObject {
         self?.locationAuthorizationStatus = status
       }
       .store(in: &cancellables)
+      
+    // Note: PersonalInfoPump doesn't have $lastUpdate property
+    // Overlay regeneration will happen when settings change instead
   }
 
   /// Load persisted selections (camera ID, overlays) into memory.
@@ -497,49 +554,49 @@ class AppState: ObservableObject {
   private func loadOverlaySettings() {
     // Load from app group defaults for extension access
     guard let appGroupDefaults = UserDefaults(suiteName: Identifiers.appGroup) else {
-      logger.debug("Failed to access app group UserDefaults for overlay settings")
+      self.logger.debug("Failed to access app group UserDefaults for overlay settings")
       return
     }
 
     if let overlayData = appGroupDefaults.data(forKey: OverlayUserDefaultsKeys.overlaySettings),
        let decodedSettings = try? JSONDecoder().decode(OverlaySettings.self, from: overlayData) {
       self.overlaySettings = decodedSettings
-      logger.debug("Loaded overlay settings: enabled=\(self.overlaySettings.isEnabled)")
+      self.logger.debug("Loaded overlay settings: enabled=\(self.overlaySettings.isEnabled)")
     } else {
       // Set default name from system if available
       self.overlaySettings.userName = NSUserName()
-      logger.debug("Using default overlay settings with user name: \(self.overlaySettings.userName)")
+      self.logger.debug("Using default overlay settings with user name: \(self.overlaySettings.userName)")
     }
   }
 
   /// Inspect extension readiness via a fast readiness flag, then fall back to device scan.
   private func checkExtensionStatus() {
-    logger.debug("Checking extension status...")
+    self.logger.debug("Checking extension status...")
 
     // Prefer fast readiness check to avoid noisy device scans
     let providerReady = UserDefaults(suiteName: Identifiers.appGroup)?
       .bool(forKey: "ExtensionProviderReady") ?? false
     if providerReady {
-      logger.debug("Extension detected via provider readiness - setting status to installed")
+      self.logger.debug("Extension detected via provider readiness - setting status to installed")
       extensionStatus = .installed
       statusMessage = "Extension is installed and ready"
-      logger.debug("Final extension status: \(String(describing: self.extensionStatus))")
+      self.logger.debug("Final extension status: \(String(describing: self.extensionStatus))")
       return
     }
 
     // Fallback to device scan when provider readiness hasn't been set yet
     propertyManager.refreshExtensionStatus()
     if propertyManager.deviceObjectID != nil {
-      logger.debug("Extension detected - setting status to installed")
+      self.logger.debug("Extension detected - setting status to installed")
       extensionStatus = .installed
       statusMessage = "Extension is installed and ready"
     } else {
-      logger.debug("Extension not detected - setting status to not installed")
+      self.logger.debug("Extension not detected - setting status to not installed")
       extensionStatus = .notInstalled
       statusMessage = "Extension needs to be installed"
     }
 
-    logger.debug("Final extension status: \(String(describing: self.extensionStatus))")
+    self.logger.debug("Final extension status: \(String(describing: self.extensionStatus))")
   }
 
   /// Discover all physical cameras (excluding the Headliner virtual camera) for selection.
@@ -548,7 +605,7 @@ class AppState: ObservableObject {
     let authStatus = AVCaptureDevice.authorizationStatus(for: .video)
     
     guard authStatus == .authorized else {
-      logger.debug("Camera permission not granted (\(authStatus.rawValue)), skipping camera discovery")
+      self.logger.debug("Camera permission not granted (\(authStatus.rawValue)), skipping camera discovery")
       availableCameras = []
       return
     }
@@ -585,16 +642,16 @@ class AppState: ObservableObject {
     let authStatus = AVCaptureDevice.authorizationStatus(for: .video)
     
     guard authStatus == .authorized else {
-      logger.debug("Camera permission not granted (\(authStatus.rawValue)), skipping capture session setup")
+      self.logger.debug("Camera permission not granted (\(authStatus.rawValue)), skipping capture session setup")
       captureSessionManager = nil
       return
     }
     
-    logger.debug("Setting up capture session for camera preview...")
+    self.logger.debug("Setting up capture session for camera preview...")
     captureSessionManager = CaptureSessionManager(capturingHeadliner: false)
 
     if let manager = captureSessionManager, manager.configured {
-      logger.debug("Capture session configured successfully")
+      self.logger.debug("Capture session configured successfully")
 
       // Set the output image manager as the video output delegate
       manager.videoOutput?.setSampleBufferDelegate(
@@ -605,10 +662,10 @@ class AppState: ObservableObject {
       // Start the capture session for preview only if we have cameras available
       if !manager.captureSession.isRunning && !availableCameras.isEmpty {
         manager.captureSession.startRunning()
-        logger.debug("Started preview capture session")
+        self.logger.debug("Started preview capture session")
       }
     } else {
-      logger.warning("Failed to configure capture session - likely due to no camera found")
+      self.logger.warning("Failed to configure capture session - likely due to no camera found")
       statusMessage = "No suitable camera found for preview"
     }
   }
@@ -619,12 +676,12 @@ class AppState: ObservableObject {
       AVCaptureDevice.requestAccess(for: .video) { granted in
         DispatchQueue.main.async {
           if granted {
-            logger.debug("Camera permission granted")
+            self.logger.debug("Camera permission granted")
             // Reload cameras and setup capture session now that we have permission
             self.loadAvailableCameras()
             self.setupCaptureSession()
           } else {
-            logger.error("Camera permission denied")
+            self.logger.error("Camera permission denied")
           }
           continuation.resume(returning: granted)
         }
@@ -634,7 +691,7 @@ class AppState: ObservableObject {
   
   /// Retry capture session configuration after permissions change.
   func retryCaptureSession() {
-    logger.debug("Retrying capture session setup...")
+    self.logger.debug("Retrying capture session setup...")
     loadAvailableCameras()
     setupCaptureSession()
   }
@@ -651,7 +708,7 @@ class AppState: ObservableObject {
     )
 
     guard let device = discoverySession.devices.first(where: { $0.uniqueID == deviceID }) else {
-      logger.error("Camera device with ID \(deviceID) not found")
+      self.logger.error("Camera device with ID \(deviceID) not found")
       return
     }
 
@@ -670,10 +727,10 @@ class AppState: ObservableObject {
       let newInput = try AVCaptureDeviceInput(device: device)
       if manager.captureSession.canAddInput(newInput) {
         manager.captureSession.addInput(newInput)
-        logger.debug("Updated preview capture session with camera: \(device.localizedName)")
+        self.logger.debug("Updated preview capture session with camera: \(device.localizedName)")
       }
     } catch {
-      logger.error("Failed to create camera input for preview: \(error)")
+      self.logger.error("Failed to create camera input for preview: \(error)")
     }
 
     manager.captureSession.commitConfiguration()
@@ -712,7 +769,7 @@ class AppState: ObservableObject {
           self.devicePollTimer?.invalidate()
           self.extensionStatus = .installed
           self.statusMessage = "Extension installed and ready"
-          logger.debug("✅ Virtual camera detected after activation")
+          self.logger.debug("✅ Virtual camera detected after activation")
           return
         }
 
@@ -722,10 +779,10 @@ class AppState: ObservableObject {
           self.devicePollTimer?.invalidate()
           self.extensionStatus = .installed
           self.statusMessage = "Extension installed and ready"
-          logger.debug("✅ Virtual camera detected after activation")
+          self.logger.debug("✅ Virtual camera detected after activation")
         } else if Date() > deadline {
           self.devicePollTimer?.invalidate()
-          logger.debug("⌛ Timed out waiting for device; user may still be approving or camera is in-use")
+          self.logger.debug("⌛ Timed out waiting for device; user may still be approving or camera is in-use")
         }
       }
     }

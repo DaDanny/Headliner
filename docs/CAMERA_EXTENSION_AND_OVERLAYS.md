@@ -18,10 +18,12 @@ The Headliner camera extension provides a virtual camera device that appears in 
 ### Key Features
 
 - **Real-time video streaming** at 1080p @ 60 FPS
-- **Professional overlays** with customizable text and styling
+- **SwiftUI overlays** with real-time rendering and live previews
+- **App Group synchronization** for seamless overlay updates
+- **Hybrid rendering** supporting both SwiftUI and CoreGraphics overlays
 - **Thread-safe rendering** using Core frameworks only
 - **GPU acceleration** via Metal and Core Image
-- **Smart caching** for optimal performance
+- **Smart caching** with LRU and time-based expiration
 - **Smooth transitions** between overlay presets and aspect ratios
 
 ## Architecture
@@ -31,15 +33,23 @@ The Headliner camera extension provides a virtual camera device that appears in 
 ```
 Headliner/
 ├── Main App                    # User interface & settings
-│   └── AppState.swift          # Central state management
+│   ├── AppState.swift          # Central state management
+│   ├── Overlay/                # SwiftUI overlay system
+│   │   ├── SwiftUIPresetRegistry.swift   # Modern overlay registry
+│   │   ├── SwiftUIOverlayRenderer.swift  # SwiftUI → CGImage renderer
+│   │   ├── OverlayRenderBroker.swift     # App Group publishing
+│   │   └── Presets/SwiftUI/              # SwiftUI overlay implementations
+│   └── Views/Components/
+│       └── SwiftUIPresetSelectionView.swift # Live preview UI
 ├── CameraExtension/            # System extension (separate process)
 │   ├── CameraExtensionProvider.swift  # Virtual camera implementation
 │   └── Rendering/
-│       └── CameraOverlayRenderer.swift # Thread-safe overlay renderer
+│       └── CameraOverlayRenderer.swift # Hybrid overlay renderer
 └── HeadlinerShared/            # Shared between app and extension
     ├── OverlayModels.swift     # Data models for overlays
-    ├── OverlayPresets.swift    # Preset definitions
+    ├── OverlayPresets.swift    # Legacy CoreGraphics presets (fallback)
     ├── OverlayRenderer.swift   # Renderer protocol
+    ├── Overlay/SharedOverlayStore.swift # App Group overlay storage
     └── CaptureSessionManager.swift # Camera capture logic
 ```
 
@@ -47,9 +57,50 @@ Headliner/
 
 - **Darwin Notifications**: Real-time signaling between app and extension
 - **UserDefaults (App Group)**: Shared settings storage
+- **App Group Container**: Pre-rendered overlay image sharing via PNG files
 - **No direct IPC**: Extension runs in isolated process for security
 
 ## Overlay System
+
+### SwiftUI Overlay Pipeline (Primary)
+
+The modern overlay system uses SwiftUI for flexible, real-time overlay rendering:
+
+#### Architecture Flow
+
+1. **SwiftUI Definition**: Overlays are defined as SwiftUI views implementing `OverlayViewProviding`
+2. **Registration**: Presets are registered in `SwiftUIPresetRegistry` with metadata and categories
+3. **Dimension Caching**: Extension caches actual pixel buffer size (1920x1080) to App Group
+4. **Main App Rendering**: `SwiftUIOverlayRenderer` renders SwiftUI → `CGImage` using cached dimensions
+5. **App Group Storage**: `OverlayRenderBroker` writes pixel-perfect rendered overlays to shared container
+6. **Darwin Notification**: Real-time notification signals extension of overlay updates
+7. **Extension Compositing**: `CameraOverlayRenderer` reads and composites pre-rendered overlays
+
+#### Key Benefits
+
+- **Live Previews**: Real SwiftUI rendering in preset selection UI
+- **Performance**: Pre-rendered in main app, composited at ~30 FPS in extension
+- **Perfect Scaling**: Automatic pixel buffer dimension sync eliminates scaling artifacts
+- **Flexibility**: Full SwiftUI layout and styling capabilities
+- **Caching**: 30-second LRU cache with memory management
+- **Type Safety**: Protocol-based design with compile-time checking
+
+#### Dimension Synchronization
+
+The system automatically synchronizes camera dimensions between the extension and main app:
+
+1. **Extension Initialization**: Camera extension caches actual pixel buffer size (1920x1080) to App Group
+2. **Main App Rendering**: `OverlayRenderBroker` reads cached dimensions and renders overlays at exact pixel size
+3. **Perfect Compositing**: No scaling artifacts or quality loss during final compositing
+4. **Fallback Safety**: Defaults to 1920x1080 if cached dimensions unavailable
+
+### Legacy CoreGraphics System (Fallback)
+
+The legacy system provides fallback rendering when SwiftUI overlays aren't available:
+
+- **Core Graphics Rendering**: Manual drawing with text, shapes, and gradients
+- **Direct Extension Rendering**: Real-time rendering in camera extension
+- **Backwards Compatibility**: Maintains support for existing presets
 
 ### Available Presets
 
@@ -186,61 +237,62 @@ The production renderer (`CameraExtension/Rendering/CameraOverlayRenderer.swift`
 
 ## Creating and Modifying Overlays
 
-### Creating a New Preset
+### Creating a New SwiftUI Overlay (Recommended)
 
-1. **Define the preset in `HeadlinerShared/OverlayPresets.swift`:**
+1. **Create your SwiftUI view implementing `OverlayViewProviding`:**
 
 ```swift
-static let myCustomPreset = OverlayPreset(
-    id: "custom",
-    name: "My Custom Preset",
-    nodes: [
-        // Background shape
-        .rect(RectNode(
-            colorHex: "#000000AA",  // Semi-transparent black
-            cornerRadius: 0.1        // 10% corner radius
-        )),
+// Headliner/Overlay/Presets/SwiftUI/MyCustomOverlay.swift
+import SwiftUI
 
-        // Main text
-        .text(TextNode(
-            text: "{displayName}",
-            fontSize: 0.05,          // 5% of container height
-            fontWeight: "bold",
-            colorHex: "#FFFFFF",
-            alignment: "center"
-        ))
-    ],
-    layout: OverlayLayout(
-        widescreen: [
-            // Position for 16:9
-            OverlayNodePlacement(
-                index: 0,  // Background rect
-                frame: NRect(x: 0.1, y: 0.1, w: 0.8, h: 0.1),
-                zIndex: 0,
-                opacity: 0.9
-            ),
-            OverlayNodePlacement(
-                index: 1,  // Text
-                frame: NRect(x: 0.1, y: 0.12, w: 0.8, h: 0.06),
-                zIndex: 1,
-                opacity: 1.0
-            )
-        ],
-        fourThree: [
-            // Adjusted positions for 4:3
-            // Similar structure with different coordinates
-        ]
-    )
+struct MyCustomOverlay: OverlayViewProviding {
+    static let presetId = "swiftui.custom.myoverlay"
+    static let defaultSize = CGSize(width: 1280, height: 720)
+
+    func makeView(tokens: OverlayTokens) -> some View {
+        VStack {
+            Spacer()
+            HStack {
+                VStack(alignment: .leading) {
+                    Text(tokens.displayName)
+                        .font(.system(size: 32, weight: .bold))
+                        .foregroundStyle(.white)
+
+                    if let tagline = tokens.tagline {
+                        Text(tagline)
+                            .font(.system(size: 18, weight: .medium))
+                            .foregroundStyle(.white.opacity(0.8))
+                    }
+                }
+                Spacer()
+            }
+            .padding(24)
+            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16))
+            .padding(.bottom, 32)
+            .padding(.horizontal, 40)
+        }
+    }
+}
+```
+
+2. **Register your overlay in `SwiftUIPresetRegistry.swift`:**
+
+```swift
+// Add to the allPresets array
+SwiftUIPresetInfo(
+    id: "swiftui.custom.myoverlay",
+    name: "My Custom Overlay",
+    description: "Custom lower third with glassmorphic background",
+    category: .standard,  // or .branded, .creative, .minimal
+    provider: MyCustomOverlay()
 )
 ```
 
-2. **Add to the preset list:**
+3. **That's it!** Your overlay will automatically appear in the UI with live preview.
 
-```swift
-static let all = [professional, personal, myCustomPreset, none]
-```
+### Creating a Legacy CoreGraphics Overlay (Fallback Only)
 
-3. **Update the UI to include your preset** (if needed)
+For backwards compatibility, you can still create CoreGraphics overlays in `OverlayPresets.swift` using the traditional node-based system. However, **SwiftUI overlays are strongly recommended** for new development due to their flexibility, live previews, and better maintainability.
 
 ### Modifying Existing Overlays
 

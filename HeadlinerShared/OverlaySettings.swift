@@ -22,6 +22,9 @@ struct OverlaySettings: Codable {
   var selectedPresetId: String = "professional"
   var overlayTokens: OverlayTokens?
   var overlayAspect: OverlayAspect = .widescreen
+  
+  // Camera dimensions (cached from extension)
+  var cameraDimensions: CGSize = CGSize(width: 1920, height: 1080)
 }
 
 enum OverlayPosition: String, Codable, CaseIterable {

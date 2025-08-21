@@ -59,7 +59,7 @@ class CameraExtensionDeviceSource: NSObject, CMIOExtensionDeviceSource, AVCaptur
 	private let overlaySettingsLock = NSLock()
 	
 	// Preset system components
-	private var overlayRenderer: CameraOverlayRenderer?
+	private var overlayRenderer: OverlayRenderer?
 	private var overlayPresetStore: OverlayPresetStore?
 	private var lastRenderedOverlay: CIImage?
 	private var lastAspectRatio: OverlayAspect?
@@ -72,6 +72,9 @@ class CameraExtensionDeviceSource: NSObject, CMIOExtensionDeviceSource, AVCaptur
 		
 		let dims = CMVideoDimensions(width: 1920, height: 1080)
 		CMVideoFormatDescriptionCreate(allocator: kCFAllocatorDefault, codecType: kCVPixelFormatType_32BGRA, width: dims.width, height: dims.height, extensions: nil, formatDescriptionOut: &_videoDescription)
+		
+		// Cache actual camera dimensions in App Group for overlay rendering sync
+		cacheCameraDimensions(width: Int(dims.width), height: Int(dims.height))
 		
 		let pixelBufferAttributes: NSDictionary = [
 			kCVPixelBufferWidthKey: dims.width,
@@ -102,8 +105,9 @@ class CameraExtensionDeviceSource: NSObject, CMIOExtensionDeviceSource, AVCaptur
 		extensionLogger.debug("✅ CameraExtensionDeviceSource init - overlay settings loaded")
 		
 		// Initialize preset system components
-		// Use thread-safe renderer with Core frameworks only (no AppKit)
+		// TESTING: Use camera overlay renderer for now
 		overlayRenderer = CameraOverlayRenderer()
+
 		overlayPresetStore = OverlayPresetStore()
 		extensionLogger.debug("✅ Initialized camera overlay renderer (thread-safe, Metal-backed)")
 	}
@@ -353,7 +357,7 @@ class CameraExtensionDeviceSource: NSObject, CMIOExtensionDeviceSource, AVCaptur
 		)
 		
 		if err == 0, let sampleBuffer = sampleBuffer {
-			extensionLogger.debug("Sending virtual camera frame to stream")
+			
 			_streamSource.stream.send(
 				sampleBuffer,
 				discontinuity: [],
@@ -398,7 +402,7 @@ class CameraExtensionDeviceSource: NSObject, CMIOExtensionDeviceSource, AVCaptur
 		let titleFont = NSFont.systemFont(ofSize: min(CGFloat(width)/12, 72), weight: .bold)
 		let titleAttributes: [NSAttributedString.Key: Any] = [
 			.font: titleFont,
-			.foregroundColor: NSColor.white,
+			.foregroundColor: NSColor.white,  // white
 			.paragraphStyle: {
 				let style = NSMutableParagraphStyle()
 				style.alignment = .center
@@ -418,7 +422,7 @@ class CameraExtensionDeviceSource: NSObject, CMIOExtensionDeviceSource, AVCaptur
 		// Draw status message
 		let statusText = isAppStreaming ? "Starting Camera..." : "Camera Stopped"
 		let statusFont = NSFont.systemFont(ofSize: min(CGFloat(width)/20, 36), weight: .medium)
-		let statusColor = isAppStreaming ? NSColor.systemGreen : NSColor.systemGray
+		let statusColor = isAppStreaming ? NSColor.systemGreen : NSColor.systemGray  // green or gray
 		let statusAttributes: [NSAttributedString.Key: Any] = [
 			.font: statusFont,
 			.foregroundColor: statusColor,
@@ -443,7 +447,7 @@ class CameraExtensionDeviceSource: NSObject, CMIOExtensionDeviceSource, AVCaptur
 		let instructionFont = NSFont.systemFont(ofSize: min(CGFloat(width)/30, 24), weight: .regular)
 		let instructionAttributes: [NSAttributedString.Key: Any] = [
 			.font: instructionFont,
-			.foregroundColor: NSColor.systemGray,
+			.foregroundColor: NSColor.systemGray,  // gray
 			.paragraphStyle: {
 				let style = NSMutableParagraphStyle()
 				style.alignment = .center
@@ -676,7 +680,9 @@ class CameraExtensionDeviceSource: NSObject, CMIOExtensionDeviceSource, AVCaptur
 		if !settings.selectedPresetId.isEmpty {
 			if let selectedPreset = OverlayPresets.preset(withId: settings.selectedPresetId) {
 				preset = selectedPreset
-			}
+			} 
+		} else {
+			extensionLogger.debug("📝 [Preset Selection] No preset ID in settings, using default: '\(preset.name)'")
 		}
 		
 		// Update tokens with current user name if needed
@@ -687,6 +693,8 @@ class CameraExtensionDeviceSource: NSObject, CMIOExtensionDeviceSource, AVCaptur
 		// Check for aspect ratio change
 		let currentAspect = settings.overlayAspect
 		let aspectChanged = lastAspectRatio != nil && lastAspectRatio != currentAspect
+		
+		// Note: aspect is now a computed property in OverlayTokens (returns .widescreen)
 		
 		// Notify renderer about aspect change for optimized crossfade
 		if aspectChanged {
@@ -755,6 +763,37 @@ class CameraExtensionDeviceSource: NSObject, CMIOExtensionDeviceSource, AVCaptur
 	
 
 	
+	// MARK: - Camera Dimensions Caching
+	
+	/// Cache the actual camera dimensions in App Group for overlay rendering sync
+	private func cacheCameraDimensions(width: Int, height: Int) {
+		guard let userDefaults = UserDefaults(suiteName: Identifiers.appGroup) else {
+			extensionLogger.error("Failed to access App Group UserDefaults for caching camera dimensions")
+			return
+		}
+		
+		// Read current settings or create default
+		var settings: OverlaySettings
+		if let data = userDefaults.data(forKey: OverlayUserDefaultsKeys.overlaySettings),
+		   let decoded = try? JSONDecoder().decode(OverlaySettings.self, from: data) {
+			settings = decoded
+		} else {
+			settings = OverlaySettings()
+		}
+		
+		// Update camera dimensions
+		settings.cameraDimensions = CGSize(width: width, height: height)
+		
+		// Write back to App Group
+		if let encoded = try? JSONEncoder().encode(settings) {
+			userDefaults.set(encoded, forKey: OverlayUserDefaultsKeys.overlaySettings)
+			userDefaults.synchronize()
+			extensionLogger.debug("📐 Cached camera dimensions: \(width)x\(height) to App Group")
+		} else {
+			extensionLogger.error("Failed to encode OverlaySettings with camera dimensions")
+		}
+	}
+	
 	// MARK: AVCaptureVideoDataOutputSampleBufferDelegate
 	
 	func captureOutput(_ output: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection) {
@@ -771,13 +810,13 @@ class CameraExtensionDeviceSource: NSObject, CMIOExtensionDeviceSource, AVCaptur
 		
 		// Log occasionally to avoid spam
 		self._frameCount += 1
-		if self._frameCount == 1 {
-			print("🎉 [Camera Extension] Received FIRST camera frame! Camera capture is working.")
-			extensionLogger.debug("Received first camera frame - camera capture is working")
-		} else if self._frameCount % 60 == 0 {
-			print("📸 [Camera Extension] Captured real camera frame \(self._frameCount)")
-			extensionLogger.debug("Captured real camera frame \(self._frameCount) for virtual camera content")
-		}
+		// if self._frameCount == 1 {
+		// 	print("🎉 [Camera Extension] Received FIRST camera frame! Camera capture is working.")
+		// 	extensionLogger.debug("Received first camera frame - camera capture is working")
+		// } else if self._frameCount % 60 == 0 {
+		// 	print("📸 [Camera Extension] Captured real camera frame \(self._frameCount)")
+		// 	extensionLogger.debug("Captured real camera frame \(self._frameCount) for virtual camera content")
+		// }
 	}
 }
 
@@ -872,6 +911,7 @@ class CameraExtensionProviderSource: NSObject, CMIOExtensionProviderSource {
     
     private let notificationCenter = CFNotificationCenterGetDarwinNotifyCenter()
     private var notificationListenerStarted = false
+
 	
 	// CMIOExtensionProviderSource protocol methods (all are required)
 	
@@ -956,6 +996,8 @@ class CameraExtensionProviderSource: NSObject, CMIOExtensionProviderSource {
         case .updateOverlaySettings:
             extensionLogger.debug("🎨 Overlay settings changed - updating now")
             deviceSource.updateOverlaySettings()
+        case .overlayUpdated:
+            extensionLogger.debug("📡 Pre-rendered overlay updated - will be refreshed on next frame")
         }
     }
 
@@ -971,6 +1013,9 @@ class CameraExtensionProviderSource: NSObject, CMIOExtensionProviderSource {
             },
             notificationName.rawValue as CFString, nil, .deliverImmediately)
         }
+        
+        notificationListenerStarted = true
+        extensionLogger.debug("✅ Started notification listeners for \(NotificationName.allCases.count) notifications")
     }
 
     private func stopNotificationListeners() {

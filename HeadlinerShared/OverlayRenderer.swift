@@ -12,6 +12,8 @@ import Foundation
 import CoreImage
 import CoreVideo
 
+// Import for OverlayUserDefaultsKeys
+
 // MARK: - Overlay Renderer Protocol
 
 /// Protocol for rendering overlays onto video frames.
@@ -31,6 +33,9 @@ protocol OverlayRenderer {
                 preset: OverlayPreset,
                 tokens: OverlayTokens,
                 previousFrame: CIImage?) -> CIImage
+    
+    /// Notify renderer that aspect ratio is changing (for smooth transitions)
+    func notifyAspectChanged()
 }
 
 
@@ -59,8 +64,9 @@ class OverlayPresetStore {
     
     /// Get the currently selected preset
     var selectedPreset: OverlayPreset {
-        guard let presetId = userDefaults?.string(forKey: Keys.selectedPresetId),
-              let preset = OverlayPresets.preset(withId: presetId) else {
+        guard let data = userDefaults?.data(forKey: OverlayUserDefaultsKeys.overlaySettings),
+              let settings = try? JSONDecoder().decode(OverlaySettings.self, from: data),
+              let preset = OverlayPresets.preset(withId: settings.selectedPresetId) else {
             return OverlayPresets.defaultPreset
         }
         return preset
@@ -74,17 +80,26 @@ class OverlayPresetStore {
     
     /// Get current overlay tokens
     var overlayTokens: OverlayTokens {
-        guard let data = userDefaults?.data(forKey: Keys.overlayTokens),
-              let tokens = try? JSONDecoder().decode(OverlayTokens.self, from: data) else {
+        guard let data = userDefaults?.data(forKey: OverlayUserDefaultsKeys.overlaySettings),
+              let settings = try? JSONDecoder().decode(OverlaySettings.self, from: data) else {
             // Return default tokens with user's name
             return OverlayTokens(
                 displayName: NSUserName(),
                 tagline: nil,
-                accentColorHex: "#007AFF",
-                aspect: .widescreen
+                accentColorHex: "#007AFF"
             )
         }
-        return tokens
+        
+        // Use custom tokens if available, otherwise create default ones
+        if let customTokens = settings.overlayTokens {
+            return customTokens
+        } else {
+            return OverlayTokens(
+                displayName: settings.userName.isEmpty ? NSUserName() : settings.userName,
+                tagline: nil,
+                accentColorHex: "#007AFF"
+            )
+        }
     }
     
     /// Save overlay tokens
@@ -97,11 +112,11 @@ class OverlayPresetStore {
     
     /// Get current aspect ratio
     var aspect: OverlayAspect {
-        guard let aspectString = userDefaults?.string(forKey: Keys.overlayAspect),
-              let aspect = OverlayAspect(rawValue: aspectString) else {
+        guard let data = userDefaults?.data(forKey: OverlayUserDefaultsKeys.overlaySettings),
+              let settings = try? JSONDecoder().decode(OverlaySettings.self, from: data) else {
             return .widescreen
         }
-        return aspect
+        return settings.overlayAspect
     }
     
     /// Set aspect ratio
@@ -109,9 +124,6 @@ class OverlayPresetStore {
         userDefaults?.set(aspect.rawValue, forKey: Keys.overlayAspect)
         userDefaults?.synchronize()
         
-        // Also update tokens to keep in sync
-        var tokens = overlayTokens
-        tokens.aspect = aspect
-        saveTokens(tokens)
+        // Note: aspect is now a computed property in OverlayTokens, no need to set it
     }
 }

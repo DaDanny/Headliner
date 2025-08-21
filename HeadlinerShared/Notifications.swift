@@ -6,6 +6,7 @@ enum NotificationName: String, CaseIterable {
   case stopStream
   case setCameraDevice
   case updateOverlaySettings
+  case overlayUpdated
   
   var rawValue: String {
     switch self {
@@ -17,12 +18,14 @@ enum NotificationName: String, CaseIterable {
       return "\(Identifiers.notificationPrefix).setCameraDevice"
     case .updateOverlaySettings:
       return "\(Identifiers.notificationPrefix).updateOverlaySettings"
+    case .overlayUpdated:
+      return "\(Identifiers.notificationPrefix).overlayUpdated"
     }
   }
   
   // Required for CaseIterable when we override rawValue
   static var allCases: [NotificationName] {
-    [.startStream, .stopStream, .setCameraDevice, .updateOverlaySettings]
+    [.startStream, .stopStream, .setCameraDevice, .updateOverlaySettings, .overlayUpdated]
   }
   
   // Support for initialization from string (used in CameraExtension)

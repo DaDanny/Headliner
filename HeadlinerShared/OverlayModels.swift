@@ -11,18 +11,18 @@ import CoreGraphics
 // MARK: - Core Data Models
 
 /// Aspect ratio for overlay layouts
-enum OverlayAspect: String, Codable, CaseIterable {
+public enum OverlayAspect: String, Codable, CaseIterable {
     case widescreen = "widescreen" // 16:9
     case fourThree = "fourThree"    // 4:3
     
-    var displayName: String {
+    public var displayName: String {
         switch self {
         case .widescreen: return "16:9 Widescreen"
         case .fourThree: return "4:3 Standard"
         }
     }
     
-    var ratio: CGFloat {
+    public var ratio: CGFloat {
         switch self {
         case .widescreen: return 16.0 / 9.0
         case .fourThree: return 4.0 / 3.0
@@ -31,35 +31,55 @@ enum OverlayAspect: String, Codable, CaseIterable {
 }
 
 /// Tokens that get replaced in overlay templates
-struct OverlayTokens: Codable, Equatable {
-    var displayName: String
-    var tagline: String?
-    var accentColorHex: String   // Store as hex for UserDefaults
-    var aspect: OverlayAspect
-    
-    // Personal preset (optional)
-    var city: String?
-    var localTime: String?
-    var weatherEmoji: String?
-    var weatherText: String?
-    
-    init(displayName: String = "",
-         tagline: String? = nil,
-         accentColorHex: String = "#007AFF", // Default blue
-         aspect: OverlayAspect = .widescreen,
-         city: String? = nil,
-         localTime: String? = nil,
-         weatherEmoji: String? = nil,
-         weatherText: String? = nil) {
+public struct OverlayTokens: Hashable, Codable {
+    public var displayName: String
+    public var tagline: String?
+    public var accentColorHex: String
+    public var localTime: String?
+    public var logoText: String?     // optional brand text
+    public var extras: [String:String]?
+
+    public init(displayName: String,
+                tagline: String? = nil,
+                accentColorHex: String = "#118342",
+                localTime: String? = nil,
+                logoText: String? = nil,
+                extras: [String:String]? = nil) {
         self.displayName = displayName
         self.tagline = tagline
         self.accentColorHex = accentColorHex
-        self.aspect = aspect
-        self.city = city
         self.localTime = localTime
-        self.weatherEmoji = weatherEmoji
-        self.weatherText = weatherText
+        self.logoText = logoText
+        self.extras = extras
     }
+    
+    // Legacy support for existing overlay system
+    public var aspect: OverlayAspect {
+        return .widescreen
+    }
+    
+    public var city: String? {
+        return extras?["location"]
+    }
+    
+    public var weatherEmoji: String? {
+        return extras?["weatherEmoji"]
+    }
+    
+    public var weatherText: String? {
+        return extras?["weatherText"]
+    }
+}
+
+public extension OverlayTokens {
+    static let previewDanny = OverlayTokens(
+        displayName: "Danny F",
+        tagline: "High School Intern",
+        accentColorHex: "#118342",
+        localTime: "8:04 PM",
+        logoText: "BONUSLY",
+        extras: ["location":"Pittsburgh, PA"]
+    )
 }
 
 /// Normalized rectangle (0...1 range for both position and size)
@@ -166,11 +186,30 @@ struct GradientNode: Codable, Equatable {
     }
 }
 
+/// Image node configuration
+struct ImageNode: Codable, Equatable {
+    var imageName: String     // Name of image in app bundle
+    var contentMode: String   // "fit", "fill", "stretch"
+    var opacity: CGFloat      // 0.0-1.0
+    var cornerRadius: CGFloat // 0.0-0.5 (0.5 = circle)
+    
+    init(imageName: String,
+         contentMode: String = "fit",
+         opacity: CGFloat = 1.0,
+         cornerRadius: CGFloat = 0.0) {
+        self.imageName = imageName
+        self.contentMode = contentMode
+        self.opacity = opacity
+        self.cornerRadius = cornerRadius
+    }
+}
+
 /// Union type for overlay nodes
 enum OverlayNode: Codable, Equatable {
     case text(TextNode)
     case rect(RectNode)
     case gradient(GradientNode)
+    case image(ImageNode)
     
     // Custom coding to handle enum with associated values
     enum CodingKeys: String, CodingKey {
@@ -179,7 +218,7 @@ enum OverlayNode: Codable, Equatable {
     }
     
     enum NodeType: String, Codable {
-        case text, rect, gradient
+        case text, rect, gradient, image
     }
     
     init(from decoder: Decoder) throws {
@@ -196,6 +235,9 @@ enum OverlayNode: Codable, Equatable {
         case .gradient:
             let node = try container.decode(GradientNode.self, forKey: .data)
             self = .gradient(node)
+        case .image:
+            let node = try container.decode(ImageNode.self, forKey: .data)
+            self = .image(node)
         }
     }
     
@@ -211,6 +253,9 @@ enum OverlayNode: Codable, Equatable {
             try container.encode(node, forKey: .data)
         case .gradient(let node):
             try container.encode(NodeType.gradient, forKey: .type)
+            try container.encode(node, forKey: .data)
+        case .image(let node):
+            try container.encode(NodeType.image, forKey: .type)
             try container.encode(node, forKey: .data)
         }
     }
