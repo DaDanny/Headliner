@@ -243,7 +243,7 @@ struct OverlaySettingsView: View {
     if selectedPresetId != "none" {
       let tokens = OverlayTokens(
         displayName: displayName.isEmpty ? NSUserName() : displayName,
-        tagline: tagline.isEmpty ? nil : tagline,  // Always save tagline if not empty
+        tagline: tagline.isEmpty ? appState.overlaySettings.overlayTokens?.tagline : tagline,  // Preserve existing tagline if field empty
         accentColorHex: accentColorHex
       )
       appState.updateOverlayTokens(tokens)

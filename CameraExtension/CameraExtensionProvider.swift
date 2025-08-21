@@ -618,7 +618,7 @@ class CameraExtensionDeviceSource: NSObject, CMIOExtensionDeviceSource, AVCaptur
 	
 	// MARK: Overlay Settings Management
 	
-        private func loadOverlaySettings() {
+	private func loadOverlaySettings() {
         self.overlaySettingsLock.lock()
         defer { self.overlaySettingsLock.unlock() }
         
@@ -803,6 +803,14 @@ class CameraExtensionDeviceSource: NSObject, CMIOExtensionDeviceSource, AVCaptur
 			return
 		}
 		
+		// Log camera input resolution for debugging overlay sizing
+		if self._frameCount == 0 {
+			let inputWidth = CVPixelBufferGetWidth(pixelBuffer)
+			let inputHeight = CVPixelBufferGetHeight(pixelBuffer)
+			print("📐 [Camera Extension] Real camera input: \(inputWidth)x\(inputHeight), Virtual output: 1920x1080")
+			extensionLogger.debug("Camera input resolution: \(inputWidth)x\(inputHeight), Virtual output: 1920x1080")
+		}
+		
 		// Store the current camera frame (thread-safe)
 		_cameraFrameLock.lock()
 		_currentCameraFrame = pixelBuffer
@@ -810,13 +818,6 @@ class CameraExtensionDeviceSource: NSObject, CMIOExtensionDeviceSource, AVCaptur
 		
 		// Log occasionally to avoid spam
 		self._frameCount += 1
-		// if self._frameCount == 1 {
-		// 	print("🎉 [Camera Extension] Received FIRST camera frame! Camera capture is working.")
-		// 	extensionLogger.debug("Received first camera frame - camera capture is working")
-		// } else if self._frameCount % 60 == 0 {
-		// 	print("📸 [Camera Extension] Captured real camera frame \(self._frameCount)")
-		// 	extensionLogger.debug("Captured real camera frame \(self._frameCount) for virtual camera content")
-		// }
 	}
 }
 

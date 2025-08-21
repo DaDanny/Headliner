@@ -296,7 +296,7 @@ class AppState: ObservableObject {
       // Initialize tokens for other presets
       overlaySettings.overlayTokens = OverlayTokens(
         displayName: overlaySettings.userName.isEmpty ? NSUserName() : overlaySettings.userName,
-        tagline: presetId == "professional" ? "Senior Developer" : nil,
+        tagline: existingTokens?.tagline ?? (presetId == "professional" ? "Senior Developer" : ""),
         accentColorHex: "#007AFF"
       )
     }
