@@ -881,9 +881,6 @@ enum OverlayPresets {
         personalPreset,
         professionalCustomPreset,
         personalCustomPreset,
-        .bonuslyBranded,  // Original template-based preset
-        componentDemoPreset,  // Demo of component approach
-        .gamerVibes,  // Fun gaming-themed preset
         fallbackPreset
     ]
 }
