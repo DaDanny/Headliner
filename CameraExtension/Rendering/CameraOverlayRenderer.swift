@@ -29,6 +29,9 @@ import QuartzCore
 /// - Deterministic cache keys for stable performance
 /// - sRGB color management throughout the pipeline
 final class CameraOverlayRenderer: OverlayRenderer {
+    // MARK: - Logging
+    private let logger = HeadlinerLogger.logger(for: .overlays)
+    
     // MARK: - Queues
     private let renderQueue = DispatchQueue(label: "CameraOverlayRenderer.render")
     private let cacheQueue = DispatchQueue(label: "CameraOverlayRenderer.cache")
@@ -148,14 +151,42 @@ final class CameraOverlayRenderer: OverlayRenderer {
         return renderQueue.sync {
             return autoreleasepool {
                 let base = CIImage(cvPixelBuffer: pixelBuffer, options: [.colorSpace: colorSpace])
+                
+                // TESTING: Check for pre-rendered SwiftUI overlay first
+                if let overlayCG = SharedOverlayStore.readOverlay() {
+                    let overlayCI = CIImage(cgImage: overlayCG)
+                    logger.info("🎯 [SharedOverlay] Base size: \(Int(base.extent.width))x\(Int(base.extent.height)), Overlay size: \(overlayCG.width)x\(overlayCG.height)")
+                    
+                    // Scale overlay to match base dimensions instead of cropping
+                    let scaledOverlay = overlayCI.transformed(by: CGAffineTransform(
+                        scaleX: base.extent.width / overlayCI.extent.width,
+                        y: base.extent.height / overlayCI.extent.height
+                    ))
+                    
+                    logger.info("✅ [SharedOverlay] Using pre-rendered SwiftUI overlay from App Group")
+                    return scaledOverlay.composited(over: base)
+                } else {
+                    logger.info("⚠️ [SharedOverlay] No pre-rendered overlay available, falling back to Core Graphics")
+                }
+                
                 guard !preset.nodes.isEmpty else { return base }
 
                 var enrichedTokens = tokens
                 if let personalInfo = getCachedPersonalInfo() {
-                    enrichedTokens.city = enrichedTokens.city ?? personalInfo.city
-                    enrichedTokens.localTime = enrichedTokens.localTime ?? personalInfo.localTime
-                    enrichedTokens.weatherEmoji = enrichedTokens.weatherEmoji ?? personalInfo.weatherEmoji
-                    enrichedTokens.weatherText = enrichedTokens.weatherText ?? personalInfo.weatherText
+                    // Merge personal info into extras dictionary
+                    var extras = enrichedTokens.extras ?? [:]
+                    extras["location"] = extras["location"] ?? personalInfo.city
+                    extras["weatherEmoji"] = extras["weatherEmoji"] ?? personalInfo.weatherEmoji
+                    extras["weatherText"] = extras["weatherText"] ?? personalInfo.weatherText
+                    
+                    enrichedTokens = OverlayTokens(
+                        displayName: enrichedTokens.displayName,
+                        tagline: enrichedTokens.tagline,
+                        accentColorHex: enrichedTokens.accentColorHex,
+                        localTime: enrichedTokens.localTime ?? personalInfo.localTime,
+                        logoText: enrichedTokens.logoText,
+                        extras: extras
+                    )
                 }
 
                 let size = CGSize(width: CGFloat(CVPixelBufferGetWidth(pixelBuffer)),

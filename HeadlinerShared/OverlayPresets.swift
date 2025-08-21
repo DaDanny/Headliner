@@ -1,4 +1,5 @@
-@available(*, deprecated, message: "Legacy CoreGraphics overlay path. Prefer SwiftUI overlays.")
+// DEPRECATED: Legacy CoreGraphics overlay path. Prefer SwiftUI overlays.
+//@available(*, deprecated, message: "Legacy CoreGraphics overlay path. Prefer SwiftUI overlays.")
 // swiftlint:disable file_length
 //
 //  OverlayPresets.swift
@@ -25,7 +26,7 @@ enum OverlayPresets {
     
     /// All available presets
     static var allPresets: [OverlayPreset] {
-        return builtInPresets + [OverlayPreset.swiftUIDemo, OverlayPreset.swiftUIDemo2]
+        return builtInPresets 
     }
     
     // MARK: - Built-in Fallback Presets
@@ -883,7 +884,6 @@ enum OverlayPresets {
         .bonuslyBranded,  // Original template-based preset
         componentDemoPreset,  // Demo of component approach
         .gamerVibes,  // Fun gaming-themed preset
-        // SwiftUI presets removed from here to avoid CameraExtension compilation issues
         fallbackPreset
     ]
 }

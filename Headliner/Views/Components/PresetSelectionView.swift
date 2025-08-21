@@ -10,10 +10,11 @@ import SwiftUI
 struct PresetSelectionView: View {
     @Binding var selectedPresetId: String
     let onSelectionChanged: (String) -> Void
+    @ObservedObject var appState: AppState
     
-    // Load all available presets dynamically
+    // Load all available presets dynamically (including SwiftUI ones)
     private var allPresets: [OverlayPreset] {
-        return OverlayPresets.allPresets
+        return appState.availablePresets
     }
     
     // Group presets by category (truly dynamic)
@@ -34,12 +35,20 @@ struct PresetSelectionView: View {
         }
     }
     
+    private var swiftUIPresets: [OverlayPreset] {
+        return allPresets.filter { 
+            $0.id.contains("swiftui") || $0.id == "simple-components"
+        }
+    }
+    
     private var otherPresets: [OverlayPreset] {
-        // Any presets that don't fit in modern or classic categories
+        // Any presets that don't fit in modern, classic, or SwiftUI categories
         let modernIds = Set(modernPresets.map { $0.id })
         let classicIds = Set(classicPresets.map { $0.id })
+        let swiftUIIds = Set(swiftUIPresets.map { $0.id })
         return allPresets.filter { 
-            !modernIds.contains($0.id) && !classicIds.contains($0.id) && $0.id != "fallback"
+            !modernIds.contains($0.id) && !classicIds.contains($0.id) && 
+            !swiftUIIds.contains($0.id) && $0.id != "fallback"
         }
     }
     
@@ -69,6 +78,41 @@ struct PresetSelectionView: View {
                     ], spacing: 12) {
                         ForEach(modernPresets, id: \.id) { preset in
                             ModernPresetCard(
+                                preset: preset,
+                                isSelected: selectedPresetId == preset.id
+                            ) {
+                                selectedPresetId = preset.id
+                                onSelectionChanged(preset.id)
+                            }
+                        }
+                    }
+                }
+            }
+            
+            // SwiftUI Presets Section (NEW!)
+            if !swiftUIPresets.isEmpty {
+                VStack(alignment: .leading, spacing: 16) {
+                    HStack {
+                        Image(systemName: "swift")
+                            .foregroundColor(.orange)
+                            .font(.caption)
+                        Text("SwiftUI Overlays")
+                            .font(.headline)
+                            .foregroundColor(.white)
+                            .fontWeight(.semibold)
+                    }
+                    
+                    Text("Next-generation SwiftUI-powered overlays with live rendering")
+                        .font(.caption)
+                        .foregroundColor(.white.opacity(0.7))
+                    
+                    LazyVGrid(columns: [
+                        GridItem(.flexible()),
+                        GridItem(.flexible()),
+                        GridItem(.flexible())
+                    ], spacing: 12) {
+                        ForEach(swiftUIPresets, id: \.id) { preset in
+                            SwiftUIPresetCard(
                                 preset: preset,
                                 isSelected: selectedPresetId == preset.id
                             ) {
@@ -340,12 +384,86 @@ struct ClassicPresetCard: View {
     }
 }
 
+// MARK: - SwiftUI Preset Card
+
+struct SwiftUIPresetCard: View {
+    let preset: OverlayPreset
+    let isSelected: Bool
+    let onTap: () -> Void
+    
+    var body: some View {
+        Button(action: onTap) {
+            VStack(spacing: 6) {
+                // SwiftUI icon with accent
+                ZStack {
+                    Circle()
+                        .fill(Color.orange.opacity(0.2))
+                        .frame(width: 40, height: 40)
+                    Image(systemName: swiftUIIcon)
+                        .font(.system(size: 20, weight: .medium))
+                        .foregroundColor(.orange)
+                }
+                
+                // Preset name
+                Text(preset.name)
+                    .font(.caption)
+                    .fontWeight(.medium)
+                    .foregroundColor(.white)
+                    .lineLimit(1)
+                
+                // Preset description
+                Text(swiftUIDescription)
+                    .font(.caption2)
+                    .foregroundColor(.white.opacity(0.7))
+                    .lineLimit(2)
+                    .multilineTextAlignment(.center)
+            }
+            .padding(8)
+            .background(
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(Color.orange.opacity(0.1))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12)
+                            .stroke(isSelected ? Color.orange.opacity(0.8) : Color.clear, lineWidth: 2)
+                    )
+            )
+        }
+        .buttonStyle(PlainButtonStyle())
+        .scaleEffect(isSelected ? 1.05 : 1.0)
+        .animation(.easeInOut(duration: 0.2), value: isSelected)
+    }
+    
+    private var swiftUIIcon: String {
+        switch preset.id {
+        case "swiftui-demo": return "text.below.photo"
+        case "swiftui-demo-2": return "rectangle.3.group.bubble"
+        case "simple-components": return "chart.bar.fill"
+        default: return "swift"
+        }
+    }
+    
+    private var swiftUIDescription: String {
+        switch preset.id {
+        case "swiftui-demo": return "Clean lower-third overlay"
+        case "swiftui-demo-2": return "Brand ribbon with chips"
+        case "simple-components": return "Metric bar display"
+        default: return "SwiftUI-powered overlay"
+        }
+    }
+}
+
 // MARK: - Preview
 
 #Preview {
+    let appState = AppState(
+        systemExtensionManager: SystemExtensionRequestManager(logText: ""),
+        propertyManager: CustomPropertyManager(),
+        outputImageManager: OutputImageManager()
+    )
     PresetSelectionView(
         selectedPresetId: .constant("professional"),
-        onSelectionChanged: { _ in }
+        onSelectionChanged: { _ in },
+        appState: appState
     )
     .padding()
     .background(Color.black)

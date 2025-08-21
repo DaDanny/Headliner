@@ -94,8 +94,7 @@ struct PersonalInfoView: View {
                 appState.overlaySettings.overlayTokens = OverlayTokens(
                     displayName: displayName,
                     tagline: tagline,
-                    accentColorHex: "#007AFF",
-                    aspect: appState.overlaySettings.overlayAspect
+                    accentColorHex: "#007AFF"
                 )
             } else {
                 appState.overlaySettings.overlayTokens?.tagline = tagline

@@ -61,7 +61,8 @@ struct OverlaySettingsView: View {
                   var updatedSettings = appState.overlaySettings
                   updatedSettings.selectedPresetId = presetId
                   appState.updateOverlaySettings(updatedSettings)
-                }
+                },
+                appState: appState
               )
             }
             .padding()
@@ -244,8 +245,7 @@ struct OverlaySettingsView: View {
       let tokens = OverlayTokens(
         displayName: displayName.isEmpty ? NSUserName() : displayName,
         tagline: tagline.isEmpty ? nil : tagline,  // Always save tagline if not empty
-        accentColorHex: accentColorHex,
-        aspect: selectedAspect
+        accentColorHex: accentColorHex
       )
       appState.updateOverlayTokens(tokens)
     }

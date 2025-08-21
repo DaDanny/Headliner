@@ -6,23 +6,26 @@ enum NotificationName: String, CaseIterable {
   case stopStream
   case setCameraDevice
   case updateOverlaySettings
+  case overlayUpdated
   
   var rawValue: String {
     switch self {
     case .startStream:
-      return "\(Identifiers.appGroup).startStream"
+      return "\(Identifiers.notificationPrefix).startStream"
     case .stopStream:
-      return "\(Identifiers.appGroup).stopStream"
+      return "\(Identifiers.notificationPrefix).stopStream"
     case .setCameraDevice:
-      return "\(Identifiers.appGroup).setCameraDevice"
+      return "\(Identifiers.notificationPrefix).setCameraDevice"
     case .updateOverlaySettings:
-      return "\(Identifiers.appGroup).updateOverlaySettings"
+      return "\(Identifiers.notificationPrefix).updateOverlaySettings"
+    case .overlayUpdated:
+      return "\(Identifiers.notificationPrefix).overlayUpdated"
     }
   }
   
   // Required for CaseIterable when we override rawValue
   static var allCases: [NotificationName] {
-    [.startStream, .stopStream, .setCameraDevice, .updateOverlaySettings]
+    [.startStream, .stopStream, .setCameraDevice, .updateOverlaySettings, .overlayUpdated]
   }
   
   // Support for initialization from string (used in CameraExtension)
@@ -39,6 +42,18 @@ enum NotificationName: String, CaseIterable {
 
 final class NotificationManager {
   private static let logger = HeadlinerLogger.logger(for: .notifications)
+
+  class func postNotification(named notificationName: String) {
+    let completeNotificationName = Identifiers.appGroup + "." + notificationName
+    logger.debug("Posting notification \(completeNotificationName)")
+    CFNotificationCenterPostNotification(
+      CFNotificationCenterGetDarwinNotifyCenter(),
+      CFNotificationName(completeNotificationName as NSString),
+      nil,
+      nil,
+      true
+    )
+  }
 
   class func postNotification(named notificationName: NotificationName) {
     logger.debug("Posting notification \(notificationName.rawValue)")

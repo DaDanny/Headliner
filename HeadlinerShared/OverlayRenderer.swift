@@ -86,8 +86,7 @@ class OverlayPresetStore {
             return OverlayTokens(
                 displayName: NSUserName(),
                 tagline: nil,
-                accentColorHex: "#007AFF",
-                aspect: .widescreen
+                accentColorHex: "#007AFF"
             )
         }
         
@@ -98,8 +97,7 @@ class OverlayPresetStore {
             return OverlayTokens(
                 displayName: settings.userName.isEmpty ? NSUserName() : settings.userName,
                 tagline: nil,
-                accentColorHex: "#007AFF",
-                aspect: settings.overlayAspect
+                accentColorHex: "#007AFF"
             )
         }
     }
@@ -126,9 +124,6 @@ class OverlayPresetStore {
         userDefaults?.set(aspect.rawValue, forKey: Keys.overlayAspect)
         userDefaults?.synchronize()
         
-        // Also update tokens to keep in sync
-        var tokens = overlayTokens
-        tokens.aspect = aspect
-        saveTokens(tokens)
+        // Note: aspect is now a computed property in OverlayTokens, no need to set it
     }
 }
