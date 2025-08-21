@@ -33,6 +33,28 @@ Main App (SwiftUI Rendering) → SharedOverlayStore (App Group) → Camera Exten
 
 **Key Advantage**: Since SwiftUI rendering happens in the main app, we can easily add safe area calculations without touching the camera extension at all.
 
+## 🎯 Key Improvements
+
+### Expert Feedback Integration
+
+Based on expert review, the implementation includes these critical improvements:
+
+1. **Real Input Aspect Ratio**: Uses actual camera dimensions instead of hardcoded 4:3
+2. **Right-Sized Crop Sets**: Optimized platform crop arrays per mode (balanced uses 4 crops, not 5)
+3. **Future-Proof Calculator**: Parameterized output size (not hardcoded 1920×1080)
+4. **Face-Avoid Bands**: Smart positioning to avoid covering faces in center of frame
+5. **User-Friendly Labels**: "Tile-Safe" instead of "Balanced", "Expanded" instead of "Aggressive"
+6. **Debug Overlays**: Visual validation with yellow borders in debug mode
+7. **Robust Error Handling**: Graceful fallbacks for missing camera dimensions
+
+### Technical Benefits
+
+- **Adaptive to Camera Hardware**: Works with any camera aspect ratio (16:9, 4:3, etc.)
+- **Platform Agnostic**: Calculator accepts any output resolution
+- **Face-Aware Positioning**: Components can prefer top/bottom bands over center
+- **Visual Debugging**: Easy validation against AspectRatioTestV2 results
+- **User-Centric UI**: Layout terminology matches how users think about video calls
+
 ## 📋 Implementation Plan
 
 ### Phase 1: Core Safe Area System
@@ -47,11 +69,211 @@ enum SafeAreaMode: String, Codable, CaseIterable {
     case aggressive = "aggressive"   // Minimal safe area (more space, slight risk)
     case balanced = "balanced"       // Proven yellow zone (default)
     case conservative = "conservative" // Extra safe area (guaranteed visible)
+
+        var displayName: String {
+        switch self {
+        case .none: return "Full Frame"
+        case .aggressive: return "Expanded"
+        case .balanced: return "Tile-Safe (Recommended)"
+        case .conservative: return "Ultra-Safe"
+        }
+    }
+
+    var description: String {
+        switch self {
+        case .none: return "Use entire frame (may crop in grids)"
+        case .aggressive: return "More space, works in most video apps"
+        case .balanced: return "Guaranteed visible in Meet/Zoom tiles"
+        case .conservative: return "Maximum compatibility, all platforms"
+        }
+    }
 }
 
 struct SafeAreaCalculator {
-    static func calculateSafeArea(mode: SafeAreaMode = .balanced) -> CGRect
-    // Implementation uses proven logic from AspectRatioTestV2
+    // Platform crop aspects based on real-world testing
+    private static let commonPlatformCrops: [CGSize] = [
+        .init(width: 1, height: 1),   // Square tiles (most restrictive)
+        .init(width: 5, height: 4),   // 5:4-ish tiles
+        .init(width: 4, height: 3),   // 4:3 tiles
+        .init(width: 3, height: 2),   // 3:2 tiles
+        .init(width: 16, height: 9)   // Widescreen tiles
+    ]
+
+        static func calculateSafeArea(
+        mode: SafeAreaMode = .balanced,
+        inputAR: CGSize? = nil,
+        outputSize: CGSize = CGSize(width: 1920, height: 1080)
+    ) -> CGRect {
+        let actualInputAR = inputAR ?? CGSize(width: 4, height: 3)
+
+        switch mode {
+        case .none:
+            return CGRect(x: 0, y: 0, width: 1, height: 1)
+
+        case .aggressive:
+            return calculateWithPlatforms(
+                inputAR: actualInputAR,
+                platforms: [
+                    .init(width: 1, height: 1),    // Square tiles
+                    .init(width: 16, height: 9)    // Widescreen tiles
+                ],
+                titleSafeInset: 0.02,
+                outputSize: outputSize
+            )
+
+        case .balanced:
+            return calculateWithPlatforms(
+                inputAR: actualInputAR,
+                platforms: [
+                    .init(width: 1, height: 1),   // Square tiles
+                    .init(width: 4, height: 3),   // 4:3 tiles
+                    .init(width: 3, height: 2),   // 3:2 tiles
+                    .init(width: 16, height: 9)   // Widescreen tiles
+                ],
+                titleSafeInset: 0.04,
+                outputSize: outputSize
+            )
+
+        case .conservative:
+            return calculateWithPlatforms(
+                inputAR: actualInputAR,
+                platforms: [
+                    .init(width: 1, height: 1),   // Square tiles
+                    .init(width: 5, height: 4),   // 5:4 tiles
+                    .init(width: 4, height: 3),   // 4:3 tiles
+                    .init(width: 3, height: 2),   // 3:2 tiles
+                    .init(width: 16, height: 9),  // Widescreen tiles
+                    .init(width: 9, height: 16)   // Mobile portrait (rare but happens)
+                ],
+                titleSafeInset: 0.08,
+                outputSize: outputSize
+            )
+        }
+    }
+
+        private static func calculateWithPlatforms(
+        inputAR: CGSize,
+        platforms: [CGSize],
+        titleSafeInset: CGFloat,
+        outputSize: CGSize
+    ) -> CGRect {
+
+        // Step 1: Fit camera input into output canvas
+        let contentSafe = fitRect(content: inputAR, into: outputSize)
+
+        // Step 2: Calculate center crops for each platform
+        let cropRects = platforms.map { fitRectInRect(content: $0, inRect: contentSafe) }
+
+        // Step 3: Find intersection = always visible area
+        let platformSafe = intersectAll(cropRects)
+
+        // Step 4: Add title-safe padding
+        let paddedSafe = inset(platformSafe, pct: titleSafeInset)
+
+        // Step 5: Convert to normalized coordinates (0-1)
+        return CGRect(
+            x: paddedSafe.minX / outputSize.width,
+            y: paddedSafe.minY / outputSize.height,
+            width: paddedSafe.width / outputSize.width,
+            height: paddedSafe.height / outputSize.height
+        )
+    }
+
+    // MARK: - Helper Functions (copied from AspectRatioTestV2)
+
+    private static func fitRect(content: CGSize, into container: CGSize) -> CGRect {
+        let sx = container.width / max(content.width, 1)
+        let sy = container.height / max(content.height, 1)
+        let s = min(sx, sy)
+        let w = content.width * s
+        let h = content.height * s
+        let x = (container.width - w) * 0.5
+        let y = (container.height - h) * 0.5
+        return CGRect(x: x, y: y, width: w, height: h)
+    }
+
+    private static func fitRectInRect(content: CGSize, inRect r: CGRect) -> CGRect {
+        let sx = r.width / max(content.width, 1)
+        let sy = r.height / max(content.height, 1)
+        let s = min(sx, sy)
+        let w = content.width * s
+        let h = content.height * s
+        let x = r.minX + (r.width - w) * 0.5
+        let y = r.minY + (r.height - h) * 0.5
+        return CGRect(x: x, y: y, width: w, height: h)
+    }
+
+    private static func intersectAll(_ rects: [CGRect]) -> CGRect {
+        guard var acc = rects.first else { return .zero }
+        for r in rects.dropFirst() { acc = acc.intersection(r) }
+        return acc
+    }
+
+    private static func inset(_ r: CGRect, pct: CGFloat) -> CGRect {
+        let dx = r.width * pct
+        let dy = r.height * pct
+        return r.insetBy(dx: dx, dy: dy)
+    }
+}
+
+// MARK: - Face-Avoid Bands
+
+/// Safe bands that avoid the center where faces typically appear
+struct SafeBands {
+    let top: CGRect
+    let bottom: CGRect
+    let left: CGRect
+    let right: CGRect
+    let center: CGRect // Avoid this area for overlays
+}
+
+extension SafeAreaCalculator {
+    /// Create safe bands within a safe area that avoid covering faces
+    static func makeBands(
+        in safeArea: CGRect,
+        centerHeightPct: CGFloat = 0.40,
+        sideWidthPct: CGFloat = 0.22
+    ) -> SafeBands {
+        let ch = safeArea.height * max(0, min(1, centerHeightPct))
+        let sw = safeArea.width * max(0, min(1, sideWidthPct))
+
+        let center = CGRect(
+            x: safeArea.minX,
+            y: safeArea.midY - ch/2,
+            width: safeArea.width,
+            height: ch
+        )
+
+        let top = CGRect(
+            x: safeArea.minX,
+            y: safeArea.minY,
+            width: safeArea.width,
+            height: center.minY - safeArea.minY
+        )
+
+        let bottom = CGRect(
+            x: safeArea.minX,
+            y: center.maxY,
+            width: safeArea.width,
+            height: safeArea.maxY - center.maxY
+        )
+
+        let left = CGRect(
+            x: safeArea.minX,
+            y: safeArea.minY,
+            width: sw,
+            height: safeArea.height
+        )
+
+        let right = CGRect(
+            x: safeArea.maxX - sw,
+            y: safeArea.minY,
+            width: sw,
+            height: safeArea.height
+        )
+
+        return SafeBands(top: top, bottom: bottom, left: left, right: right, center: center)
+    }
 }
 ```
 
@@ -64,7 +286,57 @@ struct SafeAreaContainer<Content: View>: View {
     let mode: SafeAreaMode
     let content: Content
 
-    // Automatically constrains child content to safe area
+    init(mode: SafeAreaMode = .balanced, @ViewBuilder content: () -> Content) {
+        self.mode = mode
+        self.content = content()
+    }
+
+        var body: some View {
+        GeometryReader { geo in
+            let settings = getOverlaySettings()
+            let inputAR = settings.cameraDimensions.nonZeroAspect
+            let safeArea = SafeAreaCalculator.calculateSafeArea(
+                mode: mode,
+                inputAR: inputAR,
+                outputSize: geo.size
+            )
+            let safeFrame = CGRect(
+                x: safeArea.minX * geo.size.width,
+                y: safeArea.minY * geo.size.height,
+                width: safeArea.width * geo.size.width,
+                height: safeArea.height * geo.size.height
+            )
+
+            content
+                .frame(width: safeFrame.width, height: safeFrame.height)
+                .position(x: safeFrame.midX, y: safeFrame.midY)
+                .clipped()
+            #if DEBUG
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8)
+                        .stroke(.yellow.opacity(0.6), lineWidth: 1)
+                )
+            #endif
+        }
+    }
+}
+
+// Helper function to read overlay settings from UserDefaults
+func getOverlaySettings() -> OverlaySettings {
+    guard let userDefaults = UserDefaults(suiteName: Identifiers.appGroup),
+          let data = userDefaults.data(forKey: OverlayUserDefaultsKeys.overlaySettings),
+          let settings = try? JSONDecoder().decode(OverlaySettings.self, from: data) else {
+        return OverlaySettings() // Return default settings
+    }
+    return settings
+}
+
+// Helper extension to safely convert camera dimensions to aspect ratio
+extension CGSize {
+    var nonZeroAspect: CGSize? {
+        guard width > 0 && height > 0 else { return nil }
+        return self
+    }
 }
 ```
 
@@ -83,13 +355,34 @@ struct OverlaySettings: Codable {
 
 #### 2.1 Core Components
 
-**Directory**: `Headliner/Overlay/Components/`
+**Directory Structure**: `Headliner/Overlay/Components/`
 
-- `BottomBar.swift` - Professional name/tagline display
-- `WeatherTicker.swift` - Location and weather information
-- `TimeDisplay.swift` - Current time display
-- `LogoBadge.swift` - Company/brand logo display
-- `MetricChip.swift` - Key metrics or status indicators
+```
+Headliner/Overlay/Components/
+├── Bars/
+│   ├── BottomBar.swift           // Original clean design
+│   ├── BottomBarV2.swift         // With profile circle
+│   ├── BottomBarCompact.swift    // Minimal version
+│   └── BottomBarGlass.swift      // Glassmorphic effect
+├── Tickers/
+│   ├── WeatherTicker.swift       // Location and weather information
+│   ├── TimeTicker.swift          // Current time display
+│   └── MetricTicker.swift        // Live metrics (followers, views, etc.)
+├── Badges/
+│   ├── LogoBadge.swift           // Company/brand logo display
+│   ├── StatusBadge.swift         // Live/recording status indicators
+│   └── SocialBadge.swift         // Social media handles
+└── Utils/
+    ├── SafeAreaContainer.swift   // Safe area constraint container
+    └── TokenHelpers.swift        // Token processing utilities
+```
+
+**Core Component Examples**:
+
+- **Bottom Bars**: Professional name/tagline display with various styling options
+- **Tickers**: Weather, time, and metric information displays
+- **Badges**: Logo, status, and social media elements
+- **Utilities**: Safe area management and token processing
 
 #### 2.2 Component Design Principles
 
@@ -97,6 +390,36 @@ struct OverlaySettings: Codable {
 - **Token-driven content** (user name, colors, etc.)
 - **Responsive sizing** based on container
 - **Composable design** for mix-and-match usage
+
+#### 2.3 Rapid Component Development Workflow
+
+**Creating Component Variations**:
+
+```swift
+// Example: Bottom bar iterations
+BottomBar          // Original clean design
+BottomBarV2        // With profile circle + accent gradient
+BottomBarCompact   // Minimal version for subtle overlays
+BottomBarGlass     // Glassmorphic effect for modern look
+BottomBarNeon      // Cyberpunk/gaming style
+```
+
+**Mix & Match in Presets**:
+
+```swift
+Professional      = BottomBar + WeatherTicker
+ModernProfessional = BottomBarV2 + WeatherTicker
+Minimal           = BottomBarCompact only
+Corporate         = BottomBarGlass + LogoBadge + MetricTicker
+Gaming            = BottomBarNeon + MetricTicker + StatusBadge
+Creator           = BottomBarV2 + SocialBadge + MetricTicker
+```
+
+**Development Speed Comparison**:
+
+- **Traditional Approach**: ~2.5 hours per overlay (positioning, rendering, testing)
+- **Component Approach**: ~40 minutes per overlay (15min component + 25min preset)
+- **Component Reuse**: ~5 minutes per additional preset using existing components
 
 ### Phase 3: Enhanced Overlay Presets
 
@@ -130,10 +453,22 @@ struct Professional: OverlayViewProviding {
 
 #### 3.2 New Preset Variations
 
-- **Professional** - Full bottom bar with weather
-- **Minimal** - Name only
-- **Corporate** - Logo + name + metrics
-- **Creator** - Name + social handles + subscriber count
+**Core Presets** (using component combinations):
+
+- **Professional** - `BottomBar` + `WeatherTicker`
+- **Modern Professional** - `BottomBarV2` + `WeatherTicker` + `TimeTicker`
+- **Minimal** - `BottomBarCompact` only
+- **Corporate** - `BottomBarGlass` + `LogoBadge` + `MetricTicker`
+- **Personal** - `BottomBar` + `WeatherTicker` + `TimeTicker`
+- **Creator Mode** - `BottomBarV2` + `SocialBadge` + `MetricTicker` + `StatusBadge`
+- **Gaming** - `BottomBarNeon` + `MetricTicker` + `StatusBadge`
+
+**Layout Variations** (same components, different positioning):
+
+- **Bottom Focus** - All components in bottom safe area
+- **Distributed** - Components spread across top and bottom
+- **Corner Layout** - Components in safe area corners
+- **Center Stage** - Minimal components, maximum content focus
 
 ### Phase 4: User Interface Updates
 
@@ -143,10 +478,10 @@ Add to overlay settings panel:
 
 ```swift
 VStack(alignment: .leading, spacing: 12) {
-    Text("Safe Area")
+    Text("Layout")
         .font(.headline)
 
-    Picker("Safe Area Mode", selection: $safeAreaMode) {
+    Picker("Layout Mode", selection: $safeAreaMode) {
         ForEach(SafeAreaMode.allCases, id: \.self) { mode in
             Text(mode.displayName).tag(mode)
         }
@@ -156,6 +491,7 @@ VStack(alignment: .leading, spacing: 12) {
     Text(safeAreaMode.description)
         .font(.caption)
         .foregroundColor(.secondary)
+        .multilineTextAlignment(.leading)
 }
 ```
 
@@ -242,13 +578,48 @@ Update camera preview to show safe area boundaries when configuring overlays.
 
 ## 🧪 Testing Strategy
 
-1. **Use AspectRatioTestV2** to validate safe area calculations
-2. **Test across video platforms** (Meet, Zoom, Teams)
-3. **Verify all safe area modes** work as expected
-4. **Test component combinations** in different presets
-5. **Performance testing** with SwiftUI rendering pipeline
+### Critical Validation Steps
+
+1. **Validate Against AspectRatioTestV2 Results**
+
+   - Compare SafeAreaCalculator output with proven yellow zone from testing
+   - Ensure balanced mode matches the intersection area that remained visible across all screenshots
+   - Verify calculations produce same results as manual testing
+
+2. **Cross-Platform Testing**
+
+   - **Google Meet**: Gallery view, focus view, different participant counts
+   - **Zoom**: Gallery view, speaker view, breakout rooms
+   - **Teams**: Gallery view, together mode, spotlight
+   - **Other platforms**: Slack, Discord, WebEx for additional validation
+
+3. **Safe Area Mode Verification**
+
+   - **None**: Overlays use full 1920x1080 canvas
+   - **Aggressive**: Larger usable area than balanced, still protects against common crops
+   - **Balanced**: Matches AspectRatioTestV2 yellow zone exactly
+   - **Conservative**: Smaller area than balanced, maximum compatibility
+
+4. **Component Integration Testing**
+
+   - Test all component combinations in different safe area modes
+   - Verify components scale properly within safe areas
+   - Ensure consistent spacing and alignment
+
+5. **Performance Validation**
+   - 60fps rendering maintained with SafeAreaContainer
+   - No lag when switching between safe area modes
+   - SwiftUI rendering pipeline efficiency preserved
+
+### Reference Implementation Validation
+
+**Key Validation Point**: The `balanced` mode should produce a safe area that exactly matches the yellow zone from your AspectRatioTestV2 testing. If overlays positioned within this calculated safe area are not visible in your original Google Meet screenshots, the implementation needs adjustment.
+
+**Test Command**: Create a validation overlay that draws the calculated safe area boundaries and compare visually with AspectRatioTestV2 results.
 
 ## 📝 Success Criteria
+
+### Functional Requirements
 
 - [ ] All overlays remain visible in Google Meet gallery view
 - [ ] All overlays remain visible in Zoom gallery view
@@ -258,6 +629,45 @@ Update camera preview to show safe area boundaries when configuring overlays.
 - [ ] Legacy Core Graphics system removed
 - [ ] Performance remains smooth (60fps)
 
+### Implementation Validation Checklist
+
+#### SafeAreaCalculator
+
+- [ ] Balanced mode uses optimized platform crops: `[(1,1), (4,3), (3,2), (16,9)]` (4 crops, not 5)
+- [ ] Input aspect ratio reads from camera dimensions with 4:3 fallback
+- [ ] Title-safe insets: None=0%, Aggressive=2%, Balanced=4%, Conservative=8%
+- [ ] Output size parameterized (not hardcoded 1920×1080)
+- [ ] Face-avoid bands implemented with 40% center height, 22% side width
+- [ ] Helper functions copied exactly from AspectRatioTestV2
+
+#### SafeAreaContainer
+
+- [ ] Accepts SafeAreaMode parameter
+- [ ] Uses GeometryReader for responsive sizing
+- [ ] Reads camera dimensions from settings
+- [ ] Calculates safe frame from normalized coordinates
+- [ ] Centers content within safe area using `.position()`
+- [ ] Includes `.clipped()` to prevent content overflow
+- [ ] Debug overlay with yellow border in DEBUG builds
+
+#### Settings Integration
+
+- [ ] SafeAreaMode added to OverlaySettings with `.balanced` default
+- [ ] Settings read from App Group UserDefaults
+- [ ] Settings UI includes mode picker with descriptions
+- [ ] Mode changes immediately affect overlay rendering
+
+#### Component System
+
+- [ ] Organized directory structure (Bars/, Tickers/, Badges/, Utils/)
+- [ ] All components accept consistent token parameters
+- [ ] Components work within any safe area mode
+- [ ] Easy component swapping in presets (BottomBar → BottomBarV2)
+
+### Critical Validation
+
+**🎯 The balanced mode safe area must exactly match the yellow zone from AspectRatioTestV2 testing. If not, the calculation logic needs debugging.**
+
 ---
 
-This implementation plan ensures Headliner overlays work reliably across all major video conferencing platforms while maintaining the flexibility and performance of the existing SwiftUI rendering system.
+This comprehensive implementation plan ensures Headliner overlays work reliably across all major video conferencing platforms while maintaining the flexibility and performance of the existing SwiftUI rendering system. The detailed code examples and validation steps provide everything needed for accurate implementation.
