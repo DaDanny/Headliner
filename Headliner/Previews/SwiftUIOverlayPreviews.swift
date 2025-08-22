@@ -168,6 +168,17 @@ struct ModernProfessional_Previews: PreviewProvider {
     }
 }
 
+struct ModernPersonal_Previews: PreviewProvider {
+    static var previews: some View {
+        ModernPersonal()
+            .makeView(tokens: .previewDanny)
+            .previewLayout(.fixed(width: ModernPersonal.defaultSize.width,
+                                  height: ModernPersonal.defaultSize.height))
+            .background(Color.black)
+            .previewDisplayName("Modern Personal")
+    }
+}
+
 struct CreatorMode_Previews: PreviewProvider {
     static var previews: some View {
         // Enhanced preview tokens with social media handles

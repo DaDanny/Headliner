@@ -39,7 +39,8 @@ class AppState: ObservableObject {
   @Published var isShowingOverlaySettings: Bool = false
   /// Currently selected overlay template ID
   @Published var selectedTemplateId: String = "professional"
-
+  /// Theme manager for overlay styling
+  @Published var themeManager = ThemeManager()
 
   /// Current location authorization status
   @Published var locationAuthorizationStatus: CLAuthorizationStatus = .notDetermined

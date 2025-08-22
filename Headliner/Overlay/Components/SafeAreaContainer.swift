@@ -37,12 +37,8 @@ struct SafeAreaContainer<Content: View>: View {
                 .frame(width: safeFrame.width, height: safeFrame.height)
                 .position(x: safeFrame.midX, y: safeFrame.midY)
                 .clipped()
-            #if DEBUG
-                .overlay(
-                    RoundedRectangle(cornerRadius: 8)
-                        .stroke(.yellow.opacity(0.6), lineWidth: 1)
-                )
-            #endif
+                .environment(\.overlayRenderSize, safeFrame.size)
+            
         }
     }
 }

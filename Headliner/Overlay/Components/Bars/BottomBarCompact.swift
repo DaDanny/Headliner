@@ -13,6 +13,8 @@ struct BottomBarCompact: View {
     let tagline: String?
     let accentColor: Color
     
+    @Environment(\.theme) private var theme
+
     init(displayName: String, tagline: String? = nil, accentColor: Color = .green) {
         self.displayName = displayName
         self.tagline = tagline
@@ -63,5 +65,6 @@ struct BottomBarCompact: View {
     )
     .padding()
     .background(.black)
+    .environment(\.theme, .classic)
 }
 #endif

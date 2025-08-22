@@ -18,12 +18,12 @@ struct HeadlinerApp: App {
         outputImageManager: OutputImageManager()
       )
       .frame(minWidth: 1280, maxWidth: 1360, minHeight: 900, maxHeight: 940)
-      .onAppear {
-        #if DEBUG
-        // DEV only: always ask to activate the bundled extension (no-op if same build)
-        mgr.activateLatest()
-        #endif
-      }
+//      .onAppear {
+//        #if DEBUG
+//        // DEV only: always ask to activate the bundled extension (no-op if same build)
+//        mgr.activateLatest()
+//        #endif
+//      }
     }
   }
 }

@@ -178,7 +178,14 @@ public enum SwiftUIPresetRegistry {
             description: "Live safe area testing with actual camera dimensions and selected mode",
             category: .standard,
             provider: SafeAreaLive()
-        )
+        ),
+        SwiftUIPresetInfo(
+            id: "swiftui.modern.personal",
+            name: "Modern Personal",
+            description: "Modern Personal",
+            category: .standard,
+            provider: ModernPersonal()
+        ),
         
         // Add new presets here! 🎨
         // Just create a new SwiftUIPresetInfo with your OverlayViewProviding implementation

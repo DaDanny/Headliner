@@ -90,7 +90,7 @@ public extension OverlayTokens {
         accentColorHex: "#118342",
         localTime: "8:04 PM",
         logoText: "BONUSLY",
-        extras: ["location":"Pittsburgh, PA"]
+        extras: ["location":"Pittsburgh, PA", "weatherEmoji": "☁️", "weatherText": "Cloudy"]
     )
 }
 
