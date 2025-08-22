@@ -33,6 +33,9 @@ SwiftUI Overlay Pipeline:
 - **`OverlayRenderBroker.swift`**: Publishes rendered overlays to App Group
 - **`SharedOverlayStore.swift`**: App Group storage for pre-rendered overlays
 - **`OverlayViewProviding.swift`**: Protocol for SwiftUI overlay implementations
+- **`Theme/Theme.swift`**: Core theme system with colors, typography, and effects
+- **`Theme/ThemeManager.swift`**: Theme selection and environment integration
+- **`Theme/BuiltInThemes.swift`**: Classic Glass and Midnight Pro themes
 
 ## Creating a New Overlay
 
@@ -44,29 +47,29 @@ import SwiftUI
 struct MyAwesomeOverlay: OverlayViewProviding {
     static let presetId = "swiftui.category.myawesome"
     static let defaultSize = CGSize(width: 1280, height: 720)
-    
+
     func makeView(tokens: OverlayTokens) -> some View {
         ZStack {
             // Your overlay design here
             VStack {
                 Spacer()
-                
+
                 HStack {
                     VStack(alignment: .leading, spacing: 8) {
                         Text(tokens.displayName)
                             .font(.system(size: 28, weight: .bold, design: .rounded))
                             .foregroundStyle(.white)
                             .shadow(color: .black.opacity(0.5), radius: 2)
-                        
+
                         if let tagline = tokens.tagline, !tagline.isEmpty {
                             Text(tagline)
                                 .font(.system(size: 16, weight: .medium))
                                 .foregroundStyle(.white.opacity(0.9))
                         }
                     }
-                    
+
                     Spacer()
-                    
+
                     // Optional: Add time, weather, etc.
                     if let time = tokens.localTime {
                         Text(time)
@@ -102,6 +105,7 @@ SwiftUIPresetInfo(
 ### Step 3: That's It!
 
 Your overlay will automatically:
+
 - ✅ Appear in the preset selection UI with live preview
 - ✅ Be available for real-time video rendering
 - ✅ Support all dynamic tokens (name, tagline, time, weather, etc.)
@@ -120,15 +124,32 @@ struct OverlayTokens {
     let city: String?            // User's city
     let weatherText: String?     // Weather description
     let weatherEmoji: String?    // Weather emoji (☀️, ⛅, etc.)
+    let logoText: String?        // Company/brand logo text
+    let extras: [String: String] // Additional custom data
 }
 ```
 
 Usage in SwiftUI:
+
 ```swift
 Text(tokens.displayName)
 Text(tokens.tagline ?? "")
 Color(hex: tokens.accentColorHex) ?? .blue
 Text(tokens.localTime ?? "")
+Text(tokens.logoText ?? "")
+```
+
+## Theme Integration
+
+The theme system automatically provides consistent styling:
+
+```swift
+@Environment(\.theme) private var theme
+@Environment(\.overlayRenderSize) private var renderSize
+
+Text(tokens.displayName)
+    .font(theme.typography.titleFont(for: renderSize))
+    .foregroundStyle(theme.colors.textPrimary)
 ```
 
 ## Design Guidelines
@@ -150,28 +171,43 @@ Text(tokens.localTime ?? "")
 
 ### Example Patterns
 
-#### Glass Lower Third
+#### Modern Theme-Aware Lower Third
+
 ```swift
-VStack {
-    Spacer()
-    HStack {
-        VStack(alignment: .leading) {
-            Text(tokens.displayName)
-                .font(.headline)
-                .foregroundStyle(.white)
-            Text(tokens.tagline ?? "")
-                .font(.subheadline)
-                .foregroundStyle(.white.opacity(0.8))
+func makeView(tokens: OverlayTokens) -> some View {
+    OverlayScaleReader { theme, s in
+        let e = theme.effects
+
+        return VStack {
+            Spacer()
+            HStack {
+                VStack(alignment: .leading, spacing: e.insetSmall) {
+                    Text(tokens.displayName)
+                        .font(theme.typography.titleFont(for: renderSize))
+                        .foregroundStyle(theme.colors.textPrimary)
+                    if let tagline = tokens.tagline, !tagline.isEmpty {
+                        Text(tagline)
+                            .font(theme.typography.bodyFont(for: renderSize))
+                            .foregroundStyle(theme.colors.textSecondary)
+                    }
+                }
+                Spacer()
+            }
+            .padding(e.insetMedium)
+            .background(
+                RoundedRectangle(cornerRadius: e.cornerRadius)
+                    .fill(theme.colors.surface)
+                    .stroke(theme.colors.surfaceStroke, lineWidth: e.strokeWidth)
+            )
+            .padding(.horizontal, e.insetLarge)
+            .padding(.bottom, e.insetMedium)
         }
-        Spacer()
     }
-    .padding()
-    .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12))
-    .padding()
 }
 ```
 
 #### Corner Badge
+
 ```swift
 VStack {
     HStack {
@@ -190,6 +226,7 @@ VStack {
 ```
 
 #### Full Width Banner
+
 ```swift
 VStack {
     HStack {
@@ -212,7 +249,7 @@ VStack {
 Organize your overlays by category for better UX:
 
 - **`.standard`**: Professional lower thirds and standard layouts
-- **`.branded`**: Company branding with logos and brand colors  
+- **`.branded`**: Company branding with logos and brand colors
 - **`.creative`**: Artistic designs with animations and unique layouts
 - **`.minimal`**: Clean, subtle designs with minimal visual impact
 
@@ -237,7 +274,7 @@ Add SwiftUI previews to your overlay files for faster iteration:
         tagline: "Senior Developer",
         accentColorHex: "#007AFF"
     )
-    
+
     MyAwesomeOverlay()
         .makeView(tokens: tokens)
         .frame(width: 400, height: 300)
@@ -254,7 +291,7 @@ private let logger = HeadlinerLogger.logger(for: .overlays)
 
 func makeView(tokens: OverlayTokens) -> some View {
     logger.debug("Rendering overlay with tokens: \(tokens.displayName)")
-    
+
     return VStack {
         // Your view
     }
@@ -266,17 +303,19 @@ func makeView(tokens: OverlayTokens) -> some View {
 If you're migrating from the old CoreGraphics system:
 
 ### Before (CoreGraphics)
+
 ```swift
 .text(TextNode(
     text: "{displayName}",
     fontSize: 0.05,
-    fontWeight: "bold", 
+    fontWeight: "bold",
     colorHex: "#FFFFFF",
     alignment: "left"
 ))
 ```
 
 ### After (SwiftUI)
+
 ```swift
 Text(tokens.displayName)
     .font(.system(size: 32, weight: .bold))  // 0.05 * 720 ≈ 36pt
@@ -289,9 +328,10 @@ Text(tokens.displayName)
 - [ ] Convert text nodes to SwiftUI Text views
 - [ ] Convert rect nodes to SwiftUI shapes/backgrounds
 - [ ] Replace positioning (NRect) with SwiftUI layout (VStack, HStack, etc.)
-- [ ] Update colors from hex strings to SwiftUI Color
+- [ ] Update colors from hex strings to theme system
 - [ ] Replace manual token interpolation with direct token usage
-- [ ] Test with live previews
+- [ ] Integrate with theme system using `OverlayScaleReader`
+- [ ] Test with live previews and different themes
 
 ## Advanced Features
 
@@ -319,12 +359,12 @@ var body: some View {
 func makeView(tokens: OverlayTokens) -> some View {
     VStack {
         Text(tokens.displayName)
-        
+
         // Only show tagline if it exists
         if let tagline = tokens.tagline, !tagline.isEmpty {
             Text(tagline)
         }
-        
+
         // Show weather if available
         if let weather = tokens.weatherEmoji {
             HStack {
@@ -341,11 +381,11 @@ func makeView(tokens: OverlayTokens) -> some View {
 ```swift
 func makeView(tokens: OverlayTokens) -> some View {
     let accentColor = Color(hex: tokens.accentColorHex) ?? .blue
-    
+
     return VStack {
         Text(tokens.displayName)
             .foregroundStyle(.white)
-        
+
         Rectangle()
             .fill(accentColor)
             .frame(height: 4)
@@ -365,6 +405,7 @@ func makeView(tokens: OverlayTokens) -> some View {
 ### Debug Logging
 
 Enable overlay system debug logging:
+
 ```swift
 let logger = HeadlinerLogger.logger(for: .overlays)
 logger.debug("My debug message")
@@ -373,6 +414,7 @@ logger.debug("My debug message")
 ### Cache Issues
 
 If overlays seem stale, the cache might need clearing:
+
 - Cache expires automatically after 30 seconds
 - Different tokens create different cache keys
 - Restart the app to clear all caches
@@ -382,8 +424,48 @@ If overlays seem stale, the cache might need clearing:
 ## Examples Repository
 
 Check out the existing SwiftUI overlays for inspiration:
-- `StandardLowerThird.swift` - Professional lower third
-- `BrandRibbon.swift` - Company branding overlay
-- `MetricChipBar.swift` - Dynamic metrics display
+
+- `ModernPersonal.swift` - Modern personal overlay with weather and bottom bar
+- `SafeAreaValidation.swift` - Safe area testing and validation
+- `AspectRatioTest.swift` - Aspect ratio testing and validation
+
+## Theme System Integration
+
+The overlay system now includes a comprehensive theme system with:
+
+### Available Themes
+
+- **Classic Glass**: Warm gold accents with glassmorphic effects
+- **Midnight Pro**: Cool blue accents with modern styling
+- **Dawn**: Coming soon
+
+### Using Themes in Overlays
+
+```swift
+func makeView(tokens: OverlayTokens) -> some View {
+    OverlayScaleReader { theme, s in
+        let e = theme.effects
+
+        return VStack {
+            Text(tokens.displayName)
+                .font(theme.typography.titleFont(for: renderSize))
+                .foregroundStyle(theme.colors.textPrimary)
+                .padding(e.insetMedium)
+                .background(
+                    RoundedRectangle(cornerRadius: e.cornerRadius)
+                        .fill(theme.colors.surface)
+                        .stroke(theme.colors.surfaceStroke, lineWidth: e.strokeWidth)
+                )
+        }
+    }
+}
+```
+
+### Theme-Aware Components
+
+- `BottomBarModern` - Modern bottom bar with theme support
+- `SimpleWeatherTicker` - Weather display with theme integration
+- `CompanyLogoBadgeModern` - Company branding with theme colors
+- `LocalTimeBadgeModern` - Time display with theme styling
 
 Happy overlay building! 🎨

@@ -9,11 +9,12 @@ Headliner is a modern virtual camera application for macOS that adds professiona
 ✨ **Real-time Video Streaming**: Low-latency camera pipeline with real-time preview
 🎥 **Full HD Quality**: Stream in 1080p @ 60 FPS to any compatible application  
 🔄 **Multiple Camera Sources**: Support for built-in cameras, external webcams, and Continuity Camera
-📝 **SwiftUI Overlays**: Modern, real-time SwiftUI overlays with live rendering and App Group sync
-🎨 **Modern UI**: Beautiful SwiftUI interface with animated backgrounds and glassmorphic design
+📝 **SwiftUI Overlays**: Modern, real-time SwiftUI overlays with theme system and live rendering
+🎨 **Theme System**: Choose between Classic Glass and Midnight Pro themes with consistent styling
 🛠 **Guided Onboarding**: Step-by-step setup process with automatic system extension installation
 📍 **Location & Weather**: Real-time city and weather data in overlays (optional)
 ⚡ **Auto-save Settings**: Modern UX with automatic preference persistence
+🔧 **Safe Area Support**: Intelligent overlay positioning for different video platforms
 
 ## System Requirements
 
@@ -54,20 +55,22 @@ The onboarding only appears when the system extension isn't installed. Once inst
 
 ### Available Overlay Presets
 
-- **Professional**: Lower third with name and tagline at bottom of screen
-- **Personal**: Info pill with location/time/weather at top-left
-- **Clean**: No overlays - just your camera feed
-- **Creative**: Coming soon - advanced overlay options
+- **Modern Personal**: Modern overlay with weather ticker and bottom bar
+- **Safe Area Testing**: Validation tools for overlay positioning
+- **Aspect Ratio Testing**: Tools for testing different video formats
+- **Theme Support**: Choose between Classic Glass and Midnight Pro themes
 
 ### Controls
 
 - **Start/Stop Camera**: Control the virtual camera streaming
 - **Camera Selection**: Choose from available camera devices with native dropdown UI
 - **Preset Selection**: Switch between overlay presets with visual preview cards
+- **Theme Selection**: Choose between Classic Glass and Midnight Pro themes
 - **Display Name**: Set your name for overlays (auto-saves as you type)
 - **Tagline**: Add optional title or description (auto-saves as you type)
 - **Real-time Preview**: See your camera feed with overlays before going live
 - **Location Services**: Optional city and weather data in overlays
+- **Safe Area Mode**: Choose overlay positioning strategy for different platforms
 
 ## Architecture & Technical Details
 
@@ -75,11 +78,15 @@ For detailed information about the camera extension architecture, overlay system
 
 📖 **[Camera Extension & Overlay System Documentation](docs/CAMERA_EXTENSION_AND_OVERLAYS.md)**
 
-This comprehensive guide covers:
+📖 **[SwiftUI Overlay System Documentation](docs/SWIFTUI_OVERLAY_SYSTEM.md)**
+
+📖 **[Theme System Implementation Plan](docs/THEME_IMPLEMENTATION_PLAN.md)**
+
+These comprehensive guides cover:
 
 - System architecture and components
 - How the overlay system works
-- Creating and customizing overlays
+- Creating and customizing overlays with themes
 - Technical implementation details
 - Performance optimizations
 - Troubleshooting guide
