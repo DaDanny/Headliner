@@ -101,6 +101,24 @@ final class CameraOverlayRenderer: OverlayRenderer {
     
     /// Image cache to avoid repeated disk reads
     private var imageCache: [String: CGImage] = [:]
+    
+    /// Cached SwiftUI overlay to avoid repeated file system access
+    private var cachedSwiftUIOverlay: CGImage?
+    
+    /// Timestamp of last SwiftUI overlay cache update
+    private var lastSwiftUIOverlayUpdate: TimeInterval = 0
+    
+    /// SwiftUI overlay cache refresh interval (30fps = ~0.033s)
+    private let swiftUIOverlayCacheInterval: TimeInterval = 0.1
+    
+    /// Cached scaled SwiftUI overlay to avoid repeated transformations
+    private var cachedScaledSwiftUIOverlay: CIImage?
+    
+    /// Size used for cached scaled overlay
+    private var cachedOverlaySize: CGSize = .zero
+    
+    /// Previous SwiftUI overlay for crossfade transitions
+    private var previousSwiftUIOverlay: CIImage?
 
     // MARK: - Initialization
     
@@ -149,24 +167,62 @@ final class CameraOverlayRenderer: OverlayRenderer {
                 tokens: OverlayTokens,
                 previousFrame: CIImage?) -> CIImage {
         return renderQueue.sync {
-            return autoreleasepool {
+            return autoreleasepool { () -> CIImage in
                 let base = CIImage(cvPixelBuffer: pixelBuffer, options: [.colorSpace: colorSpace])
                 
-                // TESTING: Check for pre-rendered SwiftUI overlay first
-                if let overlayCG = SharedOverlayStore.readOverlay() {
-                    let overlayCI = CIImage(cgImage: overlayCG)
-                    logger.info("🎯 [SharedOverlay] Base size: \(Int(base.extent.width))x\(Int(base.extent.height)), Overlay size: \(overlayCG.width)x\(overlayCG.height)")
+                // Check for pre-rendered SwiftUI overlay first (optimized with caching)
+                if let overlayCG = getCachedSwiftUIOverlay() {
+                    let baseSize = base.extent.size
+                    logger.info("📐 [SwiftUIOverlay] Actual stream: \(Int(baseSize.width))x\(Int(baseSize.height)), Overlay: \(overlayCG.width)x\(overlayCG.height)")
                     
-                    // Scale overlay to match base dimensions instead of cropping
+                    // Fast path: reuse cached scaled overlay if size hasn't changed
+                    if let cached = cachedScaledSwiftUIOverlay,
+                       cachedOverlaySize == baseSize {
+                        return cached.cropped(to: base.extent).composited(over: base)
+                    }
+                    
+                    // Need to scale: create CIImage and transform
+                    let overlayCI = CIImage(cgImage: overlayCG)
                     let scaledOverlay = overlayCI.transformed(by: CGAffineTransform(
-                        scaleX: base.extent.width / overlayCI.extent.width,
-                        y: base.extent.height / overlayCI.extent.height
+                        scaleX: baseSize.width / overlayCI.extent.width,
+                        y: baseSize.height / overlayCI.extent.height
                     ))
                     
-                    logger.info("✅ [SharedOverlay] Using pre-rendered SwiftUI overlay from App Group")
-                    return scaledOverlay.composited(over: base)
-                } else {
-                    logger.info("⚠️ [SharedOverlay] No pre-rendered overlay available, falling back to Core Graphics")
+                    // Check for crossfade transition
+                    if let prev = previousSwiftUIOverlay,
+                       let start = crossfadeStart,
+                       prev.extent.size != scaledOverlay.extent.size {
+                        let elapsed = CACurrentMediaTime() - start
+                        if elapsed < crossfadeDuration {
+                            let t = min(elapsed / crossfadeDuration, 1.0)
+                            dissolve.setValue(prev, forKey: kCIInputImageKey)
+                            dissolve.setValue(scaledOverlay, forKey: kCIInputTargetImageKey)
+                            dissolve.setValue(t, forKey: kCIInputTimeKey)
+                            if let blended = dissolve.outputImage {
+                                if t >= 1.0 {
+                                    crossfadeStart = nil
+                                    // Cache the final scaled overlay
+                                    cachedScaledSwiftUIOverlay = scaledOverlay
+                                    cachedOverlaySize = baseSize
+                                }
+                                previousSwiftUIOverlay = scaledOverlay
+                                return blended.cropped(to: base.extent).composited(over: base)
+                            }
+                        } else {
+                            crossfadeStart = nil
+                        }
+                    } else if previousSwiftUIOverlay?.extent.size != scaledOverlay.extent.size {
+                        // Trigger crossfade for size changes
+                        crossfadeStart = CACurrentMediaTime()
+                        previousSwiftUIOverlay = cachedScaledSwiftUIOverlay
+                    }
+                    
+                    // Cache the scaled overlay for future frames
+                    cachedScaledSwiftUIOverlay = scaledOverlay
+                    cachedOverlaySize = baseSize
+                    previousSwiftUIOverlay = scaledOverlay
+                    
+                    return scaledOverlay.cropped(to: base.extent).composited(over: base)
                 }
                 
                 guard !preset.nodes.isEmpty else { return base }
@@ -250,6 +306,9 @@ final class CameraOverlayRenderer: OverlayRenderer {
     /// Notify renderer that aspect ratio is changing
     func notifyAspectChanged() {
         crossfadeStart = CACurrentMediaTime()
+        // Invalidate scaled SwiftUI overlay cache since aspect changed
+        cachedScaledSwiftUIOverlay = nil
+        cachedOverlaySize = .zero
     }
     
     // MARK: - Private Methods
@@ -273,10 +332,48 @@ final class CameraOverlayRenderer: OverlayRenderer {
         return cachedPersonalInfo
     }
     
+    /// Get cached SwiftUI overlay, refreshing if needed
+    private func getCachedSwiftUIOverlay() -> CGImage? {
+        let now = CACurrentMediaTime()
+        
+        // Check if cache is still valid
+        if let cached = cachedSwiftUIOverlay,
+           now - lastSwiftUIOverlayUpdate < swiftUIOverlayCacheInterval {
+            return cached
+        }
+        
+        // Cache is stale or empty, refresh it
+        let previousOverlayCG = cachedSwiftUIOverlay
+        cachedSwiftUIOverlay = SharedOverlayStore.readOverlay()
+        lastSwiftUIOverlayUpdate = now
+        
+        // If overlay changed, invalidate scaled cache and trigger crossfade
+        if let prev = previousOverlayCG, let new = cachedSwiftUIOverlay,
+           prev.width != new.width || prev.height != new.height ||
+           prev.dataProvider !== new.dataProvider {
+            cachedScaledSwiftUIOverlay = nil
+            cachedOverlaySize = .zero
+            crossfadeStart = CACurrentMediaTime()
+        }
+        
+        return cachedSwiftUIOverlay
+    }
+    
     /// Force refresh the personal info cache (call when data changes)
     func refreshPersonalInfoCache() {
         cachedPersonalInfo = personalInfoReader.readPersonalInfo()
         lastPersonalInfoUpdate = CACurrentMediaTime()
+    }
+    
+    /// Force refresh the SwiftUI overlay cache (call when overlay changes)
+    func refreshSwiftUIOverlayCache() {
+        cachedSwiftUIOverlay = SharedOverlayStore.readOverlay()
+        lastSwiftUIOverlayUpdate = CACurrentMediaTime()
+        // Invalidate scaled overlay cache since source changed
+        cachedScaledSwiftUIOverlay = nil
+        cachedOverlaySize = .zero
+        // Trigger crossfade for smooth transition
+        crossfadeStart = CACurrentMediaTime()
     }
     
     /// Clear all caches (call when memory pressure or app backgrounding)
@@ -287,6 +384,11 @@ final class CameraOverlayRenderer: OverlayRenderer {
         fontCache.removeAll()
         colorCache.removeAll()
         imageCache.removeAll()
+        cachedSwiftUIOverlay = nil
+        cachedPersonalInfo = nil
+        cachedScaledSwiftUIOverlay = nil
+        cachedOverlaySize = .zero
+        previousSwiftUIOverlay = nil
     }
     
     /// Get cached font, creating if needed

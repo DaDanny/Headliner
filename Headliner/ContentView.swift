@@ -53,6 +53,8 @@ extension ContentView: View {
       }
     }
     .animation(.easeInOut(duration: 0.3), value: appState.extensionStatus.isInstalled)
+    .environmentObject(appState.themeManager)
+    .environment(\.theme, appState.themeManager.current)
   }
 }
 

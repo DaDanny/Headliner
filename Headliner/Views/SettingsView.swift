@@ -71,6 +71,15 @@ struct SettingsView: View {
                         )
                         .padding(.horizontal, 20)
                     
+                    // Theme Selection Section
+                    ThemePickerView()
+                        .background(
+                            RoundedRectangle(cornerRadius: 10)
+                                .fill(Color(NSColor.controlBackgroundColor))
+                                .shadow(color: Color.black.opacity(0.05), radius: 2, x: 0, y: 1)
+                        )
+                        .padding(.horizontal, 20)
+                    
                     // Future settings sections can go here
                     
                     Spacer(minLength: 20)

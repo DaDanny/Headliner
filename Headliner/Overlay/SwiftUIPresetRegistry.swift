@@ -39,19 +39,19 @@ public enum SwiftUIPresetCategory: String, CaseIterable {
     
     var icon: String {
         switch self {
-        case .standard: return "text.below.photo"
-        case .branded: return "building.2.fill"
-        case .creative: return "paintbrush.fill" 
-        case .minimal: return "minus"
+            case .standard: return "text.below.photo"
+            case .branded: return "building.2.fill"
+            case .creative: return "paintbrush.fill"
+            case .minimal: return "minus"
         }
     }
     
     var color: Color {
         switch self {
-        case .standard: return .blue
-        case .branded: return .green
-        case .creative: return .purple
-        case .minimal: return .gray
+            case .standard: return .blue
+            case .branded: return .green
+            case .creative: return .purple
+            case .minimal: return .gray
         }
     }
 }
@@ -62,31 +62,76 @@ public enum SwiftUIPresetRegistry {
     /// All available SwiftUI presets
     public static let allPresets: [SwiftUIPresetInfo] = [
         // Standard Category
-        SwiftUIPresetInfo(
-            id: "swiftui.standard.lowerthird",
-            name: "Standard Lower Third",
-            description: "Clean professional lower third with glassmorphic styling",
-            category: .standard,
-            provider: StandardLowerThird()
-        ),
+        // (Standard Lower Third removed - outdated component)
         
         // Branded Category  
-        SwiftUIPresetInfo(
-            id: "swiftui.branded.ribbon",
-            name: "Brand Ribbon",
-            description: "Company branding with accent ribbon and logo placement",
-            category: .branded,
-            provider: BrandRibbon()
-        ),
+        // (Brand Ribbon removed - outdated component)
         
         // Creative Category
+        // (Metric Chip Bar removed - outdated component)
+        
+        // Neo Lower Third
+        // (Neo Lower Third removed - outdated component)
+        
+        // Company Cropped - Optimized for 4:3 presentations
+        // (Company Cropped removed - outdated component)
+        
+        // (Company Cropped V2 removed - outdated component)
+        
         SwiftUIPresetInfo(
-            id: "swiftui.creative.metrics",
-            name: "Metric Chip Bar",
-            description: "Dynamic metrics display with animated chips",
-            category: .creative,
-            provider: MetricChipBar()
-        )
+            id: "swiftui.aspectratio.test",
+            name: "Aspect Ratio Test",
+            description: "Aspect Ratio Test",
+            category: .branded,
+            provider: AspectRatioTest()
+        ),
+        
+        SwiftUIPresetInfo(
+            id: "swiftui.aspectratio.test-v2",
+            name: "Aspect Ratio Test V2",
+            description: "Aspect Ratio Test V2",
+            category: .branded,
+            provider: AspectRatioTestV2()
+        ),
+        
+        // Safe Area Component-Based Presets
+        // (Professional removed - uses outdated components)
+        
+        // (Modern Professional removed - uses outdated components)
+        
+        // (Creator Mode removed - uses outdated components)
+        
+        // Validation and Testing
+        SwiftUIPresetInfo(
+            id: "swiftui.safearea.validation",
+            name: "Safe Area Validation",
+            description: "Validation overlay showing safe area boundaries vs AspectRatioTestV2",
+            category: .standard,
+            provider: SafeAreaValidation()
+        ),
+        
+        SwiftUIPresetInfo(
+            id: "swiftui.safearea.test",
+            name: "Safe Area Test",
+            description: "Simple test showing SafeAreaCalculator result vs AspectRatioTestV2",
+            category: .standard,
+            provider: SafeAreaTest()
+        ),
+        
+        SwiftUIPresetInfo(
+            id: "swiftui.safearea.live",
+            name: "Safe Area Live",
+            description: "Live safe area testing with actual camera dimensions and selected mode",
+            category: .standard,
+            provider: SafeAreaLive()
+        ),
+        SwiftUIPresetInfo(
+            id: "swiftui.modern.personal",
+            name: "Modern Personal",
+            description: "Modern Personal",
+            category: .standard,
+            provider: ModernPersonal()
+        ),
         
         // Add new presets here! 🎨
         // Just create a new SwiftUIPresetInfo with your OverlayViewProviding implementation

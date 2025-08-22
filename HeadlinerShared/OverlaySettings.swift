@@ -25,6 +25,9 @@ struct OverlaySettings: Codable {
   
   // Camera dimensions (cached from extension)
   var cameraDimensions: CGSize = CGSize(width: 1920, height: 1080)
+  
+  // Safe area system
+  var safeAreaMode: SafeAreaMode = .balanced
 }
 
 enum OverlayPosition: String, Codable, CaseIterable {

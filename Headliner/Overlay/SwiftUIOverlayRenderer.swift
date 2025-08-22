@@ -8,6 +8,9 @@
 import SwiftUI
 import CoreImage
 import CoreGraphics
+import Foundation
+
+
 
 /// Render SwiftUI overlays into CGImages with correct sizing, transparency, and caching.
 /// NOTE: ImageRenderer requires main-thread. We isolate main-thread work and keep the API async.
@@ -60,13 +63,14 @@ public final class SwiftUIOverlayRenderer {
     }
 
     /// Stable cache key composition
-    private func cacheKey(tokens: OverlayTokens, size: CGSize, scale: CGFloat, presetId: String) -> NSString {
+    private func cacheKey(tokens: OverlayTokens, size: CGSize, scale: CGFloat, presetId: String, renderTokens: RenderTokens) -> NSString {
         var hasher = Hasher()
         hasher.combine(tokens)
         hasher.combine(Int(size.width))
         hasher.combine(Int(size.height))
         hasher.combine(Int(scale * 1000))
         hasher.combine(presetId)
+        hasher.combine(renderTokens) // Include all render configuration in cache key!
         return NSString(string: String(hasher.finalize()))
     }
 
@@ -75,9 +79,30 @@ public final class SwiftUIOverlayRenderer {
         provider: P,
         tokens: OverlayTokens,
         size: CGSize,
-        scale: CGFloat = 1.0  // Use 1.0 for runtime (size already in pixels), 2.0 for previews
+        scale: CGFloat = 1.0,  // Use 1.0 for runtime (size already in pixels), 2.0 for previews
+        renderTokens: RenderTokens,
+        personalInfo: PersonalInfo? = nil
     ) async -> CGImage? {
-        let key = cacheKey(tokens: tokens, size: size, scale: scale, presetId: P.presetId)
+        // Enrich tokens with PersonalInfo data if provided
+        var enrichedTokens = tokens
+        if let personalInfo = personalInfo {
+            // Merge personal info into extras dictionary
+            var extras = enrichedTokens.extras ?? [:]
+            extras["location"] = extras["location"] ?? personalInfo.city
+            extras["weatherEmoji"] = extras["weatherEmoji"] ?? personalInfo.weatherEmoji
+            extras["weatherText"] = extras["weatherText"] ?? personalInfo.weatherText
+            
+            enrichedTokens = OverlayTokens(
+                displayName: enrichedTokens.displayName,
+                tagline: enrichedTokens.tagline,
+                accentColorHex: enrichedTokens.accentColorHex,
+                localTime: enrichedTokens.localTime ?? personalInfo.localTime,
+                logoText: enrichedTokens.logoText,
+                extras: extras
+            )
+        }
+        
+        let key = cacheKey(tokens: enrichedTokens, size: size, scale: scale, presetId: P.presetId, renderTokens: renderTokens)
         
         logger.debug("🎨 [SwiftUIRenderer] Starting render for \(P.presetId) at \(Int(size.width))x\(Int(size.height))")
 
@@ -96,7 +121,7 @@ public final class SwiftUIOverlayRenderer {
         // Main-thread render (ImageRenderer requirement)
         return await MainActor.run {
             let canvas = OverlayCanvas(size: size) {
-                provider.makeView(tokens: tokens)
+                provider.makeView(tokens: enrichedTokens)
             }
 
             let renderer = ImageRenderer(content: canvas)
@@ -124,9 +149,18 @@ public final class SwiftUIOverlayRenderer {
         provider: P,
         tokens: OverlayTokens,
         size: CGSize,
-        scale: CGFloat = 1.0  // Use 1.0 for runtime (size already in pixels), 2.0 for previews
+        scale: CGFloat = 1.0,  // Use 1.0 for runtime (size already in pixels), 2.0 for previews
+        renderTokens: RenderTokens,
+        personalInfo: PersonalInfo? = nil
     ) async -> CIImage? {
-        guard let cg = await renderCGImage(provider: provider, tokens: tokens, size: size, scale: scale) else {
+        guard let cg = await renderCGImage(
+            provider: provider, 
+            tokens: tokens, 
+            size: size, 
+            scale: scale,
+            renderTokens: renderTokens,
+            personalInfo: personalInfo
+        ) else {
             return nil
         }
         return CIImage(cgImage: cg, options: [.colorSpace: colorSpace])
@@ -143,4 +177,6 @@ public final class SwiftUIOverlayRenderer {
         // This is a placeholder for potential future enhancement with a different cache implementation
         logger.debug("🧹 [SwiftUIRenderer] Expired cache cleanup (lazy expiration active)")
     }
+    
+
 }

@@ -30,7 +30,8 @@ struct MainAppView: View {
           VStack(spacing: 20) {
             CameraPreviewCard(
               previewImage: outputImageManager.videoExtensionStreamOutputImage,
-              isActive: appState.cameraStatus.isRunning
+              isActive: appState.cameraStatus.isRunning,
+              appState: appState
             )
 
             // Camera Controls

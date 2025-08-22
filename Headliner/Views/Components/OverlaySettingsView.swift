@@ -14,6 +14,7 @@ struct OverlaySettingsView: View {
   @State private var tagline: String = ""
   @State private var accentColorHex: String = "#007AFF"
   @State private var selectedAspect: OverlayAspect = .widescreen
+  @State private var selectedSafeAreaMode: SafeAreaMode = .balanced
   @State private var showColorPicker = false
   
   init(appState: AppState) {
@@ -24,6 +25,7 @@ struct OverlaySettingsView: View {
     self._tagline = State(initialValue: appState.overlaySettings.overlayTokens?.tagline ?? "")
     self._accentColorHex = State(initialValue: appState.overlaySettings.overlayTokens?.accentColorHex ?? "#007AFF")
     self._selectedAspect = State(initialValue: appState.currentAspectRatio)
+    self._selectedSafeAreaMode = State(initialValue: appState.overlaySettings.safeAreaMode)
   }
   
   var body: some View {
@@ -58,9 +60,8 @@ struct OverlaySettingsView: View {
               SwiftUIPresetSelectionView(
                 selectedPresetId: $selectedPresetId,
                 onSelectionChanged: { presetId in
-                  var updatedSettings = appState.overlaySettings
-                  updatedSettings.selectedPresetId = presetId
-                  appState.updateOverlaySettings(updatedSettings)
+                  selectedPresetId = presetId
+                  updateSetting(\.selectedPresetId, to: presetId)
                 }
               )
             }
@@ -78,6 +79,7 @@ struct OverlaySettingsView: View {
                 ForEach(OverlayAspect.allCases, id: \.self) { aspect in
                   Button(action: {
                     selectedAspect = aspect
+                    updateSetting(\.overlayAspect, to: aspect)
                   }) {
                     VStack(spacing: 4) {
                       Image(systemName: aspect == .widescreen ? "rectangle.ratio.16.to.9" : "rectangle.ratio.4.to.3")
@@ -109,6 +111,39 @@ struct OverlaySettingsView: View {
             .padding()
           }
           
+          // Safe Area Layout Settings
+          GlassmorphicCard {
+            VStack(alignment: .leading, spacing: 12) {
+              Text("Layout")
+                .font(.headline)
+                .foregroundColor(.white)
+              
+              Text("Choose how overlays are positioned to ensure visibility across video platforms")
+                .font(.caption)
+                .foregroundColor(.white.opacity(0.7))
+                .multilineTextAlignment(.leading)
+              
+              Picker("Layout Mode", selection: $selectedSafeAreaMode) {
+                ForEach(SafeAreaMode.allCases, id: \.self) { mode in
+                  Text(mode.displayName).tag(mode)
+                }
+              }
+              .pickerStyle(SegmentedPickerStyle())
+              .background(Color.white.opacity(0.1))
+              .cornerRadius(8)
+              .onChange(of: selectedSafeAreaMode) { _, newMode in
+                updateSetting(\.safeAreaMode, to: newMode)
+              }
+              
+              Text(selectedSafeAreaMode.description)
+                .font(.caption)
+                .foregroundColor(.white.opacity(0.6))
+                .multilineTextAlignment(.leading)
+                .padding(.top, 4)
+            }
+            .padding()
+          }
+          
           // Customization Options (based on selected preset)
           if selectedPresetId != "none" {
             GlassmorphicCard {
@@ -129,18 +164,16 @@ struct OverlaySettingsView: View {
                     .cornerRadius(6)
                 }
                 
-                // Tagline (Professional preset only)
-                if selectedPresetId == "professional" {
-                  VStack(alignment: .leading, spacing: 8) {
-                    Text("Tagline")
-                      .font(.subheadline)
-                      .foregroundColor(.white.opacity(0.8))
-                    
-                    TextField("e.g., Senior Developer", text: $tagline)
-                      .textFieldStyle(RoundedBorderTextFieldStyle())
-                      .background(Color.white.opacity(0.1))
-                      .cornerRadius(6)
-                  }
+                // Tagline (Available for all presets)
+                VStack(alignment: .leading, spacing: 8) {
+                  Text("Tagline")
+                    .font(.subheadline)
+                    .foregroundColor(.white.opacity(0.8))
+                  
+                  TextField("e.g., Senior Developer, Product Manager", text: $tagline)
+                    .textFieldStyle(RoundedBorderTextFieldStyle())
+                    .background(Color.white.opacity(0.1))
+                    .cornerRadius(6)
                 }
                 
                 // Accent Color
@@ -229,21 +262,19 @@ struct OverlaySettingsView: View {
       tagline = appState.overlaySettings.overlayTokens?.tagline ?? ""
       accentColorHex = appState.overlaySettings.overlayTokens?.accentColorHex ?? "#007AFF"
       selectedAspect = appState.currentAspectRatio
+      selectedSafeAreaMode = appState.overlaySettings.safeAreaMode
     }
   }
   
   private func applySettings() {
-    // Apply preset selection
-    appState.selectPreset(selectedPresetId)
-    
-    // Apply aspect ratio
-    appState.selectAspectRatio(selectedAspect)
+    // Note: Preset selection, aspect ratio, and safe area mode are now applied immediately
+    // when changed, so we only need to handle token updates here
     
     // Update tokens if not "none" preset
     if selectedPresetId != "none" {
       let tokens = OverlayTokens(
         displayName: displayName.isEmpty ? NSUserName() : displayName,
-        tagline: tagline.isEmpty ? nil : tagline,  // Always save tagline if not empty
+        tagline: tagline.isEmpty ? appState.overlaySettings.overlayTokens?.tagline : tagline,  // Preserve existing tagline if field empty
         accentColorHex: accentColorHex
       )
       appState.updateOverlayTokens(tokens)
@@ -252,6 +283,12 @@ struct OverlaySettingsView: View {
   
   // MARK: - Helper Functions
   
+  /// Update a specific setting property and apply changes immediately
+  private func updateSetting<T>(_ keyPath: WritableKeyPath<OverlaySettings, T>, to value: T) {
+    var updatedSettings = appState.overlaySettings
+    updatedSettings[keyPath: keyPath] = value
+    appState.updateOverlaySettings(updatedSettings)
+  }
 
 }
 
@@ -284,34 +321,7 @@ struct ColorButton: View {
   }
 }
 
-// MARK: - Color Extension
-
-extension Color {
-  init?(hex: String) {
-    var hexSanitized = hex.trimmingCharacters(in: .whitespacesAndNewlines)
-    hexSanitized = hexSanitized.replacingOccurrences(of: "#", with: "")
-    
-    var rgb: UInt64 = 0
-    
-    guard Scanner(string: hexSanitized).scanHexInt64(&rgb) else { return nil }
-    
-    let length = hexSanitized.count
-    if length == 6 {
-      let r = Double((rgb & 0xFF0000) >> 16) / 255.0
-      let g = Double((rgb & 0x00FF00) >> 8) / 255.0
-      let b = Double(rgb & 0x0000FF) / 255.0
-      self.init(red: r, green: g, blue: b)
-    } else if length == 8 {
-      let r = Double((rgb & 0xFF000000) >> 24) / 255.0
-      let g = Double((rgb & 0x00FF0000) >> 16) / 255.0
-      let b = Double((rgb & 0x0000FF00) >> 8) / 255.0
-      let a = Double(rgb & 0x000000FF) / 255.0
-      self.init(red: r, green: g, blue: b, opacity: a)
-    } else {
-      return nil
-    }
-  }
-}
+// MARK: - Note: Color+Hex extension is now in shared Extensions/Color+Hex.swift
 
 #if DEBUG
 struct OverlaySettingsView_Previews: PreviewProvider {

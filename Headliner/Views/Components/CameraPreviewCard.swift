@@ -6,10 +6,14 @@
 //
 
 import SwiftUI
+import CoreGraphics
 
 struct CameraPreviewCard: View {
   let previewImage: CGImage?
   let isActive: Bool
+  let appState: AppState?  // Optional for overlay preview
+  
+  @State private var overlayPreviewImage: CGImage?
 
   var body: some View {
     ZStack {
@@ -18,12 +22,45 @@ struct CameraPreviewCard: View {
         .frame(height: 300)
 
       if let previewImage {
-        Image(previewImage, scale: 1.0, label: Text("Camera Preview"))
-          .resizable()
-          .aspectRatio(contentMode: .fill)
-          .frame(height: 300)
-          .clipped()
-          .cornerRadius(20)
+        ZStack {
+          // Base camera preview
+          Image(previewImage, scale: 1.0, label: Text("Camera Preview"))
+            .resizable()
+            .aspectRatio(contentMode: .fill)
+            .frame(height: 300)
+            .clipped()
+            .cornerRadius(20)
+          
+          // Overlay preview (if available)
+          if let overlayImage = overlayPreviewImage {
+            Image(overlayImage, scale: 1.0, label: Text("Overlay Preview"))
+              .resizable()
+              .aspectRatio(contentMode: .fit)  // Use .fit to maintain overlay proportions
+              .frame(height: 300)
+              .clipped()
+              .cornerRadius(20)
+              .allowsHitTesting(false)  // Don't interfere with camera preview interactions
+          } 
+          
+          // DEBUG: Visual indicator when overlay should be active
+          if let presetId = appState?.overlaySettings.selectedPresetId, presetId != "none" {
+            VStack {
+              HStack {
+                Text("PREVIEW: \(getOverlayName(for: presetId))")
+                  .font(.system(size: 8, weight: .bold))
+                  .foregroundColor(.yellow)
+                  .padding(.horizontal, 6)
+                  .padding(.vertical, 2)
+                  .background(Color.black.opacity(0.7))
+                  .cornerRadius(4)
+                Spacer()
+              }
+              Spacer()
+            }
+            .padding(8)
+            .allowsHitTesting(false)
+          }
+        }
       } else {
         VStack(spacing: 16) {
           Image(systemName: isActive ? "video" : "video.slash")
@@ -63,6 +100,131 @@ struct CameraPreviewCard: View {
       .padding(16)
     }
     .shadow(color: .black.opacity(0.15), radius: 12, x: 0, y: 4)
+    .onAppear {
+      updateOverlayPreview()
+    }
+    .onChange(of: appState?.overlaySettings.selectedPresetId) { _ in
+      updateOverlayPreview()
+    }
+    .onChange(of: appState?.overlaySettings.overlayTokens) { _ in
+      updateOverlayPreview()
+    }
+    .onChange(of: appState?.overlaySettings.overlayAspect) { _ in
+      updateOverlayPreview()
+    }
+    .onChange(of: appState?.overlaySettings.safeAreaMode) { _ in
+      updateOverlayPreview()
+    }
+  }
+  
+  // MARK: - Private Methods
+  
+  private func updateOverlayPreview() {
+    guard let appState = appState else {
+      overlayPreviewImage = nil
+      return
+    }
+    
+    guard appState.overlaySettings.selectedPresetId != "none" else {
+      overlayPreviewImage = nil
+      return
+    }
+    
+    guard let tokens = appState.overlaySettings.overlayTokens else {
+      overlayPreviewImage = nil
+      return
+    }
+    
+    // Use actual camera dimensions from cached settings for accurate preview
+    let cameraDimensions = appState.overlaySettings.cameraDimensions
+    let previewSize = cameraDimensions.width > 0 && cameraDimensions.height > 0 
+      ? cameraDimensions 
+      : CGSize(width: 640, height: 360) // Fallback for small cameras
+    
+    Task {
+      await renderOverlayPreview(tokens: tokens, presetId: appState.overlaySettings.selectedPresetId, size: previewSize)
+    }
+  }
+  
+  @MainActor
+  private func renderOverlayPreview(tokens: OverlayTokens, presetId: String, size: CGSize) async {
+    // Get the appropriate overlay provider based on preset ID
+    guard let provider = getOverlayProvider(for: presetId) else {
+      overlayPreviewImage = nil
+      return
+    }
+    
+    // Get current safe area mode from appState
+    let safeAreaMode = appState?.overlaySettings.safeAreaMode ?? .balanced
+    let renderTokens = RenderTokens(safeAreaMode: safeAreaMode)
+    
+    // Get PersonalInfo for previews (optional, could be nil)
+    let personalInfo = getCurrentPersonalInfo()
+    
+    // Render the overlay at preview resolution
+    overlayPreviewImage = await SwiftUIOverlayRenderer.shared.renderCGImage(
+      provider: provider,
+      tokens: tokens,
+      size: size,
+      scale: 1.0,  // Use 1.0 for performance
+      renderTokens: renderTokens,
+      personalInfo: personalInfo
+    )
+  }
+  
+  /// Get current PersonalInfo from App Group storage (same as AppState)
+  private func getCurrentPersonalInfo() -> PersonalInfo? {
+    guard let userDefaults = UserDefaults(suiteName: Identifiers.appGroup),
+          let data = userDefaults.data(forKey: "overlay.personalInfo.v1"),
+          let info = try? JSONDecoder().decode(PersonalInfo.self, from: data) else {
+      return nil
+    }
+    return info
+  }
+
+  private func getOverlayProvider(for presetId: String) -> (any OverlayViewProviding)? {
+    // Use SwiftUI registry as the single source of truth
+    if let preset = SwiftUIPresetRegistry.preset(withId: presetId) {
+      return preset.provider
+    }
+    
+    // Legacy mapping for old preset IDs (migrated to remaining valid presets)
+    let legacyMappings: [String: String] = [
+      "professional": "swiftui.modern.personal", // Use ModernPersonal as fallback
+      "personal": "swiftui.modern.personal", 
+      "company-branding": "swiftui.modern.personal",
+      "metric": "swiftui.modern.personal" // Use ModernPersonal as fallback
+    ]
+    
+    if let newId = legacyMappings[presetId] {
+      return SwiftUIPresetRegistry.preset(withId: newId)?.provider
+    }
+    
+    // Fallback to first available preset from registry
+    return SwiftUIPresetRegistry.allPresets.first?.provider
+  }
+  
+  private func getOverlayName(for presetId: String) -> String {
+    // Use SwiftUI registry as the single source of truth
+    if let preset = SwiftUIPresetRegistry.preset(withId: presetId) {
+      return preset.name
+    }
+    
+    // Legacy mapping for old preset IDs
+    let legacyMappings: [String: String] = [
+      "professional": "swiftui.modern.personal",
+      "personal": "swiftui.modern.personal",
+      "company-branding": "swiftui.modern.personal", 
+      "metric": "swiftui.modern.personal"
+    ]
+    
+    if let newId = legacyMappings[presetId],
+       let preset = SwiftUIPresetRegistry.preset(withId: newId) {
+      return preset.name
+    }
+    
+    // Fallback
+    return "Unknown"
   }
 }
 
@@ -70,8 +232,8 @@ struct CameraPreviewCard: View {
 struct CameraPreviewCard_Previews: PreviewProvider {
   static var previews: some View {
     VStack(spacing: 20) {
-      CameraPreviewCard(previewImage: nil, isActive: true)
-      CameraPreviewCard(previewImage: nil, isActive: false)
+      CameraPreviewCard(previewImage: nil, isActive: true, appState: nil)
+      CameraPreviewCard(previewImage: nil, isActive: false, appState: nil)
     }
     .padding()
     .background(Color.gray.opacity(0.1))
