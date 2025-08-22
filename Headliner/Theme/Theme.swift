@@ -83,6 +83,9 @@ struct ThemeEffects: Equatable {
     var insetTight: CGFloat { insetSmall }       // rename as you like
     var insetMicro: CGFloat { insetSmall * 0.20 }
     
+    // NEW: Square style corner radius (derived from rounded)
+    var squareRadius: CGFloat { 0 }
+    
     func s(for size: CGSize, base: CGFloat = 1080) -> CGFloat {
         max(0.6, min(2.0, size.height / base))
     }

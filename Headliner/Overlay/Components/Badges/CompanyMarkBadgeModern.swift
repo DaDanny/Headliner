@@ -8,13 +8,14 @@
 import SwiftUI
 
 /// Compact company badge: mark (or initials) + optional company name.
-/// - Rounded-only (no SurfaceStyle yet)
+/// Supports both rounded and square surface styles.
 struct CompanyMarkBadgeModern: View {
     // MARK: API
     let companyName: String?
     let markImage: Image?
     var showName: Bool = true
     var accentColor: Color? = nil   // Optional accent override (falls back to theme.colors.accent)
+    var surfaceStyle: SurfaceStyle = .rounded
 
     // MARK: Env
     @Environment(\.theme) private var theme
@@ -23,11 +24,13 @@ struct CompanyMarkBadgeModern: View {
     init(companyName: String? = nil,
          markImage: Image? = nil,
          showName: Bool = true,
-         accentColor: Color? = nil) {
+         accentColor: Color? = nil,
+         surfaceStyle: SurfaceStyle = .rounded) {
         self.companyName = companyName
         self.markImage = markImage
         self.showName = showName
         self.accentColor = accentColor
+        self.surfaceStyle = surfaceStyle
     }
 
     // MARK: View
@@ -55,12 +58,7 @@ struct CompanyMarkBadgeModern: View {
         .padding(.horizontal, e.insetLarge * s)
         .padding(.vertical, e.insetSmall * s)
         .background(
-            Capsule()
-                .fill(theme.colors.surface)
-                .overlay(
-                    Capsule().stroke(theme.colors.surfaceStroke, lineWidth: strokeW)
-                )
-                .shadow(color: theme.colors.shadow, radius: e.shadowRadius * s, y: 2 * s)
+            SurfaceBackground(theme: theme, scale: s, style: surfaceStyle)
         )
         .allowsHitTesting(false)
         .accessibilityElement(children: .combine)
@@ -122,11 +120,12 @@ struct CompanyMarkBadgeModern: View {
 }
 
 #if DEBUG
-#Preview("Classic – With Mark") {
+#Preview("Classic – With Mark - Rounded") {
     CompanyMarkBadgeModern(
         companyName: "Bonusly",
         markImage: Image("Bonusly-Mark"),
-        showName: false
+        showName: false,
+        surfaceStyle: .rounded
     )
     .padding()
     .background(.black)
@@ -134,32 +133,26 @@ struct CompanyMarkBadgeModern: View {
     .environment(\.overlayRenderSize, .init(width: 1920, height: 1080))
 }
 
-#Preview("Classic – Initials Only") {
-    VStack(spacing: 20) {
-        CompanyMarkBadgeModern(
-            companyName: "Bonusly Inc.",
-            markImage: nil,
-            showName: false
-        )
-        .frame(height: 64)
-        CompanyMarkBadgeModern(
-            companyName: "Bonusly Inc.",
-            markImage: nil,
-            showName: false
-        )
-        .frame(height: 64)
-    }
+#Preview("Midnight – Initials Only - Rounded") {
+    CompanyMarkBadgeModern(
+        companyName: "Bonusly Inc.",
+        markImage: nil,
+        showName: false,
+        surfaceStyle: .rounded
+    )
+    .frame(height: 64)
     .padding()
     .background(.black)
-    .environment(\.theme, .classic)
+    .environment(\.theme, .midnight)
     .environment(\.overlayRenderSize, .init(width: 1920, height: 1080))
 }
 
-#Preview("Dawn – Name Only") {
+#Preview("Dawn – Name Only - Square") {
     CompanyMarkBadgeModern(
         companyName: "Acme Co.",
         markImage: nil,
-        showName: true
+        showName: true,
+        surfaceStyle: .square
     )
     .padding()
     .background(.white)

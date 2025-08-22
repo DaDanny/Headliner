@@ -12,15 +12,17 @@ struct BottomBarModern: View {
     let displayName: String
     let tagline: String?
     let accentColor: Color
+    var surfaceStyle: SurfaceStyle = .rounded
     
     @Environment(\.theme) private var theme
     @Environment(\.overlayRenderSize) private var renderSize
 
 
-    init(displayName: String, tagline: String? = nil, accentColor: Color = .green) {
+    init(displayName: String, tagline: String? = nil, accentColor: Color = .green, surfaceStyle: SurfaceStyle = .rounded) {
         self.displayName = displayName
         self.tagline = tagline
         self.accentColor = accentColor
+        self.surfaceStyle = surfaceStyle
     }
     
     var body: some View {
@@ -58,24 +60,32 @@ struct BottomBarModern: View {
         .padding(.horizontal, e.insetLarge * s)
         .padding(.vertical, e.insetCozy * s)
         .background(
-            RoundedRectangle(cornerRadius: e.cornerRadius * s, style: .continuous)
-                .fill(theme.colors.surface)
-                .overlay(
-                    RoundedRectangle(cornerRadius: e.cornerRadius * s, style: .continuous)
-                        .stroke(theme.colors.surfaceStroke, lineWidth: e.strokeWidth * s)
-                )
-                .shadow(color: theme.colors.shadow, radius: e.shadowRadius * s, y: 2 * s)
+            SurfaceBackground(theme: theme, scale: s, style: surfaceStyle)
         )
         .allowsHitTesting(false)
     }
 }
 
 #if DEBUG
-#Preview("Classic Theme") {
+#Preview("Classic Theme - Rounded") {
     BottomBarModern(
         displayName: "Danny F",
         tagline: "High School Intern",
-        accentColor: Color(hex: "#118342")
+        accentColor: Color(hex: "#118342"),
+        surfaceStyle: .rounded
+    )
+    .padding()
+    .background(.thinMaterial)
+    .environment(\.theme, .classic)
+    .environment(\.overlayRenderSize, .init(width: 1920, height: 1080))
+}
+
+#Preview("Midnight Theme - Rounded") {
+    BottomBarModern(
+        displayName: "Danny F",
+        tagline: "High School Intern",
+        accentColor: Color(hex: "#118342"),
+        surfaceStyle: .rounded
     )
     .padding()
     .background(.thinMaterial)
@@ -83,11 +93,38 @@ struct BottomBarModern: View {
     .environment(\.overlayRenderSize, .init(width: 1920, height: 1080))
 }
 
-#Preview("Midnight Theme") {
+#Preview("Dawn Theme - Rounded") {
     BottomBarModern(
         displayName: "Danny F",
         tagline: "High School Intern",
-        accentColor: Color(hex: "#118342")
+        accentColor: Color(hex: "#118342"),
+        surfaceStyle: .rounded
+    )
+    .padding()
+    .background(.thinMaterial)
+    .environment(\.theme, .dawn)
+    .environment(\.overlayRenderSize, .init(width: 1920, height: 1080))
+}
+
+#Preview("Classic Theme - Square") {
+    BottomBarModern(
+        displayName: "Danny F",
+        tagline: "High School Intern",
+        accentColor: Color(hex: "#118342"),
+        surfaceStyle: .square
+    )
+    .padding()
+    .background(.thinMaterial)
+    .environment(\.theme, .classic)
+    .environment(\.overlayRenderSize, .init(width: 1920, height: 1080))
+}
+
+#Preview("Midnight Theme - Square") {
+    BottomBarModern(
+        displayName: "Danny F",
+        tagline: "High School Intern",
+        accentColor: Color(hex: "#118342"),
+        surfaceStyle: .square
     )
     .padding()
     .background(.thinMaterial)
@@ -95,15 +132,16 @@ struct BottomBarModern: View {
     .environment(\.overlayRenderSize, .init(width: 1920, height: 1080))
 }
 
-#Preview("Dawn Theme") {
+#Preview("Dawn Theme - Square") {
     BottomBarModern(
         displayName: "Danny F",
         tagline: "High School Intern",
-        accentColor: Color(hex: "#118342")
+        accentColor: Color(hex: "#118342"),
+        surfaceStyle: .square
     )
     .padding()
     .background(.thinMaterial)
-    .environment(\.theme, .midnight)
+    .environment(\.theme, .dawn)
     .environment(\.overlayRenderSize, .init(width: 1920, height: 1080))
 }
 #endif

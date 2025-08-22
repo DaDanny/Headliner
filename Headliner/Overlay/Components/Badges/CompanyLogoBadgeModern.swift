@@ -8,13 +8,14 @@
 import SwiftUI
 
 /// Badge that shows a full company wordmark (logo-with-text) inside a glass chip.
-/// Rounded-only (no SurfaceStyle yet).
+/// Supports both rounded and square surface styles.
 struct CompanyLogoBadgeModern: View {
     // MARK: API
     let logoImage: Image
     var companyName: String? = nil           // for accessibility; optional
     var preferredHeightMultiplier: CGFloat = 1.30 // relative to baseBody
     var horizontalPaddingMultiplier: CGFloat = 1.0
+    var surfaceStyle: SurfaceStyle = .rounded
 
     // MARK: Env
     @Environment(\.theme) private var theme
@@ -24,21 +25,25 @@ struct CompanyLogoBadgeModern: View {
     init(logoAssetName: String,
          companyName: String? = nil,
          preferredHeightMultiplier: CGFloat = 1.30,
-         horizontalPaddingMultiplier: CGFloat = 1.0) {
+         horizontalPaddingMultiplier: CGFloat = 1.0,
+         surfaceStyle: SurfaceStyle = .rounded) {
         self.logoImage = Image(logoAssetName)
         self.companyName = companyName
         self.preferredHeightMultiplier = preferredHeightMultiplier
         self.horizontalPaddingMultiplier = horizontalPaddingMultiplier
+        self.surfaceStyle = surfaceStyle
     }
 
     init(logoImage: Image,
          companyName: String? = nil,
          preferredHeightMultiplier: CGFloat = 1.30,
-         horizontalPaddingMultiplier: CGFloat = 1.0) {
+         horizontalPaddingMultiplier: CGFloat = 1.0,
+         surfaceStyle: SurfaceStyle = .rounded) {
         self.logoImage = logoImage
         self.companyName = companyName
         self.preferredHeightMultiplier = preferredHeightMultiplier
         self.horizontalPaddingMultiplier = horizontalPaddingMultiplier
+        self.surfaceStyle = surfaceStyle
     }
 
     // MARK: View
@@ -64,13 +69,7 @@ struct CompanyLogoBadgeModern: View {
         .padding(.horizontal, e.insetLarge * horizontalPaddingMultiplier * s)
         .padding(.vertical, e.insetSmall * s)
         .background(
-            Capsule()
-                .fill(theme.colors.surface)
-                .overlay(
-                    Capsule()
-                        .stroke(theme.colors.surfaceStroke, lineWidth: strokeW)
-                )
-                .shadow(color: theme.colors.shadow, radius: e.shadowRadius * s, y: 2 * s)
+            SurfaceBackground(theme: theme, scale: s, style: surfaceStyle)
         )
         .allowsHitTesting(false)
         .accessibilityElement(children: .combine)
@@ -79,24 +78,41 @@ struct CompanyLogoBadgeModern: View {
 }
 
 #if DEBUG
-#Preview("Midnight – Wordmark") {
-    CompanyLogoBadgeModern(logoAssetName: "Bonusly-Logo", companyName: "Bonusly")
-        .padding()
-        .background(.black)
-        .environment(\.theme, .midnight)
-        .environment(\.overlayRenderSize, .init(width: 1920, height: 1080))
+#Preview("Midnight – Rounded") {
+    CompanyLogoBadgeModern(
+        logoAssetName: "Bonusly-Logo", 
+        companyName: "Bonusly",
+        surfaceStyle: .rounded
+    )
+    .padding()
+    .background(.black)
+    .environment(\.theme, .midnight)
+    .environment(\.overlayRenderSize, .init(width: 1920, height: 1080))
 }
 
-#Preview("Classic – Wider Padding") {
+#Preview("Classic – Rounded") {
     CompanyLogoBadgeModern(
         logoAssetName: "Bonusly-Logo",
         companyName: "Bonusly",
         preferredHeightMultiplier: 1.25,
-        horizontalPaddingMultiplier: 1.2
+        horizontalPaddingMultiplier: 1.2,
+        surfaceStyle: .rounded
     )
     .padding()
     .background(.black)
     .environment(\.theme, .classic)
+    .environment(\.overlayRenderSize, .init(width: 1920, height: 1080))
+}
+
+#Preview("Dawn – Square") {
+    CompanyLogoBadgeModern(
+        logoAssetName: "Bonusly-Logo", 
+        companyName: "Bonusly",
+        surfaceStyle: .square
+    )
+    .padding()
+    .background(.black)
+    .environment(\.theme, .dawn)
     .environment(\.overlayRenderSize, .init(width: 1920, height: 1080))
 }
 #endif
