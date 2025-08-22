@@ -28,6 +28,9 @@ struct OverlaySettings: Codable {
   
   // Safe area system
   var safeAreaMode: SafeAreaMode = .balanced
+  
+  // Surface style system
+  var selectedSurfaceStyle: String = "rounded"
 }
 
 enum OverlayPosition: String, Codable, CaseIterable {
