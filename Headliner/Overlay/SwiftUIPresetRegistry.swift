@@ -187,6 +187,15 @@ public enum SwiftUIPresetRegistry {
             provider: CompanyFun()
         ),
         
+        // Modern Company Branded - Company branding with personal info
+        SwiftUIPresetInfo(
+            id: "swiftui.modern.company.branded",
+            name: "Modern Company Branded",
+            description: "Company branding with personal info and location/weather",
+            category: .branded,
+            provider: ModernCompanyBranded()
+        ),
+        
         // Add new presets here! 🎨
         // Just create a new SwiftUIPresetInfo with your OverlayViewProviding implementation
     ]

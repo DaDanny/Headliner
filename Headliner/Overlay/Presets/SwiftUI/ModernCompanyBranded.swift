@@ -1,15 +1,15 @@
 //
-//  ModernPersonal.swift
+//  ModernCompanyBranded.swift
 //  Headliner
 //
-//  Created by Danny Francken on 8/21/25.
+//  Created by AI Assistant on 8/21/25.
 //
 
 import SwiftUI
 
-/// Modern Personal Preset with all the bells and whistles
-struct ModernPersonal: OverlayViewProviding {
-    static let presetId = "swiftui.modern.personal"
+/// Modern Company Branded Preset with company branding and personal info
+struct ModernCompanyBranded: OverlayViewProviding {
+    static let presetId = "swiftui.modern.company.branded"
     static let defaultSize = CGSize(width: 1920, height: 1080)
 
     func makeView(tokens: OverlayTokens) -> some View {
@@ -17,13 +17,13 @@ struct ModernPersonal: OverlayViewProviding {
         let accentColor = TokenHelpers.accentColor(from: tokens)
         
         SafeAreaContainer(mode: settings.safeAreaMode) {
-            ModernPersonalContent(tokens: tokens, accentColor: accentColor)
+            ModernCompanyBrandedContent(tokens: tokens, accentColor: accentColor)
         }
     }
 }
 
 // Separate view to use @Environment properly
-private struct ModernPersonalContent: View {
+private struct ModernCompanyBrandedContent: View {
     let tokens: OverlayTokens
     let accentColor: Color
     
@@ -34,10 +34,7 @@ private struct ModernPersonalContent: View {
             let e = theme.effects
             
             return ZStack(alignment: .top) {
-//                ThemeAwareDebugBorder()
-
                 VStack(spacing: 0) {
-
                     // TOP BAR AREA
                     HStack {
                         // City badge (left)
@@ -62,27 +59,16 @@ private struct ModernPersonalContent: View {
                     Spacer(minLength: 0)
 
                     // BOTTOM BAR AREA
-                    BottomBarModern(
-                        displayName: tokens.displayName,
+                    ModernCompanyBar(
+                        displayName: tokens.displayName ?? "Name",
                         tagline: tokens.tagline,
-                        accentColor: accentColor,
+                        companyLogoType: .mark, // Use mark for more compact look
                         surfaceStyle: surfaceStyle
                     )
                 }
             }
             .allowsHitTesting(false) // overlay is decorative
         }
-    }
-}
-
-// Helper for theme-aware debug visualization
-private struct ThemeAwareDebugBorder: View {
-    @Environment(\.theme) private var theme
-
-    var body: some View {
-        Rectangle()
-            .stroke(theme.colors.accent.opacity(0.3), lineWidth: 2)
-            .fill(Color.clear)
     }
 }
 
@@ -97,10 +83,9 @@ private struct OverlayScaleReader<Content: View>: View {
     }
 }
 
-
 #if DEBUG
 #Preview("Classic Theme") {
-    ModernPersonal()
+    ModernCompanyBranded()
         .makeView(tokens: OverlayTokens.previewDanny)
         .frame(width: 1920, height: 1080)
         .background(.black)
@@ -109,7 +94,7 @@ private struct OverlayScaleReader<Content: View>: View {
 }
 
 #Preview("Midnight Theme") {
-    ModernPersonal()
+    ModernCompanyBranded()
         .makeView(tokens: OverlayTokens.previewDanny)
         .frame(width: 1920, height: 1080)
         .background(.black)
@@ -118,7 +103,7 @@ private struct OverlayScaleReader<Content: View>: View {
 }
 
 #Preview("Dawn Theme") {
-    ModernPersonal()
+    ModernCompanyBranded()
         .makeView(tokens: OverlayTokens.previewDanny)
         .frame(width: 1920, height: 1080)
         .background(.black)
