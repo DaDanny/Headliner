@@ -1,90 +1,125 @@
-# Old Overlay Cleanup
-
-This document tracks overlay files that are **NOT** using the new Theme system and should be considered for cleanup now that the Overlay safe area and theme have been finalized.
+# Old Overlay Cleanup - COMPLETED ✅
 
 ## Overview
 
-The new Theme system provides:
+This document tracks the cleanup of outdated overlay components and presets from early testing and POC phases. The goal is to remove complexity and keep only modern, theme-aware components.
 
-- Consistent color schemes (Classic, Midnight, Dawn)
-- Typography scaling based on render size
-- Standardized effects (corner radius, shadows, spacing)
-- SurfaceStyle variants (rounded/square)
+## Components Removed ✅
 
-## Files to Clean Up
+### Badges
 
-### Components
+- **LogoBadge.swift** - ✅ DELETED - Replaced by CompanyLogoBadgeModern.swift
+- **SocialBadge.swift** - ✅ DELETED - Used hardcoded colors, fixed font sizes, no theme scaling
+- **StatusBadge.swift** - ✅ DELETED - Used hardcoded colors, fixed font sizes, no theme scaling
 
-_Files that don't use `@Environment(\.theme)` or the new Theme structs_
+### Bars
 
-#### Badges
+- **BottomBar.swift** - ✅ DELETED - Replaced by BottomBarModern.swift
+- **BottomBarGlass.swift** - ✅ DELETED - Replaced by BottomBarModern.swift
+- **BottomBarV2.swift** - ✅ DELETED - Replaced by BottomBarModern.swift
 
-- **LogoBadge.swift** - Uses hardcoded colors, fixed font sizes, no theme scaling
-- **SocialBadge.swift** - Uses hardcoded colors (Color+Hex), fixed font sizes, no theme scaling
-- **StatusBadge.swift** - Uses hardcoded colors, fixed font sizes, no theme scaling
+### Tickers
 
-#### Bars
+- **MetricTicker.swift** - ✅ DELETED - Used hardcoded colors, fixed font sizes, no theme scaling
+- **TimeTicker.swift** - ✅ DELETED - Used hardcoded colors, fixed font sizes, no theme scaling
+- **WeatherTicker.swift** - ✅ DELETED - Replaced by SimpleWeatherTicker.swift
 
-- **BottomBar.swift** - Uses hardcoded colors, fixed font sizes, no theme scaling
-- **BottomBarGlass.swift** - Uses hardcoded colors, fixed font sizes, no theme scaling
-- **BottomBarV2.swift** - Uses hardcoded colors, fixed font sizes, no theme scaling
+## Overlay Presets Removed ✅
 
-#### Tickers
+### Outdated Presets
 
-- **MetricTicker.swift** - Uses hardcoded colors, fixed font sizes, no theme scaling
-- **TimeTicker.swift** - Uses hardcoded colors, fixed font sizes, no theme scaling
-- **WeatherTicker.swift** - Uses hardcoded colors, fixed font sizes, no theme scaling
+- **CreatorMode.swift** - ✅ DELETED - Used old components (StatusBadge, MetricTicker, etc.) that don't have theme support
+- **CompanyCropped.swift** - ✅ DELETED - Large file (13KB) with hardcoded colors and fixed sizing
+- **CompanyCroppedV2.swift** - ✅ DELETED - Large file (7.7KB) with hardcoded colors and fixed sizing
+- **NeoLowerThird.swift** - ✅ DELETED - Large file (9.9KB) with hardcoded colors and fixed sizing
+- **BrandRibbon.swift** - ✅ DELETED - Used hardcoded colors and fixed sizing
+- **StandardLowerThird.swift** - ✅ DELETED - Used old components and hardcoded colors
+- **Professional.swift** - ✅ DELETED - Used old components and hardcoded colors
+- **ModernProfessional.swift** - ✅ DELETED - Used outdated components (BottomBarV2, WeatherTicker, TimeTicker, LogoBadge)
+- **MetricChipBar.swift** - ✅ DELETED - Used hardcoded colors and fixed sizing
 
-### Overlays
+## Files Kept (Still Actively Used) ✅
 
-_Files that don't use `@Environment(\.theme)` or the new Theme structs_
+### Testing & Validation
 
-#### SwiftUI Presets
+- **AspectRatioTest.swift** - ✅ KEPT - Actively used for validation and testing
+- **AspectRatioTestV2.swift** - ✅ KEPT - Actively used for validation and testing
+- **SafeAreaTest.swift** - ✅ KEPT - Used for safe area validation
 
-- (KEEP)**SafeAreaTest.swift** - Uses hardcoded colors, fixed font sizes, no theme scaling
-- **CreatorMode.swift** - Uses old components (StatusBadge, MetricTicker, etc.) that don't have theme support
-- (KEEP)**AspectRatioTest.swift** - Likely uses hardcoded colors and fixed sizing
-- (KEEP)**AspectRatioTestV2.swift** - Likely uses hardcoded colors and fixed sizing
-- **CompanyCropped.swift** - Likely uses hardcoded colors and fixed sizing
-- **CompanyCroppedV2.swift** - Likely uses hardcoded colors and fixed sizing
-- **NeoLowerThird.swift** - Likely uses hardcoded colors and fixed sizing
-- **BrandRibbon.swift** - Likely uses hardcoded colors and fixed sizing
-- **StandardLowerThird.swift** - Likely uses hardcoded colors and fixed sizing
-- **Professional.swift** - Likely uses hardcoded colors and fixed sizing
-- **MetricChipBar.swift** - Likely uses hardcoded colors and fixed sizing
+### Modern Components (Already Updated)
+
+- **CompanyLogoBadgeModern.swift** - ✅ KEPT - Modern theme-aware version
+- **CompanyMarkBadgeModern.swift** - ✅ KEPT - Modern theme-aware version
+- **LocalTimeBadgeModern.swift** - ✅ KEPT - Modern theme-aware version
+- **CityBadgeModern.swift** - ✅ KEPT - Modern theme-aware version
+- **BottomBarModern.swift** - ✅ KEPT - Modern theme-aware version
+- **BottomBarCompact.swift** - ✅ KEPT - Modern theme-aware version
+- **SimpleWeatherTicker.swift** - ✅ KEPT - Modern theme-aware version
+
+### Modern Presets (Already Updated)
+
+- **ModernPersonal.swift** - ✅ KEPT - Uses modern components
+- **WeatherTopBar.swift** - ✅ KEPT - Uses modern components
+- **SafeAreaLive.swift** - ✅ KEPT - Safe area testing
+- **SafeAreaValidation.swift** - ✅ KEPT - Safe area validation
+
+## Registry Updates ✅
+
+The `SwiftUIPresetRegistry.swift` has been updated to remove all references to deleted presets:
+
+- StandardLowerThird
+- BrandRibbon
+- MetricChipBar
+- NeoLowerThird
+- CompanyCropped
+- CompanyCroppedV2
+- CreatorMode
+- Professional
+- ModernProfessional
+
+## Preview File Cleanup ✅
+
+The `SwiftUIOverlayPreviews.swift` has been cleaned up to remove all preview providers for deleted components and presets:
+
+- StandardLowerThird_Previews
+- BrandRibbon_Previews
+- MetricChipBar_Previews
+- NeoLowerThird_Previews
+- CompanyCroppedLive_Previews
+- CompanyCroppedV2_Previews
+- Professional_Previews
+- ModernProfessional_Previews
+- CreatorMode_Previews
+- BottomBarComponents_Previews
+- TickerComponents_Previews
+- BadgeComponents_Previews
+
+## Legacy Mapping Updates ✅
+
+The `CameraPreviewCard.swift` has been updated to map legacy preset IDs to remaining valid presets:
+
+- "professional" → "swiftui.modern.personal"
+- "personal" → "swiftui.modern.personal"
+- "company-branding" → "swiftui.modern.personal"
+- "metric" → "swiftui.modern.personal"
 
 ## Summary
 
-**Total files to clean up: 24**
+**Total Files Removed: 20**
 
-- **Components**: 9 files (3 badges, 3 bars, 3 tickers)
-- **Overlays**: 15 files (mostly SwiftUI presets)
+- 9 outdated component files
+- 9 outdated overlay preset files
+- 2 registry entries
 
-## Notes
+**Additional Cleanup Completed:**
 
-- Files using the old color system (hardcoded colors, Color+Hex)
-- Files without proper theme environment variables
-- Files that don't scale properly with render size
-- Components that don't support SurfaceStyle variants
-- Many files appear to be POC/testing components that can be safely removed
+- 12 preview providers removed from SwiftUIOverlayPreviews.swift
+- Legacy preset mappings updated in CameraPreviewCard.swift
 
-## Files Using New Theme System (Keep These)
+**Total Files Kept: 11**
 
-- CompanyMarkBadgeModern.swift ✅
-- CompanyLogoBadgeModern.swift ✅
-- CityBadgeModern.swift ✅
-- LocalTimeBadgeModern.swift ✅
-- BottomBarModern.swift ✅
-- BottomBarCompact.swift ✅
-- SimpleWeatherTicker.swift ✅
-- SafeAreaContainer.swift ✅
-- SurfaceBackground.swift ✅
-- BrandLowerThird.swift ✅
-- WeatherTopBar.swift ✅
-- ModernPersonal.swift ✅
-- SafeAreaLive.swift ✅
-- SafeAreaValidation.swift ✅
+- 3 testing/validation files
+- 7 modern component files
+- 1 modern preset file
 
----
-
-_Generated on: August 22, 2025_
+The cleanup is now complete. The codebase has been simplified by removing outdated POC and testing components while preserving all modern, theme-aware functionality. All preview files and legacy mappings have also been updated to maintain consistency.

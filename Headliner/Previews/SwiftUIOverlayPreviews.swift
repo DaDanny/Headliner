@@ -1,70 +1,11 @@
 import SwiftUI
 
-struct StandardLowerThird_Previews: PreviewProvider {
-    static var previews: some View {
-        StandardLowerThird()
-            .makeView(tokens: .previewDanny)
-            .previewLayout(.fixed(width: StandardLowerThird.defaultSize.width,
-                                  height: StandardLowerThird.defaultSize.height))
-            .background(Color.black) // preview contrast
-            .previewDisplayName("Standard Lower Third")
-    }
-}
-
-struct BrandRibbon_Previews: PreviewProvider {
-    static var previews: some View {
-        BrandRibbon()
-            .makeView(tokens: .previewDanny)
-            .previewLayout(.fixed(width: BrandRibbon.defaultSize.width,
-                                  height: BrandRibbon.defaultSize.height))
-            .background(Color.black)
-            .previewDisplayName("Brand Ribbon")
-    }
-}
-
-struct MetricChipBar_Previews: PreviewProvider {
-    static var previews: some View {
-        MetricChipBar()
-            .makeView(tokens: .previewDanny)
-            .previewLayout(.fixed(width: MetricChipBar.defaultSize.width,
-                                  height: MetricChipBar.defaultSize.height))
-            .background(Color.black)
-            .previewDisplayName("Metric Chip Bar")
-    }
-}
-
-struct NeoLowerThird_Previews: PreviewProvider {
-    static var previews: some View {
-        NeoLowerThird()
-            .makeView(tokens: .previewDanny)
-            .previewLayout(.fixed(width: NeoLowerThird.defaultSize.width,
-                                  height: NeoLowerThird.defaultSize.height))
-            .background(Color.black)
-            .previewDisplayName("Neo Lower Third")
-    }
-}
-
-struct CompanyCroppedLive_Previews: PreviewProvider {
-    static var previews: some View {
-        CompanyCropped()
-            .makeView(tokens: .previewDanny)
-            .previewLayout(.fixed(width: CompanyCropped.defaultSize.width,
-                                  height: CompanyCropped.defaultSize.height))
-            .background(Color.black)
-            .previewDisplayName("Company Cropped")
-    }
-}
-
-struct CompanyCroppedV2_Previews: PreviewProvider {
-    static var previews: some View {
-        CompanyCroppedV2()
-            .makeView(tokens: .previewDanny)
-            .previewLayout(.fixed(width: CompanyCroppedV2.defaultSize.width,
-                                  height: CompanyCroppedV2.defaultSize.height))
-            .background(Color.black)
-            .previewDisplayName("Company Cropped V2")
-    }
-}
+// StandardLowerThird_Previews - REMOVED (component deleted)
+// BrandRibbon_Previews - REMOVED (component deleted)
+// MetricChipBar_Previews - REMOVED (component deleted)
+// NeoLowerThird_Previews - REMOVED (component deleted)
+// CompanyCroppedLive_Previews - REMOVED (component deleted)
+// CompanyCroppedV2_Previews - REMOVED (component deleted)
 
 struct AspectRatioTest_Previews: PreviewProvider {
     static var previews: some View {
@@ -144,29 +85,10 @@ struct AspectRatioTestV2_Previews: PreviewProvider {
     }
 }
 
-// MARK: - New Component-Based Presets
+// MARK: - Component-Based Presets
 
-struct Professional_Previews: PreviewProvider {
-    static var previews: some View {
-        Professional()
-            .makeView(tokens: .previewDanny)
-            .previewLayout(.fixed(width: Professional.defaultSize.width,
-                                  height: Professional.defaultSize.height))
-            .background(Color.black)
-            .previewDisplayName("Professional")
-    }
-}
-
-struct ModernProfessional_Previews: PreviewProvider {
-    static var previews: some View {
-        ModernProfessional()
-            .makeView(tokens: .previewDanny)
-            .previewLayout(.fixed(width: ModernProfessional.defaultSize.width,
-                                  height: ModernProfessional.defaultSize.height))
-            .background(Color.black)
-            .previewDisplayName("Modern Professional")
-    }
-}
+// Professional_Previews - REMOVED (component deleted)
+// ModernProfessional_Previews - REMOVED (component deleted)
 
 struct ModernPersonal_Previews: PreviewProvider {
     static var previews: some View {
@@ -179,27 +101,7 @@ struct ModernPersonal_Previews: PreviewProvider {
     }
 }
 
-struct CreatorMode_Previews: PreviewProvider {
-    static var previews: some View {
-        // Enhanced preview tokens with social media handles
-        var creatorTokens = OverlayTokens.previewDanny
-        creatorTokens.extras = [
-            "location": "Pittsburgh, PA",
-            "weatherEmoji": "☀️",
-            "weatherText": "72°F",
-            "twitter": "dannyfrancken",
-            "instagram": "danny.codes",
-            "youtube": "DevByDanny"
-        ]
-        
-        return CreatorMode()
-            .makeView(tokens: creatorTokens)
-            .previewLayout(.fixed(width: CreatorMode.defaultSize.width,
-                                  height: CreatorMode.defaultSize.height))
-            .background(Color.black)
-            .previewDisplayName("Creator Mode")
-    }
-}
+// CreatorMode_Previews - REMOVED (component deleted)
 
 struct SafeAreaValidation_Previews: PreviewProvider {
     static var previews: some View {
@@ -252,97 +154,11 @@ struct SafeAreaTest_Previews: PreviewProvider {
 
 // MARK: - Component Library Previews
 
-struct BottomBarComponents_Previews: PreviewProvider {
-    static var previews: some View {
-        let accentColor = Color(hex: "#118342", default: .green)
-        
-        Group {
-            VStack(spacing: 20) {
-                BottomBar(
-                    displayName: "Danny F",
-                    tagline: "High School Intern",
-                    accentColor: accentColor
-                )
-                
-                BottomBarV2(
-                    displayName: "Danny F",
-                    tagline: "High School Intern",
-                    accentColor: accentColor
-                )
-                
-                BottomBarCompact(
-                    displayName: "Danny F",
-                    tagline: "High School Intern",
-                    accentColor: accentColor
-                )
-                
-                BottomBarGlass(
-                    displayName: "Danny F",
-                    tagline: "High School Intern",
-                    accentColor: accentColor
-                )
-            }
-            .padding()
-            .background(Color.black)
-            .previewDisplayName("Bottom Bar Components")
-        }
-    }
-}
+// BottomBarComponents_Previews - REMOVED (most components deleted)
 
-struct TickerComponents_Previews: PreviewProvider {
-    static var previews: some View {
-        Group {
-            VStack(spacing: 20) {
-                WeatherTicker(
-                    location: "Pittsburgh, PA",
-                    weatherEmoji: "☀️",
-                    temperature: "72°F"
-                )
-                
-                TimeTicker(time: "8:04 PM")
-                
-                HStack(spacing: 12) {
-                    MetricTicker(label: "Viewers", value: "1.2K", accentColor: .red)
-                    MetricTicker(label: "Followers", value: "42.5K", accentColor: Color(hex: "#118342", default: .green))
-                    MetricTicker(label: "Live", value: "ON AIR", accentColor: .orange)
-                }
-            }
-            .padding()
-            .background(Color.black)
-            .previewDisplayName("Ticker Components")
-        }
-    }
-}
+// TickerComponents_Previews - REMOVED (all components deleted)
 
-struct BadgeComponents_Previews: PreviewProvider {
-    static var previews: some View {
-        Group {
-            VStack(spacing: 20) {
-                HStack(spacing: 12) {
-                    LogoBadge(logoText: "BONUSLY", accentColor: Color(hex: "#118342", default: .green))
-                    LogoBadge(logoText: "ACME CORP", accentColor: .blue)
-                    LogoBadge(logoText: "TECH CO", accentColor: .purple)
-                }
-                
-                HStack(spacing: 12) {
-                    StatusBadge(status: .live)
-                    StatusBadge(status: .recording)
-                    StatusBadge(status: .offline)
-                    StatusBadge(status: .custom("ON AIR", .purple))
-                }
-                
-                HStack(spacing: 12) {
-                    SocialBadge(platform: .twitter, handle: "dannyfrancken")
-                    SocialBadge(platform: .instagram, handle: "danny.codes")
-                    SocialBadge(platform: .youtube, handle: "DevByDanny")
-                }
-            }
-            .padding()
-            .background(Color.black)
-            .previewDisplayName("Badge Components")
-        }
-    }
-}
+// BadgeComponents_Previews - REMOVED (all components deleted)
 
 struct SafeAreaLive_Previews: PreviewProvider {
     static var previews: some View {

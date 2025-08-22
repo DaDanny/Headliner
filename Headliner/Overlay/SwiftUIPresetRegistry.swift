@@ -62,57 +62,21 @@ public enum SwiftUIPresetRegistry {
     /// All available SwiftUI presets
     public static let allPresets: [SwiftUIPresetInfo] = [
         // Standard Category
-        SwiftUIPresetInfo(
-            id: "swiftui.standard.lowerthird",
-            name: "Standard Lower Third",
-            description: "Clean professional lower third with glassmorphic styling",
-            category: .standard,
-            provider: StandardLowerThird()
-        ),
+        // (Standard Lower Third removed - outdated component)
         
         // Branded Category  
-        SwiftUIPresetInfo(
-            id: "swiftui.branded.ribbon",
-            name: "Brand Ribbon",
-            description: "Company branding with accent ribbon and logo placement",
-            category: .branded,
-            provider: BrandRibbon()
-        ),
+        // (Brand Ribbon removed - outdated component)
         
         // Creative Category
-        SwiftUIPresetInfo(
-            id: "swiftui.creative.metrics",
-            name: "Metric Chip Bar",
-            description: "Dynamic metrics display with animated chips",
-            category: .creative,
-            provider: MetricChipBar()
-        ),
+        // (Metric Chip Bar removed - outdated component)
         
         // Neo Lower Third
-        SwiftUIPresetInfo(
-            id: "swiftui.neo.lowerthird",
-            name: "Neo Lower Third",
-            description: "Cut clean lower third with sharp edges",
-            category: .creative,
-            provider: NeoLowerThird()
-        ),
+        // (Neo Lower Third removed - outdated component)
         
         // Company Cropped - Optimized for 4:3 presentations
-        SwiftUIPresetInfo(
-            id: "company-cropped",
-            name: "Company Cropped",
-            description: "4:3 optimized overlay perfect for meeting presentations",
-            category: .branded,
-            provider: CompanyCropped()
-        ),
+        // (Company Cropped removed - outdated component)
         
-        SwiftUIPresetInfo(
-            id: "company-cropped-v2",
-            name: "Company Cropped V2",
-            description: "V2 4:3 optimized overlay perfect for meeting presentations",
-            category: .branded,
-            provider: CompanyCroppedV2()
-        ),
+        // (Company Cropped V2 removed - outdated component)
         
         SwiftUIPresetInfo(
             id: "swiftui.aspectratio.test",
@@ -131,29 +95,11 @@ public enum SwiftUIPresetRegistry {
         ),
         
         // Safe Area Component-Based Presets
-        SwiftUIPresetInfo(
-            id: "swiftui.professional",
-            name: "Professional",
-            description: "Professional overlay with safe area support using component library",
-            category: .standard,
-            provider: Professional()
-        ),
+        // (Professional removed - uses outdated components)
         
-        SwiftUIPresetInfo(
-            id: "swiftui.modern.professional",
-            name: "Modern Professional",
-            description: "Modern professional with profile circle and enhanced styling",
-            category: .standard,
-            provider: ModernProfessional()
-        ),
+        // (Modern Professional removed - uses outdated components)
         
-        SwiftUIPresetInfo(
-            id: "swiftui.creator.mode",
-            name: "Creator Mode",
-            description: "Creator mode with social badges and live metrics",
-            category: .creative,
-            provider: CreatorMode()
-        ),
+        // (Creator Mode removed - uses outdated components)
         
         // Validation and Testing
         SwiftUIPresetInfo(

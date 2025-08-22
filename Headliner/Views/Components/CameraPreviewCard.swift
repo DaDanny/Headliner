@@ -188,12 +188,12 @@ struct CameraPreviewCard: View {
       return preset.provider
     }
     
-    // Legacy mapping for old preset IDs (gradually migrate these to use new IDs)
+    // Legacy mapping for old preset IDs (migrated to remaining valid presets)
     let legacyMappings: [String: String] = [
-      "professional": "swiftui.professional",
-      "personal": "swiftui.branded.ribbon", 
-      "company-branding": "swiftui.branded.ribbon",
-      "metric": "swiftui.creative.metrics"
+      "professional": "swiftui.modern.personal", // Use ModernPersonal as fallback
+      "personal": "swiftui.modern.personal", 
+      "company-branding": "swiftui.modern.personal",
+      "metric": "swiftui.modern.personal" // Use ModernPersonal as fallback
     ]
     
     if let newId = legacyMappings[presetId] {
@@ -212,10 +212,10 @@ struct CameraPreviewCard: View {
     
     // Legacy mapping for old preset IDs
     let legacyMappings: [String: String] = [
-      "professional": "swiftui.professional",
-      "personal": "swiftui.branded.ribbon",
-      "company-branding": "swiftui.branded.ribbon", 
-      "metric": "swiftui.creative.metrics"
+      "professional": "swiftui.modern.personal",
+      "personal": "swiftui.modern.personal",
+      "company-branding": "swiftui.modern.personal", 
+      "metric": "swiftui.modern.personal"
     ]
     
     if let newId = legacyMappings[presetId],
