@@ -339,22 +339,26 @@ class AppState: ObservableObject {
   
   /// Trigger SwiftUI overlay rendering if the current preset is SwiftUI-based
   private func triggerSwiftUIRenderingIfNeeded() {
-    let presetId = overlaySettings.selectedPresetId
+    let presetId = self.overlaySettings.selectedPresetId
     
-    guard let tokens = overlaySettings.overlayTokens else { 
+    guard let tokens = self.overlaySettings.overlayTokens else { 
       self.logger.debug("🔍 [SwiftUI] No overlay tokens available for preset '\(presetId)' - skipping SwiftUI rendering")
       return 
     }
     
-    self.logger.debug("🔍 [SwiftUI] Checking SwiftUI rendering for preset '\(presetId)' with tokens: \(tokens.displayName)")
+    self.logger.debug("🔍 [SwiftUI] Triggering SwiftUI rendering for preset '\(presetId)' with tokens: \(tokens.displayName), safeAreaMode: \(self.overlaySettings.safeAreaMode.displayName)")
     
     // Check if this is a SwiftUI preset and get the appropriate provider
     if let provider = swiftUIProvider(for: presetId) {
-      self.logger.debug("🎨 [SwiftUI] Triggering SwiftUI rendering for preset '\(presetId)'")
+      self.logger.debug("🎨 [SwiftUI] Rendering SwiftUI overlay with safeAreaMode: \(self.overlaySettings.safeAreaMode.rawValue)")
       Task { @MainActor in
+        let renderTokens = RenderTokens(safeAreaMode: self.overlaySettings.safeAreaMode)
+        let personalInfo = self.getCurrentPersonalInfo()
         await OverlayRenderBroker.shared.updateOverlay(
           provider: provider,
-          tokens: tokens
+          tokens: tokens,
+          renderTokens: renderTokens,
+          personalInfo: personalInfo
         )
       }
     } else {
@@ -366,6 +370,16 @@ class AppState: ObservableObject {
   private func swiftUIProvider(for presetId: String) -> (any OverlayViewProviding)? {
     // Look up the SwiftUI preset in the registry
     return SwiftUIPresetRegistry.preset(withId: presetId)?.provider
+  }
+  
+  /// Get current PersonalInfo from App Group storage
+  private func getCurrentPersonalInfo() -> PersonalInfo? {
+    guard let userDefaults = UserDefaults(suiteName: Identifiers.appGroup),
+          let data = userDefaults.data(forKey: "overlay.personalInfo.v1"),
+          let info = try? JSONDecoder().decode(PersonalInfo.self, from: data) else {
+      return nil
+    }
+    return info
   }
   
   /// Get all available SwiftUI presets (new system)

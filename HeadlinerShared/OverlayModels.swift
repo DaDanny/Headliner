@@ -30,6 +30,18 @@ public enum OverlayAspect: String, Codable, CaseIterable {
     }
 }
 
+/// Configuration for how overlays should be rendered
+public struct RenderTokens: Hashable, Codable {
+    public var safeAreaMode: SafeAreaMode
+    // Future rendering settings can be added here:
+    // public var animation: AnimationMode?
+    // public var theme: ThemeMode?
+    
+    public init(safeAreaMode: SafeAreaMode = .balanced) {
+        self.safeAreaMode = safeAreaMode
+    }
+}
+
 /// Tokens that get replaced in overlay templates
 public struct OverlayTokens: Hashable, Codable {
     public var displayName: String
@@ -275,6 +287,239 @@ struct OverlayPreset: Identifiable, Codable, Equatable {
         self.name = name
         self.nodes = nodes
         self.layout = layout
+    }
+}
+
+// MARK: - Safe Area System
+
+/// Safe area modes for overlay positioning
+public enum SafeAreaMode: String, Codable, CaseIterable {
+    case none = "none"              // Full frame (no safe area)
+    case aggressive = "aggressive"   // Minimal safe area (more space, slight risk)
+    case balanced = "balanced"       // Proven yellow zone (default)
+    case conservative = "conservative" // Extra safe area (guaranteed visible)
+    case compact = "compact"           // macOS optimized (conservative height, balanced width)
+
+    public var displayName: String {
+        switch self {
+            case .none: return "Full Frame"
+            case .aggressive: return "Expanded"
+            case .balanced: return "Tile-Safe (Recommended)"
+            case .conservative: return "Ultra-Safe"
+            case .compact: return "Compact"
+        }
+    }
+
+    public var description: String {
+        switch self {
+            case .none: return "Use entire frame (may crop in grids)"
+            case .aggressive: return "More space, works in most video apps"
+            case .balanced: return "Guaranteed visible in Meet/Zoom tiles"
+            case .conservative: return "Maximum compatibility, all platforms"
+            case .compact: return "Balanced width, conservative height (perfect for macOS)"
+        }
+    }
+}
+
+/// Safe area calculator based on real-world platform testing
+public struct SafeAreaCalculator {
+    
+    /// Calculate safe area for overlay positioning
+    /// - Parameters:
+    ///   - mode: Safe area mode (default: balanced)
+    ///   - inputAR: Camera input aspect ratio (default: 4:3)
+    ///   - outputSize: Output canvas size (default: 1920x1080)
+    /// - Returns: Normalized safe area rectangle (0-1 coordinates)
+    public static func calculateSafeArea(
+        mode: SafeAreaMode = .balanced,
+        inputAR: CGSize? = nil,
+        outputSize: CGSize = CGSize(width: 1920, height: 1080)
+    ) -> CGRect {
+        let actualInputAR = inputAR ?? CGSize(width: 4, height: 3)
+
+        switch mode {
+        case .none:
+            return CGRect(x: 0, y: 0, width: 1, height: 1)
+
+        case .aggressive:
+            return calculateWithPlatforms(
+                inputAR: actualInputAR,
+                platforms: [
+                    .init(width: 1, height: 1),    // Square tiles
+                    .init(width: 16, height: 9)    // Widescreen tiles
+                ],
+                titleSafeInset: 0.02,
+                outputSize: outputSize
+            )
+
+        case .balanced:
+            return calculateWithPlatforms(
+                inputAR: actualInputAR,
+                platforms: [
+                    .init(width: 1, height: 1),   // Square tiles
+                    .init(width: 5, height: 4),   // 5:4-ish tiles
+                    .init(width: 4, height: 3),   // 4:3 tiles
+                    .init(width: 3, height: 2),   // 3:2 tiles
+                    .init(width: 16, height: 9)   // Widescreen tiles
+                ],
+                titleSafeInset: 0.04,
+                outputSize: outputSize
+            )
+
+        case .conservative:
+            return calculateWithPlatforms(
+                inputAR: actualInputAR,
+                platforms: [
+                    .init(width: 1, height: 1),   // Square tiles
+                    .init(width: 5, height: 4),   // 5:4 tiles
+                    .init(width: 4, height: 3),   // 4:3 tiles
+                    .init(width: 3, height: 2),   // 3:2 tiles
+                    .init(width: 16, height: 9),  // Widescreen tiles
+                    .init(width: 9, height: 16)   // Mobile portrait (rare but happens)
+                ],
+                titleSafeInset: 0.08,
+                outputSize: outputSize
+            )
+            
+        case .compact:
+            return calculateWithPlatforms(
+                inputAR: actualInputAR,
+                platforms: [
+                    .init(width: 1, height: 1),   // Square tiles
+                    .init(width: 5, height: 4),   // 5:4 tiles
+                    .init(width: 4, height: 3),   // 4:3 tiles
+                    .init(width: 3, height: 2),   // 3:2 tiles
+                    .init(width: 16, height: 9)   // Widescreen tiles
+                    // NO 9:16 mobile portrait for macOS!
+                ],
+                titleSafeInset: 0.08,    // Conservative 8% padding
+                outputSize: outputSize
+            )
+        }
+    }
+
+    private static func calculateWithPlatforms(
+        inputAR: CGSize,
+        platforms: [CGSize],
+        titleSafeInset: CGFloat,
+        outputSize: CGSize
+    ) -> CGRect {
+
+        // Step 1: Fit camera input into output canvas
+        let contentSafe = fitRect(content: inputAR, into: outputSize)
+
+        // Step 2: Calculate center crops for each platform
+        let cropRects = platforms.map { fitRectInRect(content: $0, inRect: contentSafe) }
+
+        // Step 3: Find intersection = always visible area
+        let platformSafe = intersectAll(cropRects)
+
+        // Step 4: Add title-safe padding
+        let paddedSafe = inset(platformSafe, pct: titleSafeInset)
+
+        // Step 5: Convert to normalized coordinates (0-1)
+        return CGRect(
+            x: paddedSafe.minX / outputSize.width,
+            y: paddedSafe.minY / outputSize.height,
+            width: paddedSafe.width / outputSize.width,
+            height: paddedSafe.height / outputSize.height
+        )
+    }
+
+    // MARK: - Helper Functions (copied from AspectRatioTestV2)
+
+    private static func fitRect(content: CGSize, into container: CGSize) -> CGRect {
+        let sx = container.width / max(content.width, 1)
+        let sy = container.height / max(content.height, 1)
+        let s = min(sx, sy)
+        let w = content.width * s
+        let h = content.height * s
+        let x = (container.width - w) * 0.5
+        let y = (container.height - h) * 0.5
+        return CGRect(x: x, y: y, width: w, height: h)
+    }
+
+    private static func fitRectInRect(content: CGSize, inRect r: CGRect) -> CGRect {
+        let sx = r.width / max(content.width, 1)
+        let sy = r.height / max(content.height, 1)
+        let s = min(sx, sy)
+        let w = content.width * s
+        let h = content.height * s
+        let x = r.minX + (r.width - w) * 0.5
+        let y = r.minY + (r.height - h) * 0.5
+        return CGRect(x: x, y: y, width: w, height: h)
+    }
+
+    private static func intersectAll(_ rects: [CGRect]) -> CGRect {
+        guard var acc = rects.first else { return .zero }
+        for r in rects.dropFirst() { acc = acc.intersection(r) }
+        return acc
+    }
+
+    private static func inset(_ r: CGRect, pct: CGFloat) -> CGRect {
+        let dx = r.width * pct
+        let dy = r.height * pct
+        return r.insetBy(dx: dx, dy: dy)
+    }
+}
+
+// MARK: - Face-Avoid Bands
+
+/// Safe bands that avoid the center where faces typically appear
+public struct SafeBands {
+    public let top: CGRect
+    public let bottom: CGRect
+    public let left: CGRect
+    public let right: CGRect
+    public let center: CGRect // Avoid this area for overlays
+}
+
+extension SafeAreaCalculator {
+    /// Create safe bands within a safe area that avoid covering faces
+    public static func makeBands(
+        in safeArea: CGRect,
+        centerHeightPct: CGFloat = 0.40,
+        sideWidthPct: CGFloat = 0.22
+    ) -> SafeBands {
+        let ch = safeArea.height * max(0, min(1, centerHeightPct))
+        let sw = safeArea.width * max(0, min(1, sideWidthPct))
+
+        let center = CGRect(
+            x: safeArea.minX,
+            y: safeArea.midY - ch/2,
+            width: safeArea.width,
+            height: ch
+        )
+
+        let top = CGRect(
+            x: safeArea.minX,
+            y: safeArea.minY,
+            width: safeArea.width,
+            height: center.minY - safeArea.minY
+        )
+
+        let bottom = CGRect(
+            x: safeArea.minX,
+            y: center.maxY,
+            width: safeArea.width,
+            height: safeArea.maxY - center.maxY
+        )
+
+        let left = CGRect(
+            x: safeArea.minX,
+            y: safeArea.minY,
+            width: sw,
+            height: safeArea.height
+        )
+
+        let right = CGRect(
+            x: safeArea.maxX - sw,
+            y: safeArea.minY,
+            width: sw,
+            height: safeArea.height
+        )
+
+        return SafeBands(top: top, bottom: bottom, left: left, right: right, center: center)
     }
 }
 

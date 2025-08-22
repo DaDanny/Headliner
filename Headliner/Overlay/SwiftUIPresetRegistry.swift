@@ -128,6 +128,56 @@ public enum SwiftUIPresetRegistry {
             description: "Aspect Ratio Test V2",
             category: .branded,
             provider: AspectRatioTestV2()
+        ),
+        
+        // Safe Area Component-Based Presets
+        SwiftUIPresetInfo(
+            id: "swiftui.professional",
+            name: "Professional",
+            description: "Professional overlay with safe area support using component library",
+            category: .standard,
+            provider: Professional()
+        ),
+        
+        SwiftUIPresetInfo(
+            id: "swiftui.modern.professional",
+            name: "Modern Professional",
+            description: "Modern professional with profile circle and enhanced styling",
+            category: .standard,
+            provider: ModernProfessional()
+        ),
+        
+        SwiftUIPresetInfo(
+            id: "swiftui.creator.mode",
+            name: "Creator Mode",
+            description: "Creator mode with social badges and live metrics",
+            category: .creative,
+            provider: CreatorMode()
+        ),
+        
+        // Validation and Testing
+        SwiftUIPresetInfo(
+            id: "swiftui.safearea.validation",
+            name: "Safe Area Validation",
+            description: "Validation overlay showing safe area boundaries vs AspectRatioTestV2",
+            category: .standard,
+            provider: SafeAreaValidation()
+        ),
+        
+        SwiftUIPresetInfo(
+            id: "swiftui.safearea.test",
+            name: "Safe Area Test",
+            description: "Simple test showing SafeAreaCalculator result vs AspectRatioTestV2",
+            category: .standard,
+            provider: SafeAreaTest()
+        ),
+        
+        SwiftUIPresetInfo(
+            id: "swiftui.safearea.live",
+            name: "Safe Area Live",
+            description: "Live safe area testing with actual camera dimensions and selected mode",
+            category: .standard,
+            provider: SafeAreaLive()
         )
         
         // Add new presets here! 🎨

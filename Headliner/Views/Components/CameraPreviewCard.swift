@@ -112,6 +112,9 @@ struct CameraPreviewCard: View {
     .onChange(of: appState?.overlaySettings.overlayAspect) { _ in
       updateOverlayPreview()
     }
+    .onChange(of: appState?.overlaySettings.safeAreaMode) { _ in
+      updateOverlayPreview()
+    }
   }
   
   // MARK: - Private Methods
@@ -151,70 +154,77 @@ struct CameraPreviewCard: View {
       return
     }
     
+    // Get current safe area mode from appState
+    let safeAreaMode = appState?.overlaySettings.safeAreaMode ?? .balanced
+    let renderTokens = RenderTokens(safeAreaMode: safeAreaMode)
+    
+    // Get PersonalInfo for previews (optional, could be nil)
+    let personalInfo = getCurrentPersonalInfo()
+    
     // Render the overlay at preview resolution
     overlayPreviewImage = await SwiftUIOverlayRenderer.shared.renderCGImage(
       provider: provider,
       tokens: tokens,
       size: size,
-      scale: 1.0  // Use 1.0 for performance
+      scale: 1.0,  // Use 1.0 for performance
+      renderTokens: renderTokens,
+      personalInfo: personalInfo
     )
   }
   
-  private func getOverlayProvider(for presetId: String) -> (any OverlayViewProviding)? {
-    // Map preset IDs to different SwiftUI providers for variety
-    switch presetId {
-    case "professional":
-      return StandardLowerThird()
-    case "personal":
-      return BrandRibbon()  // Use branded style for personal
-    case "company-branding":
-      return BrandRibbon()  // Use branded style for company
-    case "metric":
-      return MetricChipBar()  // Use metrics for metric preset
-    // Direct SwiftUI preset IDs
-    case "swiftui.standard.lowerthird":
-      return StandardLowerThird()
-    case "swiftui.branded.ribbon":
-      return BrandRibbon()
-    case "swiftui.creative.metrics":
-      return MetricChipBar()
-    case "company-cropped":
-      return CompanyCropped()
-    case "company-cropped-v2":
-      return CompanyCroppedV2()
-    case "swiftui.aspectratio.test":
-      return AspectRatioTest()
-    case "swiftui.aspectratio.test-v2":
-        return AspectRatioTestV2()
-    default:
-      // Fallback to StandardLowerThird for unknown presets
-      return StandardLowerThird()
+  /// Get current PersonalInfo from App Group storage (same as AppState)
+  private func getCurrentPersonalInfo() -> PersonalInfo? {
+    guard let userDefaults = UserDefaults(suiteName: Identifiers.appGroup),
+          let data = userDefaults.data(forKey: "overlay.personalInfo.v1"),
+          let info = try? JSONDecoder().decode(PersonalInfo.self, from: data) else {
+      return nil
     }
+    return info
+  }
+
+  private func getOverlayProvider(for presetId: String) -> (any OverlayViewProviding)? {
+    // Use SwiftUI registry as the single source of truth
+    if let preset = SwiftUIPresetRegistry.preset(withId: presetId) {
+      return preset.provider
+    }
+    
+    // Legacy mapping for old preset IDs (gradually migrate these to use new IDs)
+    let legacyMappings: [String: String] = [
+      "professional": "swiftui.professional",
+      "personal": "swiftui.branded.ribbon", 
+      "company-branding": "swiftui.branded.ribbon",
+      "metric": "swiftui.creative.metrics"
+    ]
+    
+    if let newId = legacyMappings[presetId] {
+      return SwiftUIPresetRegistry.preset(withId: newId)?.provider
+    }
+    
+    // Fallback to first available preset from registry
+    return SwiftUIPresetRegistry.allPresets.first?.provider
   }
   
   private func getOverlayName(for presetId: String) -> String {
-    switch presetId {
-    case "professional":
-      return "Standard"
-    case "personal":
-      return "Brand"
-    case "company-branding":
-      return "Brand"
-    case "metric":
-      return "Metrics"
-    case "swiftui.standard.lowerthird":
-      return "Standard"
-    case "swiftui.branded.ribbon":
-      return "Brand"
-    case "swiftui.creative.metrics":
-      return "Metrics"
-    case "company-cropped":
-      return "Company"
-    case "company-cropped-v2":
-      return "Company V2"
-    default:
-      return "Standard"
+    // Use SwiftUI registry as the single source of truth
+    if let preset = SwiftUIPresetRegistry.preset(withId: presetId) {
+      return preset.name
     }
+    
+    // Legacy mapping for old preset IDs
+    let legacyMappings: [String: String] = [
+      "professional": "swiftui.professional",
+      "personal": "swiftui.branded.ribbon",
+      "company-branding": "swiftui.branded.ribbon", 
+      "metric": "swiftui.creative.metrics"
+    ]
+    
+    if let newId = legacyMappings[presetId],
+       let preset = SwiftUIPresetRegistry.preset(withId: newId) {
+      return preset.name
+    }
+    
+    // Fallback
+    return "Unknown"
   }
 }
 

@@ -27,7 +27,9 @@ public final class OverlayRenderBroker {
     public func updateOverlay<P: OverlayViewProviding>(
         provider: P,
         tokens: OverlayTokens,
-        pixelSize: CGSize
+        pixelSize: CGSize,
+        renderTokens: RenderTokens,
+        personalInfo: PersonalInfo? = nil
     ) async {
         logger.debug("🚀 [OverlayBroker] Starting updateOverlay for \(P.presetId)")
         
@@ -35,7 +37,9 @@ public final class OverlayRenderBroker {
             provider: provider,
             tokens: tokens,
             size: pixelSize,
-            scale: 1.0 // IMPORTANT: pixel == point
+            scale: 1.0, // IMPORTANT: pixel == point
+            renderTokens: renderTokens,
+            personalInfo: personalInfo
         ) else { 
             logger.warning("⚠️ [OverlayBroker] Failed to render SwiftUI overlay")
             return 
@@ -54,10 +58,12 @@ public final class OverlayRenderBroker {
     /// Convenience method that automatically uses cached camera dimensions
     public func updateOverlay<P: OverlayViewProviding>(
         provider: P,
-        tokens: OverlayTokens
+        tokens: OverlayTokens,
+        renderTokens: RenderTokens,
+        personalInfo: PersonalInfo? = nil
     ) async {
         let dimensions = getCachedCameraDimensions()
-        await updateOverlay(provider: provider, tokens: tokens, pixelSize: dimensions)
+        await updateOverlay(provider: provider, tokens: tokens, pixelSize: dimensions, renderTokens: renderTokens, personalInfo: personalInfo)
     }
     
     /// Clear the current overlay

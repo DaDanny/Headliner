@@ -10,6 +10,8 @@ import CoreImage
 import CoreGraphics
 import Foundation
 
+
+
 /// Render SwiftUI overlays into CGImages with correct sizing, transparency, and caching.
 /// NOTE: ImageRenderer requires main-thread. We isolate main-thread work and keep the API async.
 @available(macOS 13.0, *)
@@ -61,13 +63,14 @@ public final class SwiftUIOverlayRenderer {
     }
 
     /// Stable cache key composition
-    private func cacheKey(tokens: OverlayTokens, size: CGSize, scale: CGFloat, presetId: String) -> NSString {
+    private func cacheKey(tokens: OverlayTokens, size: CGSize, scale: CGFloat, presetId: String, renderTokens: RenderTokens) -> NSString {
         var hasher = Hasher()
         hasher.combine(tokens)
         hasher.combine(Int(size.width))
         hasher.combine(Int(size.height))
         hasher.combine(Int(scale * 1000))
         hasher.combine(presetId)
+        hasher.combine(renderTokens) // Include all render configuration in cache key!
         return NSString(string: String(hasher.finalize()))
     }
 
@@ -76,11 +79,13 @@ public final class SwiftUIOverlayRenderer {
         provider: P,
         tokens: OverlayTokens,
         size: CGSize,
-        scale: CGFloat = 1.0  // Use 1.0 for runtime (size already in pixels), 2.0 for previews
+        scale: CGFloat = 1.0,  // Use 1.0 for runtime (size already in pixels), 2.0 for previews
+        renderTokens: RenderTokens,
+        personalInfo: PersonalInfo? = nil
     ) async -> CGImage? {
-        // Enrich tokens with PersonalInfo data (same as CameraOverlayRenderer)
+        // Enrich tokens with PersonalInfo data if provided
         var enrichedTokens = tokens
-        if let personalInfo = getPersonalInfo() {
+        if let personalInfo = personalInfo {
             // Merge personal info into extras dictionary
             var extras = enrichedTokens.extras ?? [:]
             extras["location"] = extras["location"] ?? personalInfo.city
@@ -97,7 +102,7 @@ public final class SwiftUIOverlayRenderer {
             )
         }
         
-        let key = cacheKey(tokens: enrichedTokens, size: size, scale: scale, presetId: P.presetId)
+        let key = cacheKey(tokens: enrichedTokens, size: size, scale: scale, presetId: P.presetId, renderTokens: renderTokens)
         
         logger.debug("🎨 [SwiftUIRenderer] Starting render for \(P.presetId) at \(Int(size.width))x\(Int(size.height))")
 
@@ -144,9 +149,18 @@ public final class SwiftUIOverlayRenderer {
         provider: P,
         tokens: OverlayTokens,
         size: CGSize,
-        scale: CGFloat = 1.0  // Use 1.0 for runtime (size already in pixels), 2.0 for previews
+        scale: CGFloat = 1.0,  // Use 1.0 for runtime (size already in pixels), 2.0 for previews
+        renderTokens: RenderTokens,
+        personalInfo: PersonalInfo? = nil
     ) async -> CIImage? {
-        guard let cg = await renderCGImage(provider: provider, tokens: tokens, size: size, scale: scale) else {
+        guard let cg = await renderCGImage(
+            provider: provider, 
+            tokens: tokens, 
+            size: size, 
+            scale: scale,
+            renderTokens: renderTokens,
+            personalInfo: personalInfo
+        ) else {
             return nil
         }
         return CIImage(cgImage: cg, options: [.colorSpace: colorSpace])
@@ -164,13 +178,5 @@ public final class SwiftUIOverlayRenderer {
         logger.debug("🧹 [SwiftUIRenderer] Expired cache cleanup (lazy expiration active)")
     }
     
-    /// Get PersonalInfo from App Group storage (same as CameraOverlayRenderer)
-    private func getPersonalInfo() -> PersonalInfo? {
-        guard let userDefaults = UserDefaults(suiteName: Identifiers.appGroup),
-              let data = userDefaults.data(forKey: "overlay.personalInfo.v1"),
-              let info = try? JSONDecoder().decode(PersonalInfo.self, from: data) else {
-            return nil
-        }
-        return info
-    }
+
 }
