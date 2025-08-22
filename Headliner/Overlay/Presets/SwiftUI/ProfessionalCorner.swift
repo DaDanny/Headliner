@@ -1,15 +1,15 @@
 //
-//  ModernPersonal.swift
+//  ProfessionalCorner.swift
 //  Headliner
 //
-//  Created by Danny Francken on 8/21/25.
+//  Professional corner overlay with company branding and time
 //
 
 import SwiftUI
 
-/// Modern Personal Preset with all the bells and whistles
-struct ModernPersonal: OverlayViewProviding {
-    static let presetId = "swiftui.modern.personal"
+/// Professional corner overlay: company mark + time in top-right
+struct ProfessionalCorner: OverlayViewProviding {
+    static let presetId = "swiftui.professional.corner"
     static let defaultSize = CGSize(width: 1920, height: 1080)
 
     func makeView(tokens: OverlayTokens) -> some View {
@@ -17,14 +17,15 @@ struct ModernPersonal: OverlayViewProviding {
         let accentColor = TokenHelpers.accentColor(from: tokens)
         
         SafeAreaContainer(mode: settings.safeAreaMode) {
-            ModernPersonalContent(tokens: tokens, accentColor: accentColor)
+            ProfessionalCornerContent(logoText: tokens.logoText, localTime: tokens.localTime, accentColor: accentColor)
         }
     }
 }
 
 // Separate view to use @Environment properly
-private struct ModernPersonalContent: View {
-    let tokens: OverlayTokens
+private struct ProfessionalCornerContent: View {
+    let logoText: String?
+    let localTime: String?
     let accentColor: Color
     
     @Environment(\.surfaceStyle) private var surfaceStyle
@@ -33,44 +34,34 @@ private struct ModernPersonalContent: View {
         OverlayScaleReader { theme, s in
             let e = theme.effects
             
-            return ZStack(alignment: .top) {
-//                ThemeAwareDebugBorder()
-
-                VStack(spacing: 0) {
-
-                    // TOP BAR AREA
-                    HStack {
-                        // City badge (left)
-                        if let extras = tokens.extras,
-                           let city = extras["location"] as? String, !city.isEmpty {
-                            CityBadgeModern(
-                                city: city,
-                                surfaceStyle: surfaceStyle
-                            )
-                        }
-                        
-                        Spacer(minLength: 0)
-                        
-                        // Weather ticker (right)
-                        SimpleWeatherTicker(
-                            weatherEmoji: tokens.weatherEmoji,
-                            temperature: tokens.weatherText,
+            return ZStack(alignment: .topTrailing) {
+                VStack(spacing: e.insetSmall * s) {
+                    // Company branding
+                    if let logoText = logoText, !logoText.isEmpty {
+                        CompanyMarkBadgeModern(
+                            companyName: logoText,
+                            markImage: nil,
+                            showName: true,
+                            accentColor: accentColor,
                             surfaceStyle: surfaceStyle
                         )
                     }
-
-                    Spacer(minLength: 0)
-
-                    // BOTTOM BAR AREA
-                    BottomBarModern(
-                        displayName: tokens.displayName,
-                        tagline: tokens.tagline,
-                        accentColor: accentColor,
-                        surfaceStyle: surfaceStyle
-                    )
+                    
+                    // Local time
+                    if let localTime = localTime, !localTime.isEmpty {
+                        LocalTimeBadgeModern(
+                            time: localTime,
+                            surfaceStyle: surfaceStyle
+                        )
+                    }
                 }
+                .padding(.top, e.insetLarge * s)
+                .padding(.trailing, e.insetLarge * s)
+                .frame(maxWidth: .infinity, alignment: .center) // width fill
+                .frame(maxHeight: .infinity, alignment: .bottom) // <-- pin to bottom
+                .padding(.bottom, e.insetLarge * s) // optional bottom inset
             }
-            .allowsHitTesting(false) // overlay is decorative
+            .allowsHitTesting(false)
         }
     }
 }
@@ -97,10 +88,9 @@ private struct OverlayScaleReader<Content: View>: View {
     }
 }
 
-
 #if DEBUG
-#Preview("Classic Theme") {
-    ModernPersonal()
+#Preview("Classic Theme - Rounded") {
+    ProfessionalCorner()
         .makeView(tokens: OverlayTokens.previewDanny)
         .frame(width: 1920, height: 1080)
         .background(.black)
@@ -108,8 +98,8 @@ private struct OverlayScaleReader<Content: View>: View {
         .environment(\.overlayRenderSize, .init(width: 1920, height: 1080))
 }
 
-#Preview("Midnight Theme") {
-    ModernPersonal()
+#Preview("Midnight Theme - Square") {
+    ProfessionalCorner()
         .makeView(tokens: OverlayTokens.previewDanny)
         .frame(width: 1920, height: 1080)
         .background(.black)
@@ -117,8 +107,8 @@ private struct OverlayScaleReader<Content: View>: View {
         .environment(\.overlayRenderSize, .init(width: 1920, height: 1080))
 }
 
-#Preview("Dawn Theme") {
-    ModernPersonal()
+#Preview("Dawn Theme - Rounded") {
+    ProfessionalCorner()
         .makeView(tokens: OverlayTokens.previewDanny)
         .frame(width: 1920, height: 1080)
         .background(.black)

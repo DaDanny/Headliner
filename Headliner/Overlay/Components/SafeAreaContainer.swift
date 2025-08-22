@@ -45,6 +45,18 @@ struct SafeAreaContainer<Content: View>: View {
 
 // MARK: - Helper Functions
 
+/// Environment key for surface style
+private struct SurfaceStyleKey: EnvironmentKey {
+    static let defaultValue: SurfaceStyle = .rounded
+}
+
+extension EnvironmentValues {
+    var surfaceStyle: SurfaceStyle {
+        get { self[SurfaceStyleKey.self] }
+        set { self[SurfaceStyleKey.self] = newValue }
+    }
+}
+
 /// Read overlay settings from UserDefaults (App Group)
 func getOverlaySettings() -> OverlaySettings {
     guard let userDefaults = UserDefaults(suiteName: Identifiers.appGroup),
@@ -53,6 +65,31 @@ func getOverlaySettings() -> OverlaySettings {
         return OverlaySettings() // Return default settings
     }
     return settings
+}
+
+/// Combined structure for overlay and render settings
+struct OverlayRenderSettings {
+    let overlaySettings: OverlaySettings
+    let surfaceStyle: SurfaceStyle
+}
+
+/// Get overlay settings with current surface style from environment
+func getOverlayRenderSettings(environmentSurfaceStyle: SurfaceStyle) -> OverlayRenderSettings {
+    let settings = getOverlaySettings()
+    return OverlayRenderSettings(
+        overlaySettings: settings,
+        surfaceStyle: environmentSurfaceStyle
+    )
+}
+
+/// Get overlay settings with surface style from the settings
+func getOverlayRenderSettings() -> OverlayRenderSettings {
+    let settings = getOverlaySettings()
+    let surfaceStyle = SurfaceStyle(rawValue: settings.selectedSurfaceStyle) ?? .rounded
+    return OverlayRenderSettings(
+        overlaySettings: settings,
+        surfaceStyle: surfaceStyle
+    )
 }
 
 // MARK: - Extensions

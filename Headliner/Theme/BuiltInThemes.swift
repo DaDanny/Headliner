@@ -4,11 +4,11 @@ import SwiftUI
 
 extension Theme {
     enum BaseFontSize {
-        static let small: CGFloat = 24
-        static let body: CGFloat = 22
-        static let title: CGFloat = 28
-        static let display: CGFloat = 40
-        static let emoji: CGFloat = 28
+        static let small: CGFloat = 28
+        static let body: CGFloat = 26
+        static let title: CGFloat = 32
+        static let display: CGFloat = 44
+        static let emoji: CGFloat = 32
     }
     
     enum BaseEffectSize {

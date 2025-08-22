@@ -1,31 +1,29 @@
 //
-//  ModernPersonal.swift
+//  StatusBar.swift
 //  Headliner
 //
-//  Created by Danny Francken on 8/21/25.
+//  Status bar overlay with weather, time, and location
 //
 
 import SwiftUI
 
-/// Modern Personal Preset with all the bells and whistles
-struct ModernPersonal: OverlayViewProviding {
-    static let presetId = "swiftui.modern.personal"
+/// Status bar overlay: weather, time, and location in top bar
+struct StatusBar: OverlayViewProviding {
+    static let presetId = "swiftui.status.bar"
     static let defaultSize = CGSize(width: 1920, height: 1080)
 
     func makeView(tokens: OverlayTokens) -> some View {
         let settings = getOverlaySettings()
-        let accentColor = TokenHelpers.accentColor(from: tokens)
         
         SafeAreaContainer(mode: settings.safeAreaMode) {
-            ModernPersonalContent(tokens: tokens, accentColor: accentColor)
+            StatusBarContent(tokens: tokens)
         }
     }
 }
 
 // Separate view to use @Environment properly
-private struct ModernPersonalContent: View {
+private struct StatusBarContent: View {
     let tokens: OverlayTokens
-    let accentColor: Color
     
     @Environment(\.surfaceStyle) private var surfaceStyle
     
@@ -34,43 +32,41 @@ private struct ModernPersonalContent: View {
             let e = theme.effects
             
             return ZStack(alignment: .top) {
-//                ThemeAwareDebugBorder()
-
-                VStack(spacing: 0) {
-
-                    // TOP BAR AREA
-                    HStack {
-                        // City badge (left)
-                        if let extras = tokens.extras,
-                           let city = extras["location"] as? String, !city.isEmpty {
-                            CityBadgeModern(
-                                city: city,
-                                surfaceStyle: surfaceStyle
-                            )
-                        }
-                        
-                        Spacer(minLength: 0)
-                        
-                        // Weather ticker (right)
+                HStack(spacing: e.insetMedium * s) {
+                    // Weather ticker
+                    if TokenHelpers.hasWeatherData(tokens) {
                         SimpleWeatherTicker(
                             weatherEmoji: tokens.weatherEmoji,
                             temperature: tokens.weatherText,
                             surfaceStyle: surfaceStyle
                         )
                     }
-
+                    
+                    // City badge
+                    if let city = tokens.city, !city.isEmpty {
+                        CityBadgeModern(
+                            city: city,
+                            surfaceStyle: surfaceStyle
+                        )
+                    }
+                    
                     Spacer(minLength: 0)
-
-                    // BOTTOM BAR AREA
-                    BottomBarModern(
-                        displayName: tokens.displayName,
-                        tagline: tokens.tagline,
-                        accentColor: accentColor,
-                        surfaceStyle: surfaceStyle
-                    )
+                    
+                    // Local time
+                    if let localTime = tokens.localTime, !localTime.isEmpty {
+                        LocalTimeBadgeModern(
+                            time: localTime,
+                            surfaceStyle: surfaceStyle
+                        )
+                    }
                 }
+                .padding(.horizontal, e.insetLarge * s)
+                .padding(.top, e.insetMedium * s)
+                .frame(maxWidth: .infinity, alignment: .center) // width fill
+                .frame(maxHeight: .infinity, alignment: .bottom) // <-- pin to bottom
+                .padding(.bottom, e.insetLarge * s) // optional bottom inset
             }
-            .allowsHitTesting(false) // overlay is decorative
+            .allowsHitTesting(false)
         }
     }
 }
@@ -97,10 +93,9 @@ private struct OverlayScaleReader<Content: View>: View {
     }
 }
 
-
 #if DEBUG
-#Preview("Classic Theme") {
-    ModernPersonal()
+#Preview("Classic Theme - Rounded") {
+    StatusBar()
         .makeView(tokens: OverlayTokens.previewDanny)
         .frame(width: 1920, height: 1080)
         .background(.black)
@@ -108,8 +103,8 @@ private struct OverlayScaleReader<Content: View>: View {
         .environment(\.overlayRenderSize, .init(width: 1920, height: 1080))
 }
 
-#Preview("Midnight Theme") {
-    ModernPersonal()
+#Preview("Midnight Theme - Square") {
+    StatusBar()
         .makeView(tokens: OverlayTokens.previewDanny)
         .frame(width: 1920, height: 1080)
         .background(.black)
@@ -117,8 +112,8 @@ private struct OverlayScaleReader<Content: View>: View {
         .environment(\.overlayRenderSize, .init(width: 1920, height: 1080))
 }
 
-#Preview("Dawn Theme") {
-    ModernPersonal()
+#Preview("Dawn Theme - Rounded") {
+    StatusBar()
         .makeView(tokens: OverlayTokens.previewDanny)
         .frame(width: 1920, height: 1080)
         .background(.black)

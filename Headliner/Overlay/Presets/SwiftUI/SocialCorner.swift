@@ -1,31 +1,30 @@
 //
-//  ModernPersonal.swift
+//  SocialCorner.swift
 //  Headliner
 //
-//  Created by Danny Francken on 8/21/25.
+//  Social corner overlay with social media handles in top-left
 //
 
 import SwiftUI
 
-/// Modern Personal Preset with all the bells and whistles
-struct ModernPersonal: OverlayViewProviding {
-    static let presetId = "swiftui.modern.personal"
+/// Social corner overlay: social media handles in top-left
+struct SocialCorner: OverlayViewProviding {
+    static let presetId = "swiftui.social.corner"
     static let defaultSize = CGSize(width: 1920, height: 1080)
 
     func makeView(tokens: OverlayTokens) -> some View {
         let settings = getOverlaySettings()
-        let accentColor = TokenHelpers.accentColor(from: tokens)
+        let socialHandles = TokenHelpers.extractSocialHandles(from: tokens)
         
         SafeAreaContainer(mode: settings.safeAreaMode) {
-            ModernPersonalContent(tokens: tokens, accentColor: accentColor)
+            SocialCornerContent(socialHandles: socialHandles)
         }
     }
 }
 
 // Separate view to use @Environment properly
-private struct ModernPersonalContent: View {
-    let tokens: OverlayTokens
-    let accentColor: Color
+private struct SocialCornerContent: View {
+    let socialHandles: [String: String]
     
     @Environment(\.surfaceStyle) private var surfaceStyle
     
@@ -33,44 +32,17 @@ private struct ModernPersonalContent: View {
         OverlayScaleReader { theme, s in
             let e = theme.effects
             
-            return ZStack(alignment: .top) {
-//                ThemeAwareDebugBorder()
-
-                VStack(spacing: 0) {
-
-                    // TOP BAR AREA
-                    HStack {
-                        // City badge (left)
-                        if let extras = tokens.extras,
-                           let city = extras["location"] as? String, !city.isEmpty {
-                            CityBadgeModern(
-                                city: city,
-                                surfaceStyle: surfaceStyle
-                            )
-                        }
-                        
-                        Spacer(minLength: 0)
-                        
-                        // Weather ticker (right)
-                        SimpleWeatherTicker(
-                            weatherEmoji: tokens.weatherEmoji,
-                            temperature: tokens.weatherText,
-                            surfaceStyle: surfaceStyle
-                        )
-                    }
-
-                    Spacer(minLength: 0)
-
-                    // BOTTOM BAR AREA
-                    BottomBarModern(
-                        displayName: tokens.displayName,
-                        tagline: tokens.tagline,
-                        accentColor: accentColor,
+            return ZStack(alignment: .topLeading) {
+                if !socialHandles.isEmpty {
+                    SocialMediaBadgeModern(
+                        socialHandles: socialHandles,
                         surfaceStyle: surfaceStyle
                     )
+                    .padding(.top, e.insetLarge * s)
+                    .padding(.leading, e.insetLarge * s)
                 }
             }
-            .allowsHitTesting(false) // overlay is decorative
+            .allowsHitTesting(false)
         }
     }
 }
@@ -97,10 +69,9 @@ private struct OverlayScaleReader<Content: View>: View {
     }
 }
 
-
 #if DEBUG
-#Preview("Classic Theme") {
-    ModernPersonal()
+#Preview("Classic Theme - Rounded") {
+    SocialCorner()
         .makeView(tokens: OverlayTokens.previewDanny)
         .frame(width: 1920, height: 1080)
         .background(.black)
@@ -108,8 +79,8 @@ private struct OverlayScaleReader<Content: View>: View {
         .environment(\.overlayRenderSize, .init(width: 1920, height: 1080))
 }
 
-#Preview("Midnight Theme") {
-    ModernPersonal()
+#Preview("Midnight Theme - Square") {
+    SocialCorner()
         .makeView(tokens: OverlayTokens.previewDanny)
         .frame(width: 1920, height: 1080)
         .background(.black)
@@ -117,8 +88,8 @@ private struct OverlayScaleReader<Content: View>: View {
         .environment(\.overlayRenderSize, .init(width: 1920, height: 1080))
 }
 
-#Preview("Dawn Theme") {
-    ModernPersonal()
+#Preview("Dawn Theme - Rounded") {
+    SocialCorner()
         .makeView(tokens: OverlayTokens.previewDanny)
         .frame(width: 1920, height: 1080)
         .background(.black)

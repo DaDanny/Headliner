@@ -123,6 +123,7 @@ public final class SwiftUIOverlayRenderer {
             let canvas = OverlayCanvas(size: size) {
                 provider.makeView(tokens: enrichedTokens)
             }
+            .environment(\.surfaceStyle, SurfaceStyle(rawValue: renderTokens.surfaceStyle) ?? .rounded)
 
             let renderer = ImageRenderer(content: canvas)
             renderer.scale = scale

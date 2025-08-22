@@ -133,6 +133,69 @@ public enum SwiftUIPresetRegistry {
             provider: ModernPersonal()
         ),
         
+        // Professional Corner - Company branding and time in top-right
+        SwiftUIPresetInfo(
+            id: "swiftui.professional.corner",
+            name: "Professional Corner",
+            description: "Company branding and time in top-right corner",
+            category: .branded,
+            provider: ProfessionalCorner()
+        ),
+        
+        // Status Bar - Weather, time, and location in top bar
+        SwiftUIPresetInfo(
+            id: "swiftui.status.bar",
+            name: "Status Bar",
+            description: "Weather, time, and location in top bar",
+            category: .standard,
+            provider: StatusBar()
+        ),
+        
+        // Identity Strip - Name, role, and company mark in bottom strip
+        SwiftUIPresetInfo(
+            id: "swiftui.identity.strip",
+            name: "Identity Strip",
+            description: "Name, role, and company mark in bottom strip",
+            category: .branded,
+            provider: IdentityStrip()
+        ),
+        
+        // Info Corner - Weather and location in bottom-right
+        SwiftUIPresetInfo(
+            id: "swiftui.info.corner",
+            name: "Info Corner",
+            description: "Weather and location in bottom-right corner",
+            category: .standard,
+            provider: InfoCorner()
+        ),
+        
+        // Social Corner - Social media handles in top-left
+        SwiftUIPresetInfo(
+            id: "swiftui.social.corner",
+            name: "Social Corner",
+            description: "Social media handles in top-left corner",
+            category: .creative,
+            provider: SocialCorner()
+        ),
+        
+        // Company Fun - Company logo top right, location top left, weather bottom
+        SwiftUIPresetInfo(
+            id: "swiftui.company.fun",
+            name: "Company Fun",
+            description: "Professional company branding with logo, location, and weather",
+            category: .branded,
+            provider: CompanyFun()
+        ),
+        
+        // Modern Company Branded - Company branding with personal info
+        SwiftUIPresetInfo(
+            id: "swiftui.modern.company.branded",
+            name: "Modern Company Branded",
+            description: "Company branding with personal info and location/weather",
+            category: .branded,
+            provider: ModernCompanyBranded()
+        ),
+        
         // Add new presets here! 🎨
         // Just create a new SwiftUIPresetInfo with your OverlayViewProviding implementation
     ]

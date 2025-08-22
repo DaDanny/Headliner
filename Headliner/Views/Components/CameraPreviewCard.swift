@@ -115,6 +115,9 @@ struct CameraPreviewCard: View {
     .onChange(of: appState?.overlaySettings.safeAreaMode) { _ in
       updateOverlayPreview()
     }
+    .onChange(of: appState?.overlaySettings.selectedSurfaceStyle) { _ in
+      updateOverlayPreview()
+    }
   }
   
   // MARK: - Private Methods
@@ -154,9 +157,10 @@ struct CameraPreviewCard: View {
       return
     }
     
-    // Get current safe area mode from appState
+    // Get current safe area mode and surface style from appState
     let safeAreaMode = appState?.overlaySettings.safeAreaMode ?? .balanced
-    let renderTokens = RenderTokens(safeAreaMode: safeAreaMode)
+    let surfaceStyle = appState?.overlaySettings.selectedSurfaceStyle ?? "rounded"
+    let renderTokens = RenderTokens(safeAreaMode: safeAreaMode, surfaceStyle: surfaceStyle)
     
     // Get PersonalInfo for previews (optional, could be nil)
     let personalInfo = getCurrentPersonalInfo()

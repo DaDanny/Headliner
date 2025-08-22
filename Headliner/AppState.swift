@@ -332,8 +332,16 @@ class AppState: ObservableObject {
     }
     saveOverlaySettings()
     notificationManager.postNotification(named: .updateOverlaySettings, overlaySettings: overlaySettings)
+  }
+  
+  /// Switch surface style (rounded vs square)
+  func selectSurfaceStyle(_ style: SurfaceStyle) {
+    overlaySettings.selectedSurfaceStyle = style.rawValue
+    saveOverlaySettings()
+    notificationManager.postNotification(named: .updateOverlaySettings, overlaySettings: overlaySettings)
     
-
+    // Trigger SwiftUI rendering if needed
+    triggerSwiftUIRenderingIfNeeded()
   }
   
   // MARK: - SwiftUI Overlay Rendering
@@ -351,9 +359,9 @@ class AppState: ObservableObject {
     
     // Check if this is a SwiftUI preset and get the appropriate provider
     if let provider = swiftUIProvider(for: presetId) {
-      self.logger.debug("🎨 [SwiftUI] Rendering SwiftUI overlay with safeAreaMode: \(self.overlaySettings.safeAreaMode.rawValue)")
+      self.logger.debug("🎨 [SwiftUI] Rendering SwiftUI overlay with safeAreaMode: \(self.overlaySettings.safeAreaMode.rawValue), surfaceStyle: \(self.overlaySettings.selectedSurfaceStyle)")
       Task { @MainActor in
-        let renderTokens = RenderTokens(safeAreaMode: self.overlaySettings.safeAreaMode)
+        let renderTokens = RenderTokens(safeAreaMode: self.overlaySettings.safeAreaMode, surfaceStyle: self.overlaySettings.selectedSurfaceStyle)
         let personalInfo = self.getCurrentPersonalInfo()
         await OverlayRenderBroker.shared.updateOverlay(
           provider: provider,
@@ -396,6 +404,11 @@ class AppState: ObservableObject {
   /// Get current aspect ratio
   var currentAspectRatio: OverlayAspect {
     overlaySettings.overlayAspect
+  }
+  
+  /// Get current surface style
+  var currentSurfaceStyle: SurfaceStyle {
+    SurfaceStyle(rawValue: overlaySettings.selectedSurfaceStyle) ?? .rounded
   }
   
   /// Start personal info pump for weather and location updates

@@ -9,28 +9,40 @@ struct BrandLowerThird: OverlayViewProviding {
         let accentColor = TokenHelpers.accentColor(from: tokens)
 
         return SafeAreaContainer(mode: settings.safeAreaMode) {
-            OverlayScaleReader { theme, s in
-                let e = theme.effects
-                return VStack(spacing: 0) {
-                    Spacer(minLength: 0)
-                    HStack {
-                        CompanyMarkBadgeModern(
-                            companyName: tokens.logoText ?? "Company",
-                            markImage: Image("Bonusly-Mark"),
-                            showName: false,
-                            accentColor: accentColor,
-                            surfaceStyle: .square
-                        )
-                        BottomBarModern(
-                            displayName: tokens.displayName,
-                            tagline: tokens.tagline,
-                            accentColor: accentColor,
-                            surfaceStyle: .square
-                        )
-                    }
-                    .padding(.horizontal, e.insetLarge * s)
-                    .padding(.bottom, (e.insetLarge + 4) * s)
+            BrandLowerThirdContent(tokens: tokens, accentColor: accentColor)
+        }
+    }
+}
+
+// Separate view to use @Environment properly
+private struct BrandLowerThirdContent: View {
+    let tokens: OverlayTokens
+    let accentColor: Color
+    
+    @Environment(\.surfaceStyle) private var surfaceStyle
+    
+    var body: some View {
+        OverlayScaleReader { theme, s in
+            let e = theme.effects
+            return VStack(spacing: 0) {
+                Spacer(minLength: 0)
+                HStack {
+                    CompanyMarkBadgeModern(
+                        companyName: tokens.logoText ?? "Company",
+                        markImage: Image("Bonusly-Mark"),
+                        showName: false,
+                        accentColor: accentColor,
+                        surfaceStyle: surfaceStyle
+                    )
+                    BottomBarModern(
+                        displayName: tokens.displayName,
+                        tagline: tokens.tagline,
+                        accentColor: accentColor,
+                        surfaceStyle: surfaceStyle
+                    )
                 }
+                .padding(.horizontal, e.insetLarge * s)
+                .padding(.bottom, (e.insetLarge + 4) * s)
             }
         }
     }

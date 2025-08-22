@@ -15,6 +15,7 @@ struct OverlaySettingsView: View {
   @State private var accentColorHex: String = "#007AFF"
   @State private var selectedAspect: OverlayAspect = .widescreen
   @State private var selectedSafeAreaMode: SafeAreaMode = .balanced
+  @State private var selectedSurfaceStyle: SurfaceStyle = .rounded
   @State private var showColorPicker = false
   
   init(appState: AppState) {
@@ -26,6 +27,7 @@ struct OverlaySettingsView: View {
     self._accentColorHex = State(initialValue: appState.overlaySettings.overlayTokens?.accentColorHex ?? "#007AFF")
     self._selectedAspect = State(initialValue: appState.currentAspectRatio)
     self._selectedSafeAreaMode = State(initialValue: appState.overlaySettings.safeAreaMode)
+    self._selectedSurfaceStyle = State(initialValue: appState.currentSurfaceStyle)
   }
   
   var body: some View {
@@ -140,6 +142,62 @@ struct OverlaySettingsView: View {
                 .foregroundColor(.white.opacity(0.6))
                 .multilineTextAlignment(.leading)
                 .padding(.top, 4)
+            }
+            .padding()
+          }
+          
+          // Surface Style Settings
+          GlassmorphicCard {
+            VStack(alignment: .leading, spacing: 12) {
+              Text("Surface Style")
+                .font(.headline)
+                .foregroundColor(.white)
+              
+              Text("Choose between rounded and square corner styles for overlay elements")
+                .font(.caption)
+                .foregroundColor(.white.opacity(0.7))
+                .multilineTextAlignment(.leading)
+              
+              HStack(spacing: 12) {
+                ForEach(SurfaceStyle.allCases, id: \.self) { style in
+                  Button(action: {
+                    selectedSurfaceStyle = style
+                    appState.selectSurfaceStyle(style)
+                  }) {
+                    VStack(spacing: 8) {
+                      // Preview of the style
+                      RoundedRectangle(cornerRadius: style == .rounded ? 12 : 0)
+                        .fill(Color.white.opacity(0.2))
+                        .frame(width: 60, height: 40)
+                        .overlay(
+                          RoundedRectangle(cornerRadius: style == .rounded ? 12 : 0)
+                            .stroke(Color.white.opacity(0.4), lineWidth: 2)
+                        )
+                      
+                      Text(style.rawValue.capitalized)
+                        .font(.caption)
+                        .foregroundColor(.white)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 12)
+                    .background(
+                      selectedSurfaceStyle == style
+                        ? Color.white.opacity(0.2)
+                        : Color.white.opacity(0.05)
+                    )
+                    .cornerRadius(8)
+                    .overlay(
+                      RoundedRectangle(cornerRadius: 8)
+                        .stroke(
+                          selectedSurfaceStyle == style ? Color.white : Color.clear,
+                          lineWidth: 1
+                        )
+                    )
+                  }
+                  .buttonStyle(PlainButtonStyle())
+                  .foregroundColor(.white)
+                }
+              }
             }
             .padding()
           }
@@ -263,6 +321,7 @@ struct OverlaySettingsView: View {
       accentColorHex = appState.overlaySettings.overlayTokens?.accentColorHex ?? "#007AFF"
       selectedAspect = appState.currentAspectRatio
       selectedSafeAreaMode = appState.overlaySettings.safeAreaMode
+      selectedSurfaceStyle = appState.currentSurfaceStyle
     }
   }
   

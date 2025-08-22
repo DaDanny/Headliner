@@ -7,25 +7,36 @@ struct WeatherTopBar: OverlayViewProviding {
     func makeView(tokens: OverlayTokens) -> some View {
         let settings = getOverlaySettings()
         return SafeAreaContainer(mode: settings.safeAreaMode) {
-            OverlayScaleReader { theme, s in
-                let e = theme.effects
-                return VStack(spacing: 0) {
-                    HStack {
-                        SimpleWeatherTicker(
-                            weatherEmoji: tokens.weatherEmoji,
-                            temperature: tokens.weatherText,
-                            surfaceStyle: .rounded
-                        )
-                        Spacer(minLength: 0)
-                        HStack(spacing: e.insetSmall * s) {
-                            CityBadgeModern(city: tokens.city, surfaceStyle: .rounded)
-                            LocalTimeBadgeModern(time: tokens.localTime, surfaceStyle: .rounded)
-                        }
-                    }
-                    .padding(.top, (e.insetLarge + 4) * s)
-                    .padding(.horizontal, e.insetLarge * s)
+            WeatherTopBarContent(tokens: tokens)
+        }
+    }
+}
+
+// Separate view to use @Environment properly
+private struct WeatherTopBarContent: View {
+    let tokens: OverlayTokens
+    
+    @Environment(\.surfaceStyle) private var surfaceStyle
+    
+    var body: some View {
+        OverlayScaleReader { theme, s in
+            let e = theme.effects
+            return VStack(spacing: 0) {
+                HStack {
+                    SimpleWeatherTicker(
+                        weatherEmoji: tokens.weatherEmoji,
+                        temperature: tokens.weatherText,
+                        surfaceStyle: surfaceStyle
+                    )
                     Spacer(minLength: 0)
+                    HStack(spacing: e.insetSmall * s) {
+                        CityBadgeModern(city: tokens.city, surfaceStyle: surfaceStyle)
+                        LocalTimeBadgeModern(time: tokens.localTime, surfaceStyle: surfaceStyle)
+                    }
                 }
+                .padding(.top, (e.insetLarge + 4) * s)
+                .padding(.horizontal, e.insetLarge * s)
+                Spacer(minLength: 0)
             }
         }
     }

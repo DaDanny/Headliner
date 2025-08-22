@@ -33,12 +33,14 @@ public enum OverlayAspect: String, Codable, CaseIterable {
 /// Configuration for how overlays should be rendered
 public struct RenderTokens: Hashable, Codable {
     public var safeAreaMode: SafeAreaMode
+    public var surfaceStyle: String
     // Future rendering settings can be added here:
     // public var animation: AnimationMode?
     // public var theme: ThemeMode?
     
-    public init(safeAreaMode: SafeAreaMode = .balanced) {
+    public init(safeAreaMode: SafeAreaMode = .balanced, surfaceStyle: String = "rounded") {
         self.safeAreaMode = safeAreaMode
+        self.surfaceStyle = surfaceStyle
     }
 }
 
