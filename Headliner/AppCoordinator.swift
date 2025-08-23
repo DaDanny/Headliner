@@ -150,6 +150,27 @@ final class AppCoordinator {
   }
   
   
+  /// Toggle camera on/off
+  func toggleCamera() {
+    if camera.cameraStatus == .running {
+      stopCamera()
+    } else {
+      startCamera()
+    }
+  }
+
+  /// Launch at login status
+  var launchAtLogin: Bool {
+    // TODO: Implement with ServiceManagement framework
+    return false
+  }
+
+  /// Toggle launch at login
+  func toggleLaunchAtLogin() {
+    // TODO: Implement with ServiceManagement framework
+    logger.debug("Toggle launch at login - not yet implemented")
+  }
+
   /// Quit the application
   func quitApp() {
     NSApplication.shared.terminate(nil)
