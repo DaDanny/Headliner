@@ -5,3 +5,4 @@ sample-camera/
 
 # Performance Baselines - Instruments trace files are large
 docs/Baselines/**/*.trace/
+InstrumentTraces/
