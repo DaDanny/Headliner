@@ -15,6 +15,7 @@ Headliner is a modern virtual camera application for macOS that adds professiona
 📍 **Location & Weather**: Real-time city and weather data in overlays (optional)
 ⚡ **Auto-save Settings**: Modern UX with automatic preference persistence
 🔧 **Safe Area Support**: Intelligent overlay positioning for different video platforms
+📱 **Menu Bar Interface**: Elegant menu bar app with Loom-style selectors and popover preview
 
 ## System Requirements
 
@@ -60,8 +61,15 @@ The onboarding only appears when the system extension isn't installed. Once inst
 - **Aspect Ratio Testing**: Tools for testing different video formats
 - **Theme Support**: Choose between Classic Glass and Midnight Pro themes
 
-### Controls
+### Menu Bar Interface
 
+**Quick Access from Menu Bar:**
+- **Camera Selector**: Elegant dropdown with device type indicators and status badges
+- **Overlay Selector**: Navigate to overlay settings with visual feedback
+- **Live Preview**: Popover preview showing camera feed with active overlays
+- **Status Indicators**: Real-time camera and overlay status at a glance
+
+**Main App Controls:**
 - **Start/Stop Camera**: Control the virtual camera streaming
 - **Camera Selection**: Choose from available camera devices with native dropdown UI
 - **Preset Selection**: Switch between overlay presets with visual preview cards
@@ -148,12 +156,17 @@ Headliner/
 ├── Headliner/              # Main application (SwiftUI)
 │   ├── Views/              # UI components and their previews
 │   │   ├── Components/     # Reusable UI components
+│   │   │   ├── LoomStyleSelector.swift   # Beautiful pill-style selector component
+│   │   │   ├── MenuBarCameraSelector.swift # Menu bar camera dropdown
+│   │   │   └── CameraPreviewCard.swift   # Live preview with overlay rendering
 │   │   ├── OnboardingView.swift  # Guided setup flow
 │   │   ├── MainAppView.swift     # Main application interface
+│   │   ├── MenuContent.swift     # Menu bar interface content
 │   │   └── SettingsView.swift    # App configuration
 │   ├── Managers/           # App services
 │   ├── Services/           # Location, weather, and personal info services
 │   ├── ViewModels/         # View-specific state management
+│   │   └── MenuBarViewModel.swift # Menu bar state management
 │   └── AppState.swift      # Central state management
 ├── CameraExtension/        # System extension
 │   ├── CameraExtensionProvider.swift
@@ -232,6 +245,20 @@ Weather data is fetched from either Apple's WeatherKit service or the open-sourc
 - App must be in `/Applications` folder for system extension
 - Color customization requires manual configuration
 - Creative overlay preset coming in future updates
+
+---
+
+## Menu Bar App
+
+Headliner includes a streamlined menu bar interface for quick camera control:
+
+- **Beautiful Design**: Loom-inspired pill-style selectors with glassmorphic backgrounds
+- **Smart Chevrons**: Down arrows for dropdowns, right arrows for navigation
+- **Live Preview**: Popover showing real-time camera feed with overlays
+- **Status Awareness**: Visual indicators showing camera and overlay status
+- **Quick Access**: Control camera and overlays without opening the main app
+
+The menu bar app provides instant access to your most-used controls while keeping the interface clean and unobtrusive.
 
 ---
 
