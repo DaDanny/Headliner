@@ -1,0 +1,153 @@
+Initial prompt:
+  I want to create a menu bar app that controls the virtual camera and overlays.
+  Please reference the images in the @reference-images folder for inspiration for the UI.
+  The app should be a menu bar app that controls the virtual camera and overlays.
+  Be sure to reference the existing files and components, such as @Headliner/Views/Components/OverlaySettingsView.swift
+  and @Headliner/Views/SettingsView.swift
+  A lot of the functionality and components are already built, so you can reference them for inspiration. The goal 
+  for this task is to convert the existing Headliner app into a menu bar app that controls the virtual camera and overlays.
+  For now, please leave the existing @Headliner/Views/MainAppView.swift mainApp view.
+headliner_menu_bar_mvp:
+  goal: "Convert Headliner into a polished menu‑bar app that controls the virtual camera + overlays."
+
+  primary_features:
+    - status_item_with_states: ["idle", "live"]
+    - actions:
+        - start_stop_virtual_camera
+        - select_input_camera
+        - select_overlay
+        - preview_popover_or_window
+        - settings_window
+        - launch_at_login_toggle
+        - quit
+    - persistence: "Shared via App Group UserDefaults"
+    - app_extension_comms: "One‑way Darwin notifications (fire‑and‑forget); XPC later if replies needed"
+
+  app_group:
+    identifier: "group.com.yourcompany.headliner"
+    keys:
+      - selectedCameraID
+      - selectedOverlayID
+      - displayName
+      - tagline
+      - theme
+      - surfaceStyle
+
+  notifications:
+    domain: "com.headliner"
+    events:
+      - start: "com.headliner.start"
+      - stop: "com.headliner.stop"
+      - set_camera: "com.headliner.setCamera"        # userInfo: { id: String }
+      - set_overlay: "com.headliner.setOverlay"      # userInfo: { id: String }
+      - ping: "com.headliner.ping"                   # optional health check
+    handler_in_extension: "Apply state, rebuild pipeline if needed, render"
+
+  status_item:
+    icon:
+      idle_asset: "StatusIconIdle.pdf (template rendering mode)"
+      live_asset: "StatusIconLive.pdf (template)"
+    behavior:
+      - swap_icon_on: "isRunning state"
+      - supports_dark_mode: true
+
+  scenes:
+    menubar:
+      type: "MenuBarExtra (macOS 13+)"
+      title: "Headliner"
+      icon_binding: "vm.isRunning ? 'dot.radiowaves.left.and.right' : 'camera'"
+      style: "window"
+      content_view: "MenuContent(vm: vm)"
+    settings:
+      view: "SettingsView(vm: vm)"
+      sections: ["Identity (name/tagline)", "Theme", "Surface Style", "Overlay defaults"]
+
+  view_model:
+    name: "MenuBarViewModel"
+    publishes:
+      - isRunning: bool
+      - cameras: "[CameraDevice]"
+      - overlays: "[OverlayPreset]"
+      - selectedCameraID: string
+      - selectedOverlayID: string
+    lifecycle:
+      - refreshDevices_on_init
+      - loadOverlays_on_init
+      - observe_extension_state_via_notifications
+    actions:
+      - start: "post com.headliner.start; set isRunning=true"
+      - stop:  "post com.headliner.stop; set isRunning=false"
+      - selectCamera(id): "persist -> notify setCamera"
+      - selectOverlay(id): "persist -> notify setOverlay"
+
+  menu_structure:
+    - button: "{Start|Stop} Virtual Camera"
+    - divider
+    - menu: "Input Camera"
+      items: "radio list from vm.cameras; checkmark on selectedCameraID"
+    - menu: "Overlay"
+      items: "radio list from vm.overlays; checkmark on selectedOverlayID"
+    - button: "Preview"
+      action: "open popover/window with 16:9 preview (placeholder OK)"
+    - button: "Settings…"
+    - toggle: "Launch at Login"
+    - divider
+    - button: "Quit"
+
+  preview:
+    options:
+      - "Simple NSWindow with SwiftUI view (shows latest frame or placeholder)"
+      - "Popover attached to status item (MenuBarExtra .window style)"
+    performance_notes:
+      - "Never block UI; do preview updates on background queue"
+      - "It’s OK if preview lags; Meet/Zoom are the true preview for MVP"
+
+  device_and_overlay_sources:
+    camera_discovery:
+      method: "AVCaptureDevice.DiscoverySession"
+      filter: "exclude Headliner virtual camera"
+      refresh: "async on open + on system notifications"
+    overlay_registry:
+      source: "static list or manifest; provide displayName + id + optional thumbnail"
+
+  launch_at_login:
+    storage: "SMAppService or ServiceManagement framework"
+    toggle_binding: "LaunchAtLogin.isEnabled"
+
+  error_handling:
+    - start_failures: "show inline banner in menu: 'Extension blocked — Open System Settings'"
+    - missing_extension: "offer deep link to System Settings → Privacy & Security → Extensions"
+    - telemetry_optional: "count start/stop, overlay changes (for internal QA)"
+
+  gotchas:
+    - "Do not enumerate devices on main thread."
+    - "Use template images so status icon adapts to light/dark."
+    - "App Group is required so extension reads initial state at boot."
+    - "Darwin notifications are fire‑and‑forget; don’t await replies."
+    - "Keep menu content lightweight; avoid long overlay thumbnails."
+
+  acceptance_criteria:
+    - "Menu bar appears with idle icon."
+    - "Start/Stop toggles icon and posts notifications."
+    - "Camera list populates; selecting persists and notifies."
+    - "Overlay list populates; selecting persists and notifies."
+    - "Settings updates (name/tagline/theme/surface) persist to App Group."
+    - "Launch at Login toggle works across reboots."
+    - "Quit cleanly tears down observers."
+
+  minimal_implementation_checklist:
+    - "Create App Group and wire Prefs helper."
+    - "Add MenuBarExtra scene + MenuContent."
+    - "Implement MenuBarViewModel with start/stop/select actions."
+    - "Hook up CameraDiscovery.list() and OverlayRegistry.all."
+    - "Post Darwin notifications on actions."
+    - "Swap status icon based on isRunning."
+    - "Add simple SettingsView for identity/theme."
+    - "Optional: preview window."
+    - "Ship signed build; verify extension receives notifications."
+
+  nice_to_haves_later:
+    - "Global shortcuts: ⌃⌘V start/stop, ⌃⌘P preview"
+    - "Overlay thumbnails in menu rows"
+    - "Health badge (green dot) if extension acknowledges 'ping'"
+    - "Recent overlays section"

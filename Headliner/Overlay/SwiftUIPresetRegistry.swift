@@ -196,6 +196,15 @@ public enum SwiftUIPresetRegistry {
             provider: ModernCompanyBranded()
         ),
         
+        // Clean - No overlay elements (minimal category)
+        SwiftUIPresetInfo(
+            id: "swiftui.clean",
+            name: "Clean",
+            description: "No overlay elements - completely transparent",
+            category: .minimal,
+            provider: Clean()
+        ),
+        
         // Add new presets here! 🎨
         // Just create a new SwiftUIPresetInfo with your OverlayViewProviding implementation
     ]

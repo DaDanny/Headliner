@@ -14,8 +14,10 @@ struct CameraSelector: View {
   @State private var open = false
   @State private var hover = false
 
-  // If your AppState doesn't have this yet, stub it to false
-  private var isVirtualCameraRunning: Bool { false }
+  // Get the running state from AppState camera status
+  private var isVirtualCameraRunning: Bool { 
+    appState.cameraStatus.isRunning
+  }
 
   private var selectedCamera: CameraDevice? {
     appState.availableCameras.first { $0.id == appState.selectedCameraID }

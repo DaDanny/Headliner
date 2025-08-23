@@ -83,28 +83,25 @@ struct PersonalInfoView: View {
     }
     
     private func saveChanges() {
-        // Save display name
+        // Update display name
         if !displayName.isEmpty {
             appState.overlaySettings.userName = displayName
         }
         
-        // Save tagline
-        if !tagline.isEmpty {
-            if appState.overlaySettings.overlayTokens == nil {
-                appState.overlaySettings.overlayTokens = OverlayTokens(
-                    displayName: displayName,
-                    tagline: tagline,
-                    accentColorHex: "#007AFF"
-                )
-            } else {
-                appState.overlaySettings.overlayTokens?.tagline = tagline
-            }
-        } else {
-            // Clear tagline if empty
-            appState.overlaySettings.overlayTokens?.tagline = nil
-        }
+        // Update or create overlay tokens with display name and tagline
+        let updatedTokens = OverlayTokens(
+            displayName: displayName.isEmpty ? NSUserName() : displayName,
+            tagline: tagline.isEmpty ? nil : tagline,
+            accentColorHex: appState.overlaySettings.overlayTokens?.accentColorHex ?? "#007AFF",
+            localTime: appState.overlaySettings.overlayTokens?.localTime,
+            logoText: appState.overlaySettings.overlayTokens?.logoText,
+            extras: appState.overlaySettings.overlayTokens?.extras
+        )
         
-        logger.debug("PersonalInfoView: Auto-saved changes - name: \(displayName), tagline: \(tagline)")
+        // Use AppState's method to properly save and persist changes
+        appState.updateOverlayTokens(updatedTokens)
+        
+        logger.debug("PersonalInfoView: Saved and persisted changes - name: \(displayName), tagline: \(tagline)")
     }
 }
 
