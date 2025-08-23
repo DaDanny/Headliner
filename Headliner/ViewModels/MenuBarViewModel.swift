@@ -51,13 +51,15 @@ class MenuBarViewModel: ObservableObject {
   
   private let appState: AppState
   private let extensionService: ExtensionService
+  private let overlayService: OverlayService
   private var cancellables = Set<AnyCancellable>()
   
   // MARK: - Initialization
   
-  init(appState: AppState, extensionService: ExtensionService) {
+  init(appState: AppState, extensionService: ExtensionService, overlayService: OverlayService) {
     self.appState = appState
     self.extensionService = extensionService
+    self.overlayService = overlayService
     setupBindings()
     refreshData()
     loadLaunchAtLoginState()
@@ -66,11 +68,12 @@ class MenuBarViewModel: ObservableObject {
   // Legacy constructor for compatibility during migration
   init(appState: AppState) {
     self.appState = appState
-    // Create a temporary ExtensionService for legacy compatibility
+    // Create temporary services for legacy compatibility
     self.extensionService = ExtensionService(
       requestManager: SystemExtensionRequestManager(logText: ""),
       propertyManager: CustomPropertyManager()
     )
+    self.overlayService = OverlayService()
     setupBindings()
     refreshData()
     loadLaunchAtLoginState()
@@ -116,7 +119,7 @@ class MenuBarViewModel: ObservableObject {
   
   /// Select an overlay preset
   func selectOverlay(_ overlayID: String) {
-    appState.selectPreset(overlayID)
+    overlayService.selectPreset(overlayID)
     selectedOverlayID = overlayID
   }
   
@@ -192,8 +195,8 @@ class MenuBarViewModel: ObservableObject {
       .receive(on: DispatchQueue.main)
       .assign(to: &$statusMessage)
     
-    // Bind overlay preset ID
-    appState.$overlaySettings
+    // Bind overlay preset ID from OverlayService instead of AppState
+    overlayService.$settings
       .map { $0.selectedPresetId }
       .receive(on: DispatchQueue.main)
       .assign(to: &$selectedOverlayID)
@@ -204,12 +207,12 @@ class MenuBarViewModel: ObservableObject {
     // Check extension status
     extensionService.checkStatus()
     
-    // Load overlay presets
-    overlays = appState.availableSwiftUIPresets
+    // Load overlay presets from OverlayService
+    overlays = overlayService.availablePresets
     
     // Set initial values
     selectedCameraID = appState.selectedCameraID
-    selectedOverlayID = appState.currentPresetId
+    selectedOverlayID = overlayService.currentPresetId
     isRunning = appState.cameraStatus.isRunning
   }
   
