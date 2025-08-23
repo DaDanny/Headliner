@@ -50,12 +50,27 @@ class MenuBarViewModel: ObservableObject {
   // MARK: - Dependencies
   
   private let appState: AppState
+  private let extensionService: ExtensionService
   private var cancellables = Set<AnyCancellable>()
   
   // MARK: - Initialization
   
+  init(appState: AppState, extensionService: ExtensionService) {
+    self.appState = appState
+    self.extensionService = extensionService
+    setupBindings()
+    refreshData()
+    loadLaunchAtLoginState()
+  }
+  
+  // Legacy constructor for compatibility during migration
   init(appState: AppState) {
     self.appState = appState
+    // Create a temporary ExtensionService for legacy compatibility
+    self.extensionService = ExtensionService(
+      requestManager: SystemExtensionRequestManager(logText: ""),
+      propertyManager: CustomPropertyManager()
+    )
     setupBindings()
     refreshData()
     loadLaunchAtLoginState()
@@ -167,8 +182,8 @@ class MenuBarViewModel: ObservableObject {
       .receive(on: DispatchQueue.main)
       .assign(to: &$selectedCameraID)
     
-    // Bind extension status
-    appState.$extensionStatus
+    // Bind extension status from ExtensionService instead of AppState
+    extensionService.$status
       .receive(on: DispatchQueue.main)
       .assign(to: &$extensionStatus)
     
@@ -186,10 +201,8 @@ class MenuBarViewModel: ObservableObject {
   
   /// Load initial data
   private func refreshData() {
-    // Initialize app state if needed
-    if appState.extensionStatus == .unknown {
-      appState.initializeForUse()
-    }
+    // Check extension status
+    extensionService.checkStatus()
     
     // Load overlay presets
     overlays = appState.availableSwiftUIPresets
