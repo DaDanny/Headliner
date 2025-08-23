@@ -11,8 +11,9 @@ import IOKit.audio
 import AVFoundation
 import Cocoa
 
-let kWhiteStripeHeight: Int = 10
-let kFrameRate: Int = 60
+	// UNUSED: Legacy constant from Core Graphics overlay system - can be removed
+	let kWhiteStripeHeight: Int = 10
+	let kFrameRate: Int = 60
 
 
 private let extensionLogger = HeadlinerLogger.logger(for: .cameraExtension)
@@ -43,7 +44,7 @@ class CameraExtensionDeviceSource: NSObject, CMIOExtensionDeviceSource, AVCaptur
 	private var _currentCameraFrame: CVPixelBuffer?
 	private let _cameraFrameLock = NSLock()
 	
-	// Frame counting for logging
+	// UNUSED: Legacy frame counting for overlay sizing - can be removed
 	private var _frameCount = 0
 	
 	// Streaming state management
@@ -52,13 +53,14 @@ class CameraExtensionDeviceSource: NSObject, CMIOExtensionDeviceSource, AVCaptur
 	
 	// Camera capture components - using shared CaptureSessionManager
 	private var captureSessionManager: CaptureSessionManager?
+	// UNUSED: Legacy camera device reference - can be removed
 	private var selectedCameraDevice: AVCaptureDevice?
 	
 	// Overlay settings
 	private var overlaySettings: OverlaySettings = OverlaySettings()
 	private let overlaySettingsLock = NSLock()
 	
-	// Preset system components
+	// NOTE: These properties are REQUIRED for overlay rendering system
 	private var overlayRenderer: OverlayRenderer?
 	private var overlayPresetStore: OverlayPresetStore?
 	private var lastRenderedOverlay: CIImage?
@@ -73,8 +75,9 @@ class CameraExtensionDeviceSource: NSObject, CMIOExtensionDeviceSource, AVCaptur
 		let dims = CMVideoDimensions(width: 1920, height: 1080)
 		CMVideoFormatDescriptionCreate(allocator: kCFAllocatorDefault, codecType: kCVPixelFormatType_32BGRA, width: dims.width, height: dims.height, extensions: nil, formatDescriptionOut: &_videoDescription)
 		
-		// Cache actual camera dimensions in App Group for overlay rendering sync
+		// NOTE: REQUIRED - Cache camera dimensions for main app overlay rendering
 		cacheCameraDimensions(width: Int(dims.width), height: Int(dims.height))
+		
 		
 		let pixelBufferAttributes: NSDictionary = [
 			kCVPixelBufferWidthKey: dims.width,
@@ -104,8 +107,7 @@ class CameraExtensionDeviceSource: NSObject, CMIOExtensionDeviceSource, AVCaptur
 		loadOverlaySettings()
 		extensionLogger.debug("✅ CameraExtensionDeviceSource init - overlay settings loaded")
 		
-		// Initialize preset system components
-		// TESTING: Use camera overlay renderer for now
+		// NOTE: REQUIRED initialization for overlay rendering system
 		overlayRenderer = CameraOverlayRenderer()
 
 		overlayPresetStore = OverlayPresetStore()
@@ -130,6 +132,7 @@ class CameraExtensionDeviceSource: NSObject, CMIOExtensionDeviceSource, AVCaptur
 		return deviceProperties
 	}
 	
+	// UNUSED: Empty method stub - can be removed
 	func setDeviceProperties(_ deviceProperties: CMIOExtensionDeviceProperties) throws {
 		
 		// Handle settable properties here.
@@ -368,6 +371,7 @@ class CameraExtensionDeviceSource: NSObject, CMIOExtensionDeviceSource, AVCaptur
 		}
 	}
 	
+	// UNUSED: Legacy splash screen text rendering - can be simplified to just show "Headliner" logo
 	private func drawSplashScreen(context: CGContext, rect: CGRect) {
 		let width = Int(rect.width)
 		let height = Int(rect.height)
@@ -473,151 +477,13 @@ class CameraExtensionDeviceSource: NSObject, CMIOExtensionDeviceSource, AVCaptur
 		return context.createCGImage(ciImage, from: ciImage.extent)
 	}
 	
-	private func drawOverlays(on context: CGContext, in rect: CGRect) {
-		self.overlaySettingsLock.lock()
-		let settings = self.overlaySettings
-		self.overlaySettingsLock.unlock()
-		
-		// Only draw overlays if enabled
-		guard settings.isEnabled else { return }
-		
-		// Setup NSGraphicsContext for text drawing
-		let graphicsContext = NSGraphicsContext(cgContext: context, flipped: false)
-		NSGraphicsContext.saveGraphicsState()
-		NSGraphicsContext.current = graphicsContext
-		
-		// Draw user name overlay if enabled and name is provided
-		if settings.showUserName && !settings.userName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-			drawUserNameOverlay(settings: settings, in: rect)
-		}
-		
-		// Draw version overlay if enabled
-		if settings.showVersion {
-			drawVersionOverlay(settings: settings, in: rect)
-		}
-		
-		NSGraphicsContext.restoreGraphicsState()
-	}
 	
-	private func drawUserNameOverlay(settings: OverlaySettings, in rect: CGRect) {
-		let userName = settings.userName.trimmingCharacters(in: .whitespacesAndNewlines)
-		guard !userName.isEmpty else { return }
-		
-		// Create attributed string for the user name
-		let font = NSFont.systemFont(ofSize: settings.fontSize, weight: .medium)
-		let attributes: [NSAttributedString.Key: Any] = [
-			.font: font,
-			.foregroundColor: settings.nameTextColor.nsColor
-		]
-		
-		let attributedString = NSAttributedString(string: userName, attributes: attributes)
-		let textSize = attributedString.size()
-		
-		// Calculate background rect with padding
-		let backgroundWidth = textSize.width + (settings.padding * 2)
-		let backgroundHeight = textSize.height + (settings.padding * 2)
-		
-		// Calculate position based on overlay position setting
-		let overlayRect = calculateOverlayRect(
-			size: CGSize(width: backgroundWidth, height: backgroundHeight),
-			position: settings.namePosition,
-			containerRect: rect,
-			margin: settings.margin
-		)
-		
-		// Draw background with corner radius
-		let backgroundPath = NSBezierPath(roundedRect: overlayRect, xRadius: settings.cornerRadius, yRadius: settings.cornerRadius)
-		settings.nameBackgroundColor.nsColor.setFill()
-		backgroundPath.fill()
-		
-		// Draw text centered in the background
-		let textRect = CGRect(
-			x: overlayRect.origin.x + settings.padding,
-			y: overlayRect.origin.y + settings.padding,
-			width: textSize.width,
-			height: textSize.height
-		)
-		
-		attributedString.draw(in: textRect)
-	}
 	
-	private func drawVersionOverlay(settings: OverlaySettings, in rect: CGRect) {
-		// Resolve version text from bundle
-		let bundle = Bundle.main
-		let shortVersion = bundle.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "?"
-		let buildNumber = bundle.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "?"
-		let versionText = "Headliner V\(shortVersion) (\(buildNumber))"
-		
-		let font = NSFont.systemFont(ofSize: settings.versionFontSize, weight: .regular)
-		let attributes: [NSAttributedString.Key: Any] = [
-			.font: font,
-			.foregroundColor: settings.versionTextColor.nsColor
-		]
-		let attributedString = NSAttributedString(string: versionText, attributes: attributes)
-		let textSize = attributedString.size()
-		
-		let backgroundWidth = textSize.width + (settings.padding * 2)
-		let backgroundHeight = textSize.height + (settings.padding * 2)
-		
-		let overlayRect = calculateOverlayRect(
-			size: CGSize(width: backgroundWidth, height: backgroundHeight),
-			position: settings.versionPosition,
-			containerRect: rect,
-			margin: settings.margin
-		)
-		
-		let backgroundPath = NSBezierPath(roundedRect: overlayRect, xRadius: settings.cornerRadius, yRadius: settings.cornerRadius)
-		settings.versionBackgroundColor.nsColor.setFill()
-		backgroundPath.fill()
-		
-		let textRect = CGRect(
-			x: overlayRect.origin.x + settings.padding,
-			y: overlayRect.origin.y + settings.padding,
-			width: textSize.width,
-			height: textSize.height
-		)
-		attributedString.draw(in: textRect)
-	}
 	
-	private func calculateOverlayRect(size: CGSize, position: OverlayPosition, containerRect: CGRect, margin: CGFloat) -> CGRect {
-		let x: CGFloat
-		let y: CGFloat
-		
-		switch position {
-		case .topLeft:
-			x = margin
-			y = containerRect.height - size.height - margin
-		case .topCenter:
-			x = (containerRect.width - size.width) / 2
-			y = containerRect.height - size.height - margin
-		case .topRight:
-			x = containerRect.width - size.width - margin
-			y = containerRect.height - size.height - margin
-		case .centerLeft:
-			x = margin
-			y = (containerRect.height - size.height) / 2
-		case .center:
-			x = (containerRect.width - size.width) / 2
-			y = (containerRect.height - size.height) / 2
-		case .centerRight:
-			x = containerRect.width - size.width - margin
-			y = (containerRect.height - size.height) / 2
-		case .bottomLeft:
-			x = margin
-			y = margin
-		case .bottomCenter:
-			x = (containerRect.width - size.width) / 2
-			y = margin
-		case .bottomRight:
-			x = containerRect.width - size.width - margin
-			y = margin
-		}
-		
-		return CGRect(x: x, y: y, width: size.width, height: size.height)
-	}
 	
 	// MARK: Overlay Settings Management
 	
+	// UNUSED: Legacy overlay settings loading from Core Graphics system - can be removed
 	private func loadOverlaySettings() {
         self.overlaySettingsLock.lock()
         defer { self.overlaySettingsLock.unlock() }
@@ -653,6 +519,7 @@ class CameraExtensionDeviceSource: NSObject, CMIOExtensionDeviceSource, AVCaptur
 	
 	// MARK: Preset System Support
 	
+	// NOTE: This method is REQUIRED - renders overlays onto video frames using CameraOverlayRenderer
 	private func drawOverlaysWithPresetSystem(pixelBuffer: CVPixelBuffer, context: CGContext, rect: CGRect) {
 		guard let renderer = overlayRenderer,
 		      let presetStore = overlayPresetStore else {
@@ -721,6 +588,7 @@ class CameraExtensionDeviceSource: NSObject, CMIOExtensionDeviceSource, AVCaptur
 	
 	// MARK: Camera Setup
 	
+	// NOTE: This method is REQUIRED - sets up physical camera capture for extension
 	private func setupCaptureSession() {
 		print("🔧 [Camera Extension] Setting up capture session using CaptureSessionManager...")
 		extensionLogger.debug("Setting up Camera Extension capture session using shared CaptureSessionManager...")
@@ -746,6 +614,7 @@ class CameraExtensionDeviceSource: NSObject, CMIOExtensionDeviceSource, AVCaptur
 		}
 	}
 	
+	// UNUSED: Legacy camera device selection method - can be removed
 	func setCameraDevice(_ deviceID: String) {
 		print("📷 [Camera Extension] Setting camera device to: \(deviceID)")
 		extensionLogger.debug("Setting camera device to: \(deviceID)")
@@ -757,14 +626,16 @@ class CameraExtensionDeviceSource: NSObject, CMIOExtensionDeviceSource, AVCaptur
 			print("✅ [Camera Extension] Saved camera device selection to UserDefaults")
 		}
 		
-		// Recreate the capture session with the new device
-		setupCaptureSession()
+		// UNUSED: Legacy camera device change handling - can be removed
+		// setupCaptureSession() // This entire call can be removed
 	}
 	
 
 	
+	
 	// MARK: - Camera Dimensions Caching
 	
+	// NOTE: REQUIRED - Cache camera dimensions for main app overlay rendering and preview sizing
 	/// Cache the actual camera dimensions in App Group for overlay rendering sync
 	private func cacheCameraDimensions(width: Int, height: Int) {
 		guard let userDefaults = UserDefaults(suiteName: Identifiers.appGroup) else {
@@ -796,6 +667,7 @@ class CameraExtensionDeviceSource: NSObject, CMIOExtensionDeviceSource, AVCaptur
 	
 	// MARK: AVCaptureVideoDataOutputSampleBufferDelegate
 	
+	// NOTE: This method is REQUIRED - captures frames from physical camera for virtual camera output
 	func captureOutput(_ output: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection) {
 		// Store the latest camera frame for use by the virtual camera timer
 		guard let pixelBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) else {
@@ -803,6 +675,7 @@ class CameraExtensionDeviceSource: NSObject, CMIOExtensionDeviceSource, AVCaptur
 			return
 		}
 		
+		// UNUSED: Legacy overlay sizing debug logging - can be removed
 		// Log camera input resolution for debugging overlay sizing
 		if self._frameCount == 0 {
 			let inputWidth = CVPixelBufferGetWidth(pixelBuffer)
@@ -816,6 +689,7 @@ class CameraExtensionDeviceSource: NSObject, CMIOExtensionDeviceSource, AVCaptur
 		_currentCameraFrame = pixelBuffer
 		_cameraFrameLock.unlock()
 		
+		// UNUSED: Legacy frame counting for overlay sizing - can be removed
 		// Log occasionally to avoid spam
 		self._frameCount += 1
 	}
@@ -944,11 +818,13 @@ class CameraExtensionProviderSource: NSObject, CMIOExtensionProviderSource {
 	
     // MARK: Internal
     
+	// UNUSED: Empty method stubs - can be removed
 	func connect(to client: CMIOExtensionClient) throws {
 		
 		// Handle client connect
 	}
 	
+	// UNUSED: Empty method stub - can be removed
 	func disconnect(from client: CMIOExtensionClient) {
 		
 		// Handle client disconnect
@@ -969,6 +845,7 @@ class CameraExtensionProviderSource: NSObject, CMIOExtensionProviderSource {
 		return providerProperties
 	}
 	
+	// UNUSED: Empty method stub - can be removed
 	func setProviderProperties(_ providerProperties: CMIOExtensionProviderProperties) throws {
 		
 		// Handle settable properties here.
