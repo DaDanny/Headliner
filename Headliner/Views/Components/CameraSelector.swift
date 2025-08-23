@@ -10,17 +10,18 @@ import SwiftUI
 // MARK: - CameraSelector
 
 struct CameraSelector: View {
-  @ObservedObject var appState: AppState
+  @EnvironmentObject private var cameraService: CameraService
+  @Environment(\.appCoordinator) private var appCoordinator
   @State private var open = false
   @State private var hover = false
 
-  // Get the running state from AppState camera status
+  // Get the running state from CameraService
   private var isVirtualCameraRunning: Bool { 
-    appState.cameraStatus.isRunning
+    cameraService.cameraStatus.isRunning
   }
 
   private var selectedCamera: CameraDevice? {
-    appState.availableCameras.first { $0.id == appState.selectedCameraID }
+    cameraService.selectedCamera
   }
 
   public var body: some View {
@@ -37,7 +38,6 @@ struct CameraSelector: View {
     .onHover { hover = $0 }
     .popover(isPresented: $open, arrowEdge: .bottom) {
       CameraSelectorPopoverContent(
-        appState: appState,
         selectedCamera: selectedCamera,
         close: { open = false }
       )
@@ -114,7 +114,8 @@ private struct CameraSelectorLabel: View {
 // MARK: - Popover content
 
 private struct CameraSelectorPopoverContent: View {
-  @ObservedObject var appState: AppState
+  @EnvironmentObject private var cameraService: CameraService
+  @Environment(\.appCoordinator) private var appCoordinator
   let selectedCamera: CameraDevice?
   let close: () -> Void
 
@@ -134,7 +135,7 @@ private struct CameraSelectorPopoverContent: View {
           .foregroundStyle(.secondary)
         Spacer()
         Button {
-          appState.refreshCameras()
+          cameraService.refreshCameras()
         } label: {
           Image(systemName: "arrow.clockwise")
             .font(.system(size: 13, weight: .semibold))
@@ -145,7 +146,7 @@ private struct CameraSelectorPopoverContent: View {
       .padding(.horizontal, 10)
       .padding(.top, 10)
 
-      if appState.availableCameras.isEmpty {
+      if cameraService.availableCameras.isEmpty {
         // Empty state
         VStack(spacing: 10) {
           Image(systemName: "camera.slash")
@@ -157,7 +158,7 @@ private struct CameraSelectorPopoverContent: View {
             .font(.footnote)
             .foregroundStyle(.secondary)
           Button {
-            appState.refreshCameras()
+            cameraService.refreshCameras()
           } label: {
             Label("Refresh", systemImage: "arrow.clockwise")
           }
@@ -176,10 +177,10 @@ private struct CameraSelectorPopoverContent: View {
               title: "No Camera",
               subtitle: "Disable input",
               symbol: "video.slash.fill",
-              selected: appState.selectedCameraID.isEmpty,
+              selected: cameraService.selectedCamera == nil,
               hoveringID: $hoveringID
             ) {
-              appState.selectedCameraID = ""
+              // TODO: Handle "No Camera" selection - need to add this to CameraService
               close()
             }
 
@@ -206,7 +207,7 @@ private struct CameraSelectorPopoverContent: View {
           .padding(.horizontal, 8)
           .padding(.bottom, 8)
         }
-        .frame(height: min(380, CGFloat(appState.availableCameras.count + 6) * (rowHeight * 0.9)))
+        .frame(height: min(380, CGFloat(cameraService.availableCameras.count + 6) * (rowHeight * 0.9)))
       }
     }
     .frame(width: maxWidth)
@@ -225,23 +226,25 @@ private struct CameraSelectorPopoverContent: View {
       title: cam.name,
       subtitle: cam.deviceType,
       symbol: symbol(for: cam),
-      selected: cam.id == appState.selectedCameraID,
+      selected: cam.id == cameraService.selectedCamera?.id,
       hoveringID: $hoveringID
     ) {
-      appState.selectCamera(cam)
+      Task {
+        await appCoordinator?.selectCamera(cam)
+      }
       close()
     }
   }
 
   // Grouping
   private var builtIn: [CameraDevice] {
-    appState.availableCameras.filter { $0.deviceType.localizedCaseInsensitiveContains("built") }
+    cameraService.availableCameras.filter { $0.deviceType.localizedCaseInsensitiveContains("built") }
   }
   private var external: [CameraDevice] {
-    appState.availableCameras.filter { $0.deviceType.localizedCaseInsensitiveContains("external") }
+    cameraService.availableCameras.filter { $0.deviceType.localizedCaseInsensitiveContains("external") }
   }
   private var iphone: [CameraDevice] {
-    appState.availableCameras.filter {
+    cameraService.availableCameras.filter {
       $0.deviceType.localizedCaseInsensitiveContains("iphone")
       || $0.deviceType.localizedCaseInsensitiveContains("continuity")
     }
@@ -320,42 +323,9 @@ private struct SectionHeader: View {
 #if DEBUG
 struct CameraSelector_Previews: PreviewProvider {
   static var previews: some View {
-    Group {
-      CameraSelector(appState: PreviewAppState())
-        .padding()
-        .frame(width: 420)
-        .background(Color.gray.opacity(0.1))
-        .previewDisplayName("Empty / Off")
-
-      CameraSelector(appState: PreviewAppState(
-        availableCameras: [
-          CameraDevice(id: "built-in", name: "Built-in Camera", deviceType: "Built-in Camera"),
-          CameraDevice(id: "external", name: "Logitech C920", deviceType: "External Camera"),
-          CameraDevice(id: "iphone", name: "iPhone Camera", deviceType: "iPhone / Continuity")
-        ],
-        selectedCameraID: "built-in"
-      ))
-      .padding()
-      .frame(width: 420)
-      .background(Color.gray.opacity(0.1))
-      .previewDisplayName("Selected / On")
-    }
-  }
-}
-
-// Preview-only AppState for CameraSelector
-private class PreviewAppState: AppState {
-  init(
-    availableCameras: [CameraDevice] = [],
-    selectedCameraID: String = ""
-  ) {
-    super.init(
-      systemExtensionManager: SystemExtensionRequestManager(logText: "Preview"),
-      propertyManager: CustomPropertyManager(),
-      outputImageManager: OutputImageManager()
-    )
-    self.availableCameras = availableCameras
-    self.selectedCameraID = selectedCameraID
+    // TODO: Update preview to work with new CameraService architecture
+    Text("Preview temporarily disabled - update needed for CameraService")
+      .previewDisplayName("CameraSelector Preview")
   }
 }
 #endif

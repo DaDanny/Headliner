@@ -4,6 +4,12 @@
 //
 //  Created by AI Assistant on 8/2/25.
 //
+//  ⚠️ TEMPORARILY DISABLED FOR BIG BANG MIGRATION ⚠️
+//  This file is used for onboarding windowed interface only.
+//  Re-enable after migration complete by removing #if false wrapper.
+//
+
+#if false // 🚧 DISABLED DURING BIG BANG MIGRATION - RE-ENABLE LATER
 
 import SwiftUI
 
@@ -64,7 +70,7 @@ struct MainAppView: View {
 
             // Camera Selection
             GlassmorphicCard {
-              CameraSelector(appState: appState)
+              CameraSelector()
             }
 
             // Camera Settings
@@ -410,3 +416,5 @@ struct MainAppView_Previews: PreviewProvider {
   }
 }
 #endif
+
+#endif // 🚧 END DISABLED SECTION - Re-enable after Big Bang Migration complete

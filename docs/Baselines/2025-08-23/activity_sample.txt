@@ -1,0 +1,20 @@
+Analysis of sampling Headliner (pid 85415) every 1 millisecond
+Process:         Headliner [85415]
+Path:            /Applications/Headliner.app/Contents/MacOS/Headliner
+Load Address:    0x1026a0000
+Identifier:      com.dannyfrancken.Headliner
+Version:         1.0 (152)
+Code Type:       ARM64
+Platform:        macOS
+Parent Process:  launchd [1]
+Target Type:     live task
+
+Date/Time:       2025-08-23 14:56:23.375 -0400
+Launch Time:     2025-08-23 14:56:03.020 -0400
+OS Version:      macOS 15.6 (24G84)
+Report Version:  7
+Analysis Tool:   /usr/bin/sample
+
+Physical footprint:         192.5M
+Physical footprint (peak):  244.4M
+Idle exit:                  untracked

@@ -4,6 +4,12 @@
 //
 //  Created by AI Assistant on 8/2/25.
 //
+//  ⚠️ TEMPORARILY DISABLED FOR BIG BANG MIGRATION ⚠️
+//  This view is heavily dependent on AppState and used in windowed interface.
+//  Re-enable after migration complete by removing #if false wrapper.
+//
+
+#if false // 🚧 DISABLED DURING BIG BANG MIGRATION - RE-ENABLE LATER
 
 import SwiftUI
 
@@ -395,3 +401,5 @@ struct OverlaySettingsView_Previews: PreviewProvider {
   }
 }
 #endif
+
+#endif // 🚧 END DISABLED SECTION - Re-enable after Big Bang Migration complete

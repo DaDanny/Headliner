@@ -4,6 +4,12 @@
 //
 //  Created by AI Assistant on 8/2/25.
 //
+//  ⚠️ TEMPORARILY DISABLED FOR BIG BANG MIGRATION ⚠️
+//  This file contains onboarding flow for windowed interface only.
+//  Re-enable after migration complete by removing #if false wrapper.
+//
+
+#if false // 🚧 DISABLED DURING BIG BANG MIGRATION - RE-ENABLE LATER
 
 import SwiftUI
 import CoreLocation
@@ -605,7 +611,7 @@ struct CameraSetupStepView: View {
               .font(.system(size: 18, weight: .semibold))
               .foregroundColor(.primary)
             
-            CameraSelector(appState: appState)
+            CameraSelector()
               .frame(maxWidth: 400)
           }
           .opacity(isAnimating ? 1.0 : 0.0)
@@ -1160,3 +1166,5 @@ struct OverlayPresetCardPreview: PreviewProvider {
 }
 
 #endif
+
+#endif // 🚧 END DISABLED SECTION - Re-enable after Big Bang Migration complete

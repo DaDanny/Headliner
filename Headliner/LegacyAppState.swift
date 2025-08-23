@@ -1,17 +1,23 @@
 //
-//  AppState_OLD_DEPRECATED.swift
+//  LegacyAppState.swift  
 //  Headliner
 //
-//  ⚠️ DEPRECATED - DO NOT USE ⚠️
-//  This 1036-line God Object has been replaced by:
-//  - AppCoordinator.swift (orchestration)
-//  - Services/CameraService.swift (camera logic)
-//  - Services/ExtensionService.swift (extension logic)
-//  - Services/OverlayService.swift (overlay logic)
+//  Created by Danny Francken on 8/23/25.
 //
-//  This file is kept temporarily for reference during migration.
-//  DELETE THIS FILE once all views are updated.
+// 🚨 REFERENCE ONLY - DO NOT MODIFY 🚨
+// 
+// This file contains the WORKING AppState implementation before migration.
+// It is preserved for debugging and reference purposes only.
+// 
+// Use this to compare against new services when debugging migration issues:
+// - Extension triggering issues → compare with ExtensionService.swift
+// - Camera selection problems → compare with CameraService.swift  
+// - Overlay rendering issues → compare with OverlayService.swift
 //
+// ⚠️ THIS CODE IS NOT COMPILED - wrapped in #if false
+//
+
+#if false  // Prevent compilation - REFERENCE ONLY
 
 import AVFoundation
 import Combine
@@ -20,13 +26,14 @@ import SwiftUI
 import SystemExtensions
 import CoreGraphics
 
-/// Main application state.
+/// REFERENCE ONLY - Original working AppState implementation (1036 lines)
 ///
+/// This was the main application state before migration to service architecture.
 /// Coordinates UI state with the system extension lifecycle and a local AVCaptureSession
 /// used for on-device preview. Owns user selections (camera, overlay settings), persists
 /// them, and communicates updates to the extension via Darwin notifications.
 @MainActor
-class AppState: ObservableObject {
+class LegacyAppState_REFERENCE_ONLY: ObservableObject {
   // MARK: - Published Properties
 
   /// Current install/run status of the system extension.
@@ -63,6 +70,7 @@ class AppState: ObservableObject {
   private let personalInfoPump = PersonalInfoPump()
   let locationPermissionManager = LocationPermissionManager()
 
+
   // MARK: - Private Properties
 
   private var cancellables = Set<AnyCancellable>()
@@ -73,29 +81,6 @@ class AppState: ObservableObject {
   private var locationPermissionObserver: NSObjectProtocol?
   private let devicePollWindow: TimeInterval = 60 // seconds
   private let devicePollInterval: TimeInterval = 0.5
-  private var settingsSaveTimer: Timer?
-  
-  // Lazy camera discovery session to avoid repeated expensive device enumeration
-  private lazy var cameraDiscoverySession = AVCaptureDevice.DiscoverySession(
-    deviceTypes: [.builtInWideAngleCamera, .external, .continuityCamera, .deskViewCamera],
-    mediaType: .video,
-    position: .unspecified
-  )
-  
-  // Performance monitoring
-  private var performanceMetrics = PerformanceMetrics()
-  
-  /// Performance metrics tracking
-  private struct PerformanceMetrics {
-    var appLaunchTime: Date?
-    var cameraStartTime: Date?
-    var lastCameraSwitchDuration: TimeInterval?
-    var extensionPollCount: Int = 0
-    var overlayRenderCount: Int = 0
-  }
-  
-  // Caching for personal info to reduce repeated reads
-  private var personalInfoCache: (info: PersonalInfo?, timestamp: Date?)
 
   // MARK: - App Group Keys
 
@@ -138,50 +123,24 @@ class AppState: ObservableObject {
   // MARK: Deinitialization
 
   deinit {
-    // Clean up timers
     devicePollTimer?.invalidate()
-    settingsSaveTimer?.invalidate()
-    
-    // Stop services
     personalInfoPump.stop()
-    
-    // Clean up capture session
-    if let manager = captureSessionManager {
-      if manager.captureSession.isRunning {
-        manager.captureSession.stopRunning()
-      }
-      captureSessionManager = nil
-    }
-    
-    // Remove observers
     if let token = didBecomeActiveObserver {
       NSWorkspace.shared.notificationCenter.removeObserver(token)
     }
     if let token = locationPermissionObserver {
       NotificationCenter.default.removeObserver(token)
     }
-    
-    // Clear caches
-    personalInfoCache = (nil, nil)
-    
-    logger.debug("📊 AppState deinit - cleaned up resources")
   }
 
   // MARK: - Public Methods
 
   /// Initialize app state for first time use - checks extension status and loads cameras
   func initializeForUse() {
-    performanceMetrics.appLaunchTime = Date()
     self.logger.debug("Initializing app state for first use...")
     checkExtensionStatus()
     loadAvailableCameras()
     setupCaptureSession()
-    
-    // Log initialization performance
-    if let launchTime = performanceMetrics.appLaunchTime {
-      let duration = Date().timeIntervalSince(launchTime)
-      logger.debug("📊 App initialization completed in \(String(format: "%.2f", duration))s")
-    }
   }
 
   /// Begin installation flow for the system extension and start device detection polling.
@@ -221,22 +180,22 @@ class AppState: ObservableObject {
             self?.retryCaptureSession()
             self?.proceedWithCameraStart()
           } else {
-            self?.cameraStatus = .error(.cameraPermissionDenied)
-            self?.statusMessage = AppStateError.cameraPermissionDenied.localizedDescription
+            self?.cameraStatus = .error("Camera permission denied")
+            self?.statusMessage = "Camera access denied - enable in System Settings > Privacy & Security > Camera"
             self?.logger.error("Camera permission denied by user")
           }
         }
       }
     case .denied:
-      cameraStatus = .error(.cameraPermissionDenied)
-      statusMessage = AppStateError.cameraPermissionDenied.localizedDescription
+      cameraStatus = .error("Camera permission denied")
+      statusMessage = "Camera access denied - enable in System Settings > Privacy & Security > Camera"
       self.logger.error("Camera access denied - user needs to enable in System Settings")
     case .restricted:
-      cameraStatus = .error(.cameraPermissionRestricted)
-      statusMessage = AppStateError.cameraPermissionRestricted.localizedDescription
+      cameraStatus = .error("Camera access restricted")
+      statusMessage = "Camera access restricted by system policy"
       self.logger.error("Camera access restricted by system policy")
     @unknown default:
-      cameraStatus = .error(.cameraPermissionDenied)
+      cameraStatus = .error("Unknown camera permission status")
       statusMessage = "Camera permission issue"
       self.logger.error("Unknown camera authorization status")
     }
@@ -245,7 +204,6 @@ class AppState: ObservableObject {
   /// Complete startup once permissions are satisfied; idempotent if already running.
   private func proceedWithCameraStart() {
     guard cameraStatus != .running && cameraStatus != .starting else { return }
-    performanceMetrics.cameraStartTime = Date()
     self.logger.debug("Starting camera...")
     cameraStatus = .starting
     statusMessage = "Starting camera..."
@@ -264,13 +222,6 @@ class AppState: ObservableObject {
     DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
       self.cameraStatus = .running
       self.statusMessage = "Camera is running"
-      
-      // Log camera start performance
-      if let startTime = self.performanceMetrics.cameraStartTime {
-        let duration = Date().timeIntervalSince(startTime)
-        self.logger.debug("📊 Camera started in \(String(format: "%.2f", duration))s")
-      }
-      
       self.logger.debug("Camera status updated to running")
     }
   }
@@ -300,7 +251,6 @@ class AppState: ObservableObject {
   /// Persist and apply a newly selected camera.
   /// - Parameter camera: The selected physical camera device.
   func selectCamera(_ camera: CameraDevice) {
-    let switchStartTime = Date()
     selectedCameraID = camera.id
     userDefaults.set(camera.id, forKey: AppGroupKeys.selectedCameraID)
     statusMessage = "Selected camera: \(camera.name)"
@@ -313,12 +263,6 @@ class AppState: ObservableObject {
 
     // Update capture session with new camera
     updateCaptureSessionCamera(deviceID: camera.id)
-    
-    // Track camera switch performance
-    performanceMetrics.lastCameraSwitchDuration = Date().timeIntervalSince(switchStartTime)
-    if let duration = performanceMetrics.lastCameraSwitchDuration {
-      logger.debug("📊 Camera switch completed in \(String(format: "%.2f", duration))s")
-    }
 
     // If camera is running, restart with new device
     if cameraStatus == .running {
@@ -421,9 +365,9 @@ class AppState: ObservableObject {
   private func triggerSwiftUIRenderingIfNeeded() {
     let presetId = self.overlaySettings.selectedPresetId
     
-    guard let tokens = self.overlaySettings.overlayTokens else { 
+    guard let tokens = self.overlaySettings.overlayTokens else {
       self.logger.debug("🔍 [SwiftUI] No overlay tokens available for preset '\(presetId)' - skipping SwiftUI rendering")
-      return 
+      return
     }
     
     self.logger.debug("🔍 [SwiftUI] Triggering SwiftUI rendering for preset '\(presetId)' with tokens: \(tokens.displayName), safeAreaMode: \(self.overlaySettings.safeAreaMode.displayName)")
@@ -431,21 +375,15 @@ class AppState: ObservableObject {
     // Check if this is a SwiftUI preset and get the appropriate provider
     if let provider = swiftUIProvider(for: presetId) {
       self.logger.debug("🎨 [SwiftUI] Rendering SwiftUI overlay with safeAreaMode: \(self.overlaySettings.safeAreaMode.rawValue), surfaceStyle: \(self.overlaySettings.selectedSurfaceStyle)")
-      self.performanceMetrics.overlayRenderCount += 1
-      // Move rendering to background with main actor context
       Task { @MainActor in
         let renderTokens = RenderTokens(safeAreaMode: self.overlaySettings.safeAreaMode, surfaceStyle: self.overlaySettings.selectedSurfaceStyle)
         let personalInfo = self.getCurrentPersonalInfo()
-        
-        // Perform rendering in background task
-        Task.detached {
-          await OverlayRenderBroker.shared.updateOverlay(
-            provider: provider,
-            tokens: tokens,
-            renderTokens: renderTokens,
-            personalInfo: personalInfo
-          )
-        }
+        await OverlayRenderBroker.shared.updateOverlay(
+          provider: provider,
+          tokens: tokens,
+          renderTokens: renderTokens,
+          personalInfo: personalInfo
+        )
       }
     } else {
       self.logger.debug("⚠️ [SwiftUI] No SwiftUI provider found for preset '\(presetId)'")
@@ -458,26 +396,13 @@ class AppState: ObservableObject {
     return SwiftUIPresetRegistry.preset(withId: presetId)?.provider
   }
   
-  /// Get current PersonalInfo from App Group storage with caching
+  /// Get current PersonalInfo from App Group storage
   private func getCurrentPersonalInfo() -> PersonalInfo? {
-    // Check cache first (valid for 5 seconds)
-    if let cachedTimestamp = personalInfoCache.timestamp,
-       Date().timeIntervalSince(cachedTimestamp) < 5.0,
-       let cachedInfo = personalInfoCache.info {
-      logger.debug("📊 Using cached personal info")
-      return cachedInfo
-    }
-    
-    // Load from UserDefaults if cache miss or expired
     guard let userDefaults = UserDefaults(suiteName: Identifiers.appGroup),
           let data = userDefaults.data(forKey: "overlay.personalInfo.v1"),
           let info = try? JSONDecoder().decode(PersonalInfo.self, from: data) else {
       return nil
     }
-    
-    // Update cache
-    personalInfoCache = (info, Date())
-    logger.debug("📊 Loaded and cached personal info")
     return info
   }
   
@@ -552,29 +477,20 @@ class AppState: ObservableObject {
     locationPermissionManager.openSystemSettings()
   }
   
+
+
   /// Persist `overlaySettings` to the shared app group so the extension can load them.
   private func saveOverlaySettings() {
-    // Cancel existing timer
-    settingsSaveTimer?.invalidate()
-    
-    // Schedule debounced save
-    settingsSaveTimer = Timer.scheduledTimer(withTimeInterval: 0.2, repeats: false) { [weak self] _ in
-      self?.performSettingsSave()
-    }
-  }
-  
-  private func performSettingsSave() {
     // Save to app group defaults for extension access
     guard let appGroupDefaults = UserDefaults(suiteName: Identifiers.appGroup) else {
       self.logger.error("Failed to access app group UserDefaults for saving overlay settings")
-      self.statusMessage = AppStateError.appGroupAccessFailed.localizedDescription
       return
     }
 
     do {
       let overlayData = try JSONEncoder().encode(self.overlaySettings)
       appGroupDefaults.set(overlayData, forKey: OverlayUserDefaultsKeys.overlaySettings)
-      // Remove synchronize() call - let system handle timing
+      appGroupDefaults.synchronize() // Force immediate sync
 
       logger
         .debug(
@@ -737,8 +653,13 @@ class AppState: ObservableObject {
       return
     }
     
-    // Use shared discovery session instead of creating new one
-    availableCameras = cameraDiscoverySession.devices
+    let discoverySession = AVCaptureDevice.DiscoverySession(
+      deviceTypes: [.builtInWideAngleCamera, .external, .continuityCamera, .deskViewCamera],
+      mediaType: .video,
+      position: .unspecified
+    )
+
+    availableCameras = discoverySession.devices
       .filter { !$0.localizedName.contains("Headliner") } // Exclude our virtual camera
       .map { device in
         CameraDevice(
@@ -769,12 +690,6 @@ class AppState: ObservableObject {
       return
     }
     
-    // Reuse existing capture session if available to avoid recreation overhead
-    if captureSessionManager != nil {
-      logger.debug("Reusing existing capture session")
-      return
-    }
-    
     self.logger.debug("Setting up capture session for camera preview...")
     captureSessionManager = CaptureSessionManager(capturingHeadliner: false)
 
@@ -787,8 +702,11 @@ class AppState: ObservableObject {
         queue: manager.dataOutputQueue
       )
 
-      // Don't auto-start the session - let startCamera() handle it
-      self.logger.debug("Capture session ready for use")
+      // Start the capture session for preview only if we have cameras available
+      if !manager.captureSession.isRunning && !availableCameras.isEmpty {
+        manager.captureSession.startRunning()
+        self.logger.debug("Started preview capture session")
+      }
     } else {
       self.logger.warning("Failed to configure capture session - likely due to no camera found")
       statusMessage = "No suitable camera found for preview"
@@ -825,10 +743,15 @@ class AppState: ObservableObject {
   private func updateCaptureSessionCamera(deviceID: String) {
     guard let manager = captureSessionManager else { return }
 
-    // Use shared discovery session
-    guard let device = cameraDiscoverySession.devices.first(where: { $0.uniqueID == deviceID }) else {
+    // Find the camera device by ID
+    let discoverySession = AVCaptureDevice.DiscoverySession(
+      deviceTypes: [.builtInWideAngleCamera, .external, .continuityCamera, .deskViewCamera],
+      mediaType: .video,
+      position: .unspecified
+    )
+
+    guard let device = discoverySession.devices.first(where: { $0.uniqueID == deviceID }) else {
       self.logger.error("Camera device with ID \(deviceID) not found")
-      self.statusMessage = AppStateError.cameraNotFound(deviceID).localizedDescription
       return
     }
 
@@ -874,114 +797,54 @@ class AppState: ObservableObject {
   /// Poll for extension device readiness with a time-bounded timer.
   private func waitForExtensionDeviceAppear() {
     devicePollTimer?.invalidate()
-    
+
     let deadline = Date().addingTimeInterval(devicePollWindow)
-    var currentInterval: TimeInterval = 1.0 // Start with 1 second
-    let maxInterval: TimeInterval = 4.0 // Cap at 4 seconds
-    
-    func scheduleNextPoll() {
-      let timer = Timer(timeInterval: currentInterval, repeats: false) { [weak self] _ in
-        Task { @MainActor in
-          await self?.performExtensionPoll(deadline: deadline, scheduleNext: scheduleNextPoll)
+
+    // ensure timer is created on the main run loop
+    let t = Timer(timeInterval: devicePollInterval, repeats: true) { [weak self] _ in
+      Task { @MainActor in
+        guard let self else { return }
+
+        // Prefer provider readiness to avoid noisy device scans once the extension has signaled readiness
+        let providerReady = UserDefaults(suiteName: Identifiers.appGroup)?
+          .bool(forKey: AppGroupKeys.extensionProviderReady) ?? false
+        if providerReady {
+          self.devicePollTimer?.invalidate()
+          self.extensionStatus = .installed
+          self.statusMessage = "Extension installed and ready"
+          self.logger.debug("✅ Virtual camera detected after activation")
+          return
+        }
+
+        // Only scan devices if provider readiness hasn't been signaled yet
+        self.propertyManager_internal.refreshExtensionStatus()
+        if self.propertyManager_internal.deviceObjectID != nil {
+          self.devicePollTimer?.invalidate()
+          self.extensionStatus = .installed
+          self.statusMessage = "Extension installed and ready"
+          self.logger.debug("✅ Virtual camera detected after activation")
+        } else if Date() > deadline {
+          self.devicePollTimer?.invalidate()
+          self.logger.debug("⌛ Timed out waiting for device; user may still be approving or camera is in-use")
         }
       }
-      
-      devicePollTimer = timer
-      RunLoop.main.add(timer, forMode: .common)
-      
-      // Exponential backoff
-      currentInterval = min(currentInterval * 1.5, maxInterval)
     }
-    
-    scheduleNextPoll()
-  }
-  
-  private func performExtensionPoll(deadline: Date, scheduleNext: @escaping () -> Void) async {
-    performanceMetrics.extensionPollCount += 1
-    // Prioritize provider readiness flag
-    let providerReady = UserDefaults(suiteName: Identifiers.appGroup)?
-      .bool(forKey: AppGroupKeys.extensionProviderReady) ?? false
-      
-    if providerReady {
-      devicePollTimer?.invalidate()
-      extensionStatus = .installed
-      statusMessage = "Extension installed and ready"
-      logger.debug("✅ Extension ready via provider flag")
-      return
-    }
-    
-    // Fallback to device scan if needed
-    propertyManager_internal.refreshExtensionStatus()
-    if propertyManager_internal.deviceObjectID != nil {
-      devicePollTimer?.invalidate()
-      extensionStatus = .installed
-      statusMessage = "Extension installed and ready"
-      logger.debug("✅ Extension detected via device scan")
-    } else if Date() > deadline {
-      devicePollTimer?.invalidate()
-      logger.debug("⌛ Extension installation timed out")
-    } else {
-      // Schedule next poll with backoff
-      scheduleNext()
-    }
+
+    // keep firing while UI is interacting (scroll/menus)
+    devicePollTimer = t
+    t.tolerance = 0.1
+    RunLoop.main.add(t, forMode: .common)
   }
 }
 
 // MARK: - Supporting Types
-
-/// Standardized error types for AppState operations
-enum AppStateError: LocalizedError, Equatable {
-  case cameraPermissionDenied
-  case cameraPermissionRestricted
-  case cameraNotFound(String)
-  case extensionNotInstalled
-  case captureSessionConfigurationFailed
-  case overlaySettingsSaveFailed(String) // Changed from Error to String for Equatable
-  case appGroupAccessFailed
-  
-  static func == (lhs: AppStateError, rhs: AppStateError) -> Bool {
-    switch (lhs, rhs) {
-    case (.cameraPermissionDenied, .cameraPermissionDenied),
-         (.cameraPermissionRestricted, .cameraPermissionRestricted),
-         (.extensionNotInstalled, .extensionNotInstalled),
-         (.captureSessionConfigurationFailed, .captureSessionConfigurationFailed),
-         (.appGroupAccessFailed, .appGroupAccessFailed):
-      return true
-    case (.cameraNotFound(let a), .cameraNotFound(let b)):
-      return a == b
-    case (.overlaySettingsSaveFailed(let a), .overlaySettingsSaveFailed(let b)):
-      return a == b
-    default:
-      return false
-    }
-  }
-  
-  var errorDescription: String? {
-    switch self {
-    case .cameraPermissionDenied:
-      return "Camera access denied - enable in System Settings > Privacy & Security > Camera"
-    case .cameraPermissionRestricted:
-      return "Camera access restricted by system policy"
-    case .cameraNotFound(let id):
-      return "Camera device with ID \(id) not found"
-    case .extensionNotInstalled:
-      return "System extension is not installed"
-    case .captureSessionConfigurationFailed:
-      return "Failed to configure camera preview"
-    case .overlaySettingsSaveFailed(let errorMessage):
-      return "Failed to save overlay settings: \(errorMessage)"
-    case .appGroupAccessFailed:
-      return "Failed to access shared app group storage"
-    }
-  }
-}
 
 enum ExtensionStatus: Equatable {
   case unknown
   case notInstalled
   case installing
   case installed
-  case error(AppStateError)
+  case error(String)
 
   var displayText: String {
     switch self {
@@ -989,7 +852,7 @@ enum ExtensionStatus: Equatable {
     case .notInstalled: "Not Installed"
     case .installing: "Installing..."
     case .installed: "Installed"
-    case let .error(error): error.localizedDescription ?? "Error"
+    case let .error(message): "Error: \(message)"
     }
   }
 
@@ -1004,7 +867,7 @@ enum CameraStatus: Equatable {
   case starting
   case running
   case stopping
-  case error(AppStateError)
+  case error(String)
 
   var displayText: String {
     switch self {
@@ -1012,7 +875,7 @@ enum CameraStatus: Equatable {
     case .starting: "Starting..."
     case .running: "Running"
     case .stopping: "Stopping..."
-    case let .error(error): error.localizedDescription ?? "Error"
+    case let .error(message): "Error: \(message)"
     }
   }
 
@@ -1041,3 +904,22 @@ extension AVCaptureDevice.DeviceType {
     }
   }
 }
+
+#endif // End of REFERENCE ONLY code
+
+// 📖 REFERENCE USAGE EXAMPLES:
+//
+// When debugging extension issues:
+// 1. Look at LegacyAppState_REFERENCE_ONLY.waitForExtensionDeviceAppear() 
+// 2. Compare with ExtensionService.checkStatus()
+// 3. Ensure same polling logic is preserved
+//
+// When debugging camera selection:
+// 1. Look at LegacyAppState_REFERENCE_ONLY.selectCamera()
+// 2. Compare with CameraService.selectCamera() 
+// 3. Ensure same Darwin notifications are sent
+//
+// When debugging overlay rendering:
+// 1. Look at LegacyAppState_REFERENCE_ONLY.triggerSwiftUIRenderingIfNeeded()
+// 2. Compare with OverlayService render pipeline
+// 3. Ensure same background task structure

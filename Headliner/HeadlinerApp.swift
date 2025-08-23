@@ -9,42 +9,28 @@ import SwiftUI
 
 @main
 struct HeadlinerApp: App {
-  // Simple, clean initialization
-  @StateObject private var appState: AppState
-  @StateObject private var menuBarViewModel: MenuBarViewModel
+  @State private var appCoordinator = CompositionRoot.makeCoordinator()  // Clean dependency injection
+  @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
   
   init() {
-    // Initialize AppState with dependencies
-    let appState = AppState(
-      systemExtensionManager: SystemExtensionRequestManager(logText: ""),
-      propertyManager: CustomPropertyManager(),
-      outputImageManager: OutputImageManager()
-    )
-    self._appState = StateObject(wrappedValue: appState)
-    self._menuBarViewModel = StateObject(wrappedValue: MenuBarViewModel(appState: appState))
+    if !AppLifecycleManager.enforcesSingleInstance() {
+      fatalError("Another instance is already running")
+    }
   }
   
   var body: some Scene {
-    // Menu Bar Scene - The ONLY interface
-    MenuBarExtra("Headliner", systemImage: isRunning ? "dot.radiowaves.left.and.right" : "video") {
-      MenuContent(viewModel: menuBarViewModel)
+    MenuBarExtra("Headliner", systemImage: "video") {  // Static icon for now, TODO: observe CameraService
+      MenuContent(appCoordinator: appCoordinator)
+        .withAppCoordinator(appCoordinator)  // Inject services
         .onAppear {
-          // Initialize app state for first use
-          appState.initializeForUse()
+          appCoordinator.initializeApp()
         }
     }
     .menuBarExtraStyle(.window)
     
-    // Settings Window - Only when needed for complex settings
-    Settings {
-      SettingsView(appState: appState)
-        .environmentObject(appState.themeManager)
-    }
-  }
-  
-  // MARK: - Computed Properties
-  
-  private var isRunning: Bool {
-    appState.cameraStatus.isRunning
+    // Settings {
+    //   SettingsView(appCoordinator: appCoordinator)
+    //     .withAppCoordinator(appCoordinator)  // Inject services
+    // }
   }
 }

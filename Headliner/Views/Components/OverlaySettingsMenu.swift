@@ -61,7 +61,8 @@ struct PillSegmented<T: Hashable>: View {
 }
 
 struct OverlaySettingsMenu: View {
-    @ObservedObject var viewModel: MenuBarViewModel
+    let appCoordinator: AppCoordinator  // For delegation only
+    @EnvironmentObject private var overlayService: OverlayService
     let onBack: () -> Void
     
     @State private var overlayStyle: OverlayStyle = .rounded
@@ -152,11 +153,11 @@ struct OverlaySettingsMenu: View {
                         ForEach(categoryOverlays, id: \.id) { overlay in
                             OverlayListRow(
                                 overlay: overlay,
-                                isSelected: overlay.id == viewModel.selectedOverlayID,
+                                isSelected: overlay.id == overlayService.currentPreset?.id,
                                 isHovered: hoveredOverlayID == overlay.id,
                                 style: overlayStyle
                             ) {
-                                viewModel.selectOverlay(overlay.id)
+                                overlayService.selectPreset(overlay.id)
                                 onBack()
                             }
                             .onHover { isHovering in
@@ -176,7 +177,7 @@ struct OverlaySettingsMenu: View {
     // MARK: - Helper Properties
     
     private func overlaysForCategory(_ category: SwiftUIPresetCategory) -> [SwiftUIPresetInfo] {
-        viewModel.overlays.filter { $0.category == category }
+        overlayService.availablePresets.filter { $0.category == category }
     }
 }
 
@@ -331,11 +332,12 @@ struct OverlayListRow: View {
 #if DEBUG
 struct OverlaySettingsMenu_Previews: PreviewProvider {
     static var previews: some View {
-        // Single, simplified preview to avoid timeout
+        let coordinator = CompositionRoot.makeMockCoordinator()
         OverlaySettingsMenu(
-            viewModel: .createMinimalMock(),
+            appCoordinator: coordinator,
             onBack: { }
         )
+        .withAppCoordinator(coordinator)
         .frame(width: 320, height: 500)
         .previewDisplayName("Overlay Settings Menu")
         .previewLayout(.sizeThatFits)
@@ -345,10 +347,12 @@ struct OverlaySettingsMenu_Previews: PreviewProvider {
 // Separate preview for dark mode if needed
 struct OverlaySettingsMenuDark_Previews: PreviewProvider {
     static var previews: some View {
+        let coordinator = CompositionRoot.makeMockCoordinator()
         OverlaySettingsMenu(
-            viewModel: .createMinimalMock(),
+            appCoordinator: coordinator,
             onBack: { }
         )
+        .withAppCoordinator(coordinator)
         .frame(width: 320, height: 500)
         .preferredColorScheme(.dark)
         .previewDisplayName("Overlay Settings - Dark")

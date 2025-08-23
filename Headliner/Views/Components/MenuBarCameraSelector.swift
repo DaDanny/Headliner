@@ -8,14 +8,15 @@
 import SwiftUI
 
 /// Camera selector optimized for MenuBar interface
-/// Uses MenuBarViewModel instead of direct AppState access
+/// Uses services directly via @EnvironmentObject
 struct MenuBarCameraSelector: View {
-    @ObservedObject var viewModel: MenuBarViewModel
+    let appCoordinator: AppCoordinator  // For delegation only
+    @EnvironmentObject private var cameraService: CameraService
     @State private var isExpanded = false
     @State private var hoveringID: String? = nil
     
     private var selectedCamera: CameraDevice? {
-        viewModel.cameras.first { $0.id == viewModel.selectedCameraID }
+        cameraService.availableCameras.first { $0.id == (cameraService.selectedCamera?.id ?? "") }
     }
     
     var body: some View {
@@ -65,24 +66,25 @@ struct MenuBarCameraSelector: View {
                         name: "No Camera",
                         deviceType: "Disable input",
                         symbol: "video.slash",
-                        isSelected: viewModel.selectedCameraID.isEmpty,
+                        isSelected: cameraService.selectedCamera == nil,
                         hoveringID: $hoveringID
                     ) {
-                        viewModel.selectCamera(id: "")
+                        // TODO: Handle no camera selection properly
+                        // Task { await cameraService.selectCamera(nil) }
                         isExpanded = false
                     }
                     
                     // Available cameras
-                    ForEach(viewModel.cameras, id: \.id) { camera in
+                    ForEach(cameraService.availableCameras, id: \.id) { camera in
                         CameraMenuRow(
                             id: camera.id,
                             name: camera.name,
                             deviceType: camera.deviceType,
                             symbol: symbol(for: camera),
-                            isSelected: camera.id == viewModel.selectedCameraID,
+                            isSelected: camera.id == cameraService.selectedCamera?.id,
                             hoveringID: $hoveringID
                         ) {
-                            viewModel.selectCamera(camera)
+                            Task { await cameraService.selectCamera(camera) }
                             isExpanded = false
                         }
                     }
@@ -173,7 +175,9 @@ private struct CameraMenuRow: View {
 #if DEBUG
 struct MenuBarCameraSelector_Previews: PreviewProvider {
     static var previews: some View {
-        MenuBarCameraSelector(viewModel: .createMinimalMock())
+        let coordinator = CompositionRoot.makeMockCoordinator()
+        MenuBarCameraSelector(appCoordinator: coordinator)
+            .withAppCoordinator(coordinator)
             .frame(width: 280)
             .padding()
             .previewDisplayName("MenuBar Camera Selector")

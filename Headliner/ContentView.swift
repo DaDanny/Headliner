@@ -4,6 +4,13 @@
 //
 //  Created by Danny Francken on 8/2/25.
 //
+//  ⚠️ TEMPORARILY DISABLED FOR BIG BANG MIGRATION ⚠️
+//  This ContentView switches between MainAppView (windowed) and OnboardingView.
+//  Since both are disabled during migration, this is also disabled.
+//  Re-enable after migration complete by removing #if false wrapper.
+//
+
+#if false // 🚧 DISABLED DURING BIG BANG MIGRATION - RE-ENABLE LATER
 
 import SwiftUI
 
@@ -71,3 +78,5 @@ struct ContentView_Previews: PreviewProvider {
   }
 }
 #endif
+
+#endif // 🚧 END DISABLED SECTION - Re-enable after Big Bang Migration complete

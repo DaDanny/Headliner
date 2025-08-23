@@ -67,6 +67,7 @@ The build scheme includes a post-action that copies the built app to `/Applicati
 - **Never modify**: Xcode project files, entitlements, Info.plist files, or system extension implementation
 - Files excluded via `.cursorignore`: `*.xcodeproj`, `*.entitlements`, `Info.plist`, `*.plist`
 - System extension must remain in `/Applications/` for proper installation
+- **Avoid git commands**: Do not use git commands for commits, branches, or other version control operations
 
 ### Camera Integration
 - Uses AVFoundation for camera device discovery and capture

@@ -2,3 +2,7 @@ build/
 sample-camera/
 .periphery-index
 .DS_Store
+
+# Performance Baselines - Instruments trace files are large
+docs/Baselines/**/*.trace/
+InstrumentTraces/

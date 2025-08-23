@@ -4,6 +4,12 @@
 //
 //  Created by AI Assistant on 8/22/25.
 //
+//  ⚠️ DEPRECATED: This file is deprecated as of Phase 9 of the Big Bang Migration
+//  Views now use AppCoordinator + Services directly via @EnvironmentObject
+//  TODO: Delete this file after confirming all legacy usage is removed
+//
+
+#if false // DEPRECATED - Remove after migration complete
 
 import SwiftUI
 import AVFoundation
@@ -50,12 +56,30 @@ class MenuBarViewModel: ObservableObject {
   // MARK: - Dependencies
   
   private let appState: AppState
+  private let extensionService: ExtensionService
+  private let overlayService: OverlayService
   private var cancellables = Set<AnyCancellable>()
   
   // MARK: - Initialization
   
+  init(appState: AppState, extensionService: ExtensionService, overlayService: OverlayService) {
+    self.appState = appState
+    self.extensionService = extensionService
+    self.overlayService = overlayService
+    setupBindings()
+    refreshData()
+    loadLaunchAtLoginState()
+  }
+  
+  // Legacy constructor for compatibility during migration
   init(appState: AppState) {
     self.appState = appState
+    // Create temporary services for legacy compatibility
+    self.extensionService = ExtensionService(
+      requestManager: SystemExtensionRequestManager(logText: ""),
+      propertyManager: CustomPropertyManager()
+    )
+    self.overlayService = OverlayService()
     setupBindings()
     refreshData()
     loadLaunchAtLoginState()
@@ -101,7 +125,7 @@ class MenuBarViewModel: ObservableObject {
   
   /// Select an overlay preset
   func selectOverlay(_ overlayID: String) {
-    appState.selectPreset(overlayID)
+    overlayService.selectPreset(overlayID)
     selectedOverlayID = overlayID
   }
   
@@ -167,8 +191,8 @@ class MenuBarViewModel: ObservableObject {
       .receive(on: DispatchQueue.main)
       .assign(to: &$selectedCameraID)
     
-    // Bind extension status
-    appState.$extensionStatus
+    // Bind extension status from ExtensionService instead of AppState
+    extensionService.$status
       .receive(on: DispatchQueue.main)
       .assign(to: &$extensionStatus)
     
@@ -177,8 +201,8 @@ class MenuBarViewModel: ObservableObject {
       .receive(on: DispatchQueue.main)
       .assign(to: &$statusMessage)
     
-    // Bind overlay preset ID
-    appState.$overlaySettings
+    // Bind overlay preset ID from OverlayService instead of AppState
+    overlayService.$settings
       .map { $0.selectedPresetId }
       .receive(on: DispatchQueue.main)
       .assign(to: &$selectedOverlayID)
@@ -186,17 +210,15 @@ class MenuBarViewModel: ObservableObject {
   
   /// Load initial data
   private func refreshData() {
-    // Initialize app state if needed
-    if appState.extensionStatus == .unknown {
-      appState.initializeForUse()
-    }
+    // Check extension status
+    extensionService.checkStatus()
     
-    // Load overlay presets
-    overlays = appState.availableSwiftUIPresets
+    // Load overlay presets from OverlayService
+    overlays = overlayService.availablePresets
     
     // Set initial values
     selectedCameraID = appState.selectedCameraID
-    selectedOverlayID = appState.currentPresetId
+    selectedOverlayID = overlayService.currentPresetId
     isRunning = appState.cameraStatus.isRunning
   }
   
@@ -328,3 +350,5 @@ extension MenuBarViewModel {
   }
 }
 #endif
+
+#endif // DEPRECATED - Remove after migration complete
