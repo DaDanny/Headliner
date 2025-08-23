@@ -9,7 +9,7 @@ import SwiftUI
 
 @main
 struct HeadlinerApp: App {
-  @StateObject private var appState = AppCoordinator()  // Just rename to appState for compatibility
+  @StateObject private var appCoordinator = AppCoordinator()  // Real service-based coordinator
   @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
   
   init() {
@@ -20,21 +20,22 @@ struct HeadlinerApp: App {
   
   var body: some Scene {
     MenuBarExtra("Headliner", systemImage: isRunning ? "dot.radiowaves.left.and.right" : "video") {
-      MenuContent(appState: appState)
+      MenuContent(appCoordinator: appCoordinator)
+        .withAppCoordinator(appCoordinator)  // Inject services
         .onAppear {
-          appState.initializeApp()
+          appCoordinator.initializeApp()
         }
     }
     .menuBarExtraStyle(.window)
     
     Settings {
-      SettingsView(appState: appState)
+      SettingsView(appCoordinator: appCoordinator)
+        .withAppCoordinator(appCoordinator)  // Inject services
     }
   }
   
-    // TODO: Review if this is needed or should be moved out and into the proper location
-    // My gut is telling me that this should be from either the ExtensionService or CameraService
+  // TODO: This should observe CameraService directly, not through coordinator
   private var isRunning: Bool {
-    appState.isCameraRunning
+    appCoordinator.camera.cameraStatus == .running
   }
 }

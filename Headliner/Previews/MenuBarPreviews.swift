@@ -13,7 +13,7 @@ import SwiftUI
 struct MenuBarPreviews: PreviewProvider {
   static var previews: some View {
     // Single, lightweight preview to avoid heavy initialization
-    MenuContent(viewModel: .createMinimalMock())
+    MenuContent(appCoordinator: AppCoordinator())
       .frame(width: 320)
       .environmentObject(ThemeManager())
       .previewDisplayName("Menu Bar")

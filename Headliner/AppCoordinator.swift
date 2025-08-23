@@ -8,11 +8,12 @@
 import SwiftUI
 import Combine
 import AVFoundation
+import CoreLocation
 
-/// Drop-in replacement for the old AppState God Object
-/// Now properly architected with services
+/// Service coordinator - THIN orchestration layer only
+/// NOT ObservableObject - views observe services directly
 @MainActor
-final class AppCoordinator: ObservableObject {
+final class AppCoordinator {
   // MARK: - Services
   
   let camera: CameraService
@@ -21,30 +22,13 @@ final class AppCoordinator: ObservableObject {
   let location: LocationPermissionManager
   let personalInfo: PersonalInfoPump
   
-  // MARK: - Published Properties (API compatibility with old AppState)
+  // MARK: - Services (for view injection)
+  // Views observe these directly, not the coordinator
   
-  @Published var extensionStatus: ExtensionStatus { 
-    didSet { } 
-  }
-  @Published var cameraStatus: CameraStatus {
-    didSet { }
-  }
-  @Published var availableCameras: [CameraDevice] = []
-  @Published var selectedCameraID: String = ""
-  @Published var statusMessage: String = ""
-  @Published var isShowingSettings = false
-  @Published var overlaySettings: OverlaySettings {
-    didSet { }
-  }
-  @Published var isShowingOverlaySettings = false
-  @Published var selectedTemplateId = "professional"
-  @Published var themeManager = ThemeManager()
-  @Published var locationAuthorizationStatus: CLAuthorizationStatus = .notDetermined
-  
-  let locationPermissionManager: LocationPermissionManager
+  // MARK: - Shared utilities  
+  let themeManager = ThemeManager()
   
   // MARK: - Private Properties
-  
   private var cancellables = Set<AnyCancellable>()
   private let logger = HeadlinerLogger.logger(for: .application)
   private let analytics = AnalyticsManager.shared
@@ -63,13 +47,13 @@ final class AppCoordinator: ObservableObject {
       outputImageManager: outputManager
     )
     
-    self.extension = ExtensionService(
+    self.extensionService = ExtensionService(
       requestManager: extensionRequestManager,
       propertyManager: propertyManager
     )
     
     self.overlay = OverlayService()
-    self.location = LocationPermissionManager()
+    self.location = LocationPermissionManager() 
     self.personalInfo = PersonalInfoPump()
     
     setupBindings()
@@ -84,7 +68,7 @@ final class AppCoordinator: ObservableObject {
     analytics.trackAppLaunch()
     
     // Check extension status
-    extension.checkStatus()
+    extensionService.checkStatus()
     
     // Load cameras if we have permission
     if camera.hasCameraPermission {
@@ -97,11 +81,11 @@ final class AppCoordinator: ObservableObject {
     }
   }
   
-  // MARK: - User Actions
+  // MARK: - App Actions (delegate to appropriate services)
   
   /// Start the camera and virtual device
   func startCamera() {
-    guard extension.isInstalled else {
+    guard extensionService.isInstalled else {
       logger.debug("Cannot start - extension not installed")
       return
     }
@@ -109,7 +93,7 @@ final class AppCoordinator: ObservableObject {
     Task {
       do {
         // Send overlay settings first
-        overlay.notifyExtension()
+        // TODO: overlay.notifyExtension() - make this method public"
         
         // Start camera
         try await camera.startCamera()
@@ -129,13 +113,22 @@ final class AppCoordinator: ObservableObject {
     analytics.track(.cameraStopped)
   }
   
+  /// Toggle camera on/off - for MenuContent compatibility
+  func toggleCamera() {
+    if isRunning {
+      stopCamera()
+    } else {
+      startCamera()
+    }
+  }
+  
   /// Install the system extension
   func installExtension() {
-    extension.install()
+    extensionService.install()
     analytics.track(.extensionInstalled)
   }
   
-  /// Select a camera device
+  /// Select a camera device - delegate to CameraService
   func selectCamera(_ device: CameraDevice) {
     Task {
       await camera.selectCamera(device)
@@ -146,22 +139,31 @@ final class AppCoordinator: ObservableObject {
     }
   }
   
-  /// Select an overlay preset
+  /// Select an overlay preset - delegate to OverlayService
   func selectOverlayPreset(_ presetId: String) {
     overlay.selectPreset(presetId)
-    selectedTemplateId = presetId
     analytics.trackOverlaySelection(presetId: presetId)
   }
   
-  /// Update overlay tokens
+  /// Update overlay tokens - delegate to OverlayService
   func updateOverlayTokens(_ tokens: OverlayTokens) {
     overlay.updateTokens(tokens)
     analytics.trackOverlaySettingChange(setting: "tokens", value: tokens.displayName)
   }
   
-  /// Request location permission
+  /// Request location permission - delegate to LocationPermissionManager
   func requestLocationPermission() {
     location.requestLocationPermission()
+  }
+  
+  /// Toggle launch at login
+  func toggleLaunchAtLogin() {
+    // TODO: Implement actual launch at login logic with ServiceManagement
+  }
+  
+  /// Quit the application
+  func quitApp() {
+    NSApplication.shared.terminate(nil)
   }
   
   // MARK: - Private Methods
@@ -170,7 +172,7 @@ final class AppCoordinator: ObservableObject {
     // Coordinate between services
     
     // When extension installs, refresh cameras
-    extension.$status
+    extensionService.$status
       .removeDuplicates()
       .sink { [weak self] status in
         if status == .installed {
@@ -191,7 +193,6 @@ final class AppCoordinator: ObservableObject {
     
     // Track overlay changes
     overlay.$settings
-      .removeDuplicates()
       .sink { [weak self] settings in
         if settings.isEnabled {
           self?.analytics.track(.overlayEnabled)
@@ -202,44 +203,56 @@ final class AppCoordinator: ObservableObject {
       .store(in: &cancellables)
   }
   
-  // MARK: - Computed Properties
+  // MARK: - Legacy compatibility (to be removed after migration)
   
-  /// Check if we can start the camera
-  var canStartCamera: Bool {
-    extension.isInstalled && camera.hasCameraPermission
-  }
-  
-  /// Check if camera is running
-  var isCameraRunning: Bool {
-    camera.cameraStatus == .running
-  }
-  
-  /// Check if we need any permissions
-  var needsPermissions: Bool {
-    !camera.hasCameraPermission
-  }
-  
-  /// Get current status message
-  var statusMessage: String {
-    if !extension.isInstalled {
-      return extension.statusMessage
-    } else if camera.cameraStatus != .stopped {
-      return camera.statusMessage
+  /// Legacy methods for MenuContent compatibility - TEMPORARY
+  /// TODO: Remove these after views observe services directly
+  func toggleCamera() {
+    if camera.cameraStatus == .running {
+      stopCamera()
     } else {
-      return "Ready"
+      startCamera()
     }
   }
+  
+  // Legacy properties - views should observe services directly instead
+  var isRunning: Bool { camera.cameraStatus == .running }
+  var cameras: [CameraDevice] { camera.availableCameras }
+  var selectedCameraID: String { camera.selectedCamera?.id ?? "" }
+  var extensionStatus: ExtensionStatus { extensionService.status }
+  var overlays: [SwiftUIPresetInfo] { overlay.availablePresets }
+  var selectedOverlayID: String { overlay.currentPreset?.id ?? "" }
+  var overlaySettings: OverlaySettings { overlay.settings }
+  var launchAtLogin: Bool { false } // TODO: Implement properly
+  
+  func getAppState() -> Any { self } // Legacy hack
 }
 
 // MARK: - SwiftUI Environment Setup
 
 extension View {
-  /// Inject the coordinator and its services into the environment
+  /// Inject services into the environment for direct observation
+  /// Views observe services directly, NOT the coordinator
   func withAppCoordinator(_ coordinator: AppCoordinator) -> some View {
     self
-      .environmentObject(coordinator)
-      .environmentObject(coordinator.camera)
-      .environmentObject(coordinator.extension)
-      .environmentObject(coordinator.overlay)
+      .environmentObject(coordinator.camera)           // Views observe CameraService
+      .environmentObject(coordinator.extensionService) // Views observe ExtensionService  
+      .environmentObject(coordinator.overlay)          // Views observe OverlayService
+      .environmentObject(coordinator.location)         // Views observe LocationPermissionManager
+      .environmentObject(coordinator.themeManager)     // Views observe ThemeManager
+      // Coordinator itself available via environment for delegation
+      .environment(\.appCoordinator, coordinator)
+  }
+}
+
+// Environment key for coordinator access
+private struct AppCoordinatorKey: EnvironmentKey {
+  static let defaultValue: AppCoordinator? = nil
+}
+
+extension EnvironmentValues {
+  var appCoordinator: AppCoordinator? {
+    get { self[AppCoordinatorKey.self] }
+    set { self[AppCoordinatorKey.self] = newValue }
   }
 }

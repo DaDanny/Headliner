@@ -152,7 +152,7 @@ final class ExtensionService: ObservableObject {
     }
   }
   
-  private func handleInstallationPhase(_ phase: SystemExtensionRequestManager.RequestPhase) {
+  private func handleInstallationPhase(_ phase: ExtensionStatus) {
     switch phase {
     case .needsApproval:
       status = .installing

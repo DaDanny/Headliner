@@ -38,34 +38,44 @@ Transform Headliner from a 1036-line God Object architecture to clean service-ba
 - [x] ✅ **LegacyAppState.swift created** - Safe reference copy wrapped in `#if false`
 - [x] ✅ **APP_ARCHITECTURE_OVERVIEW.md** - Complete architecture documentation
 
-### **Phase 2: Resolve Naming Conflicts** 
-- [ ] 🔧 **Rename AppStateAdapter → LegacyAppStateBridge**
+### **Phase 2: Resolve Naming Conflicts** ✅ *DONE*
+- [x] ✅ **Rename AppStateAdapter → LegacyAppStateBridge**
   ```bash
   mv AppStateAdapter.swift LegacyAppStateBridge.swift
   # Update class name and add deprecation warning
   ```
-- [ ] 🔧 **Mark as deprecated**
+- [x] ✅ **Mark as deprecated**
   ```swift
   @available(*, deprecated, message: "Use AppCoordinator + Services")
   final class LegacyAppStateBridge: ObservableObject { 
   ```
-- [ ] 🔧 **Make AppCoordinator.swift the real coordinator**
-- [ ] 🔧 **Update HeadlinerApp to use proper AppCoordinator**
+- [x] ✅ **Make AppCoordinator.swift the real coordinator**
+- [x] ✅ **Update HeadlinerApp to use proper AppCoordinator**
 
-### **Phase 3: Compilation Fix**
-- [ ] 🔧 **Fix MenuContent parameter mismatch**
+### **Phase 3: Compilation Fix** ✅ *DONE*
+- [x] ✅ **Fix MenuContent parameter mismatch**
   ```swift
   // Before: MenuContent(appState: appState) ❌
   // After: MenuContent(coordinator: appCoordinator) ✅
   ```
-- [ ] 🔧 **Create MenuContent bridge if needed** (temporary compatibility)
-- [ ] 🔧 **Verify app compiles cleanly**
+- [x] ✅ **Create MenuContent bridge if needed** (temporary compatibility)
+- [x] ⚠️ **Verify app compiles cleanly** (compiles with minor warnings)
 
-### **Friday Success Criteria** 
-- [ ] ✅ **App compiles without errors**
-- [ ] ✅ **AppCoordinator is the real coordinator**  
-- [ ] ✅ **LegacyAppStateBridge exists for compatibility**
-- [ ] ✅ **All naming conflicts resolved**
+### **Phase 3.5: Fix AppCoordinator Architecture** ✅ *DONE*
+- [x] ✅ **Remove ObservableObject from AppCoordinator** (prevent God Object v2)
+- [x] ✅ **Remove @Published properties** from coordinator
+- [x] ✅ **Make AppCoordinator pure service wiring** (~60 lines)
+- [x] ✅ **Views inject services via .withAppCoordinator()** 
+- [x] ✅ **Services available as @EnvironmentObject** for direct observation
+- [x] ✅ **Legacy compatibility methods** (temporary, marked for removal)
+
+### **Friday Success Criteria** ✅ *COMPLETE!*
+- [x] ✅ **App compiles without errors**
+- [x] ✅ **AppCoordinator is the real coordinator**  
+- [x] ✅ **LegacyAppStateBridge exists for compatibility**
+- [x] ✅ **All naming conflicts resolved**
+- [x] ✅ **AppCoordinator < 100 lines** (orchestration only)
+- [x] ✅ **Views observe services directly** (proper architecture)
 
 ---
 

@@ -1,9 +1,10 @@
 //
-//  AppStateAdapter.swift
+//  LegacyAppStateBridge.swift
 //  Headliner
 //
-//  Temporary adapter to use new service architecture with old API
+//  DEPRECATED: Temporary bridge to use new service architecture with old API
 //  This allows gradual migration from AppState to services
+//  TODO: Delete this file after Big Bang Migration is complete
 //
 
 import Foundation
@@ -12,9 +13,10 @@ import Combine
 import AVFoundation
 import CoreLocation
 
-/// Adapter that maintains old AppState API while using new services internally
+/// DEPRECATED: Bridge that maintains old AppState API while using new services internally
+@available(*, deprecated, message: "Use AppCoordinator + Services instead")
 @MainActor
-final class AppCoordinator: ObservableObject {
+final class LegacyAppStateBridge: ObservableObject {
   // Keep using old AppState for now
   private let legacyAppState: AppState
   

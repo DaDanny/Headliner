@@ -119,7 +119,7 @@ final class OverlayService: ObservableObject {
     }
     
     settings = decoded
-    logger.debug("Loaded overlay settings: enabled=\(settings.isEnabled)")
+    logger.debug("Loaded overlay settings: enabled=\(self.settings.isEnabled)")
   }
   
   private func saveSettings() {
@@ -161,8 +161,8 @@ final class OverlayService: ObservableObject {
       return
     }
     
-    renderCount += 1
-    logger.debug("🎨 Rendering overlay #\(renderCount)")
+    self.renderCount += 1
+    logger.debug("🎨 Rendering overlay #\(self.renderCount)")
     
     // Background rendering for performance
     Task.detached { [weak self] in

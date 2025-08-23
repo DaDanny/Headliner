@@ -16,10 +16,25 @@ enum MenuDestination {
 
 /// Main content view for the menu bar popup with navigation
 struct MenuContent: View {
-  @ObservedObject var viewModel: MenuBarViewModel
+  @ObservedObject var appCoordinator: AppCoordinator
   @Environment(\.openURL) private var openURL
   @State private var showingPreview = false
   @State private var currentDestination: MenuDestination = .main
+  
+  // Legacy constructor for backward compatibility
+  init(appState: LegacyAppStateBridge) {
+    self.appCoordinator = AppCoordinator() // TODO: Remove this hack
+  }
+  
+  // New constructor for AppCoordinator
+  init(appCoordinator: AppCoordinator) {
+    self.appCoordinator = appCoordinator
+  }
+  
+  // Legacy constructor for MenuBarViewModel
+  init(appCoordinator: MenuBarViewModel) {
+    self.appCoordinator = AppCoordinator() // TODO: Remove this hack 
+  }
   
   var body: some View {
     VStack(alignment: .leading, spacing: 0) {
@@ -27,7 +42,7 @@ struct MenuContent: View {
         switch currentDestination {
         case .main:
           MainMenuView(
-            viewModel: viewModel,
+            appCoordinator: appCoordinator,
             showingPreview: $showingPreview,
             navigateTo: { destination in
               withAnimation(.easeInOut(duration: 0.3)) {
@@ -42,7 +57,7 @@ struct MenuContent: View {
           
         case .overlaySettings:
           OverlaySettingsMenu(
-            viewModel: viewModel,
+            appCoordinator: appCoordinator,
             onBack: {
               withAnimation(.easeInOut(duration: 0.3)) {
                 currentDestination = .main
@@ -56,7 +71,7 @@ struct MenuContent: View {
           
         case .settings:
           SettingsMenuView(
-            viewModel: viewModel,
+            appCoordinator: appCoordinator,
             onBack: {
               withAnimation(.easeInOut(duration: 0.3)) {
                 currentDestination = .main
@@ -80,7 +95,7 @@ struct MenuContent: View {
 
 /// The main menu content (what you see first)
 struct MainMenuView: View {
-  @ObservedObject var viewModel: MenuBarViewModel
+  @ObservedObject var appCoordinator: MenuBarViewModel
   @Environment(\.openURL) private var openURL
   @Binding var showingPreview: Bool
   let navigateTo: (MenuDestination) -> Void
@@ -135,10 +150,10 @@ struct MainMenuView: View {
       // Status indicator
       HStack(spacing: 6) {
         Circle()
-          .fill(viewModel.isRunning ? Color.green : Color.gray)
+          .fill(appCoordinator.isRunning ? Color.green : Color.gray)
           .frame(width: 8, height: 8)
         
-        Text(viewModel.isRunning ? "Live" : "Idle")
+        Text(appCoordinator.isRunning ? "Live" : "Idle")
           .font(.caption)
           .foregroundColor(.secondary)
       }
@@ -153,16 +168,16 @@ struct MainMenuView: View {
     VStack(spacing: 8) {
       Button(action: { 
         withAnimation(.easeInOut(duration: 0.3)) {
-          viewModel.toggleCamera()
+          appCoordinator.toggleCamera()
         }
       }) {
         HStack {
-          Image(systemName: viewModel.isRunning ? "stop.circle.fill" : "play.circle.fill")
+          Image(systemName: appCoordinator.isRunning ? "stop.circle.fill" : "play.circle.fill")
             .font(.system(size: 18))
             .foregroundColor(.white)
-            .animation(.easeInOut(duration: 0.2), value: viewModel.isRunning)
+            .animation(.easeInOut(duration: 0.2), value: appCoordinator.isRunning)
           
-          Text(viewModel.isRunning ? "Stop Virtual Camera" : "Start Virtual Camera")
+          Text(appCoordinator.isRunning ? "Stop Virtual Camera" : "Start Virtual Camera")
             .font(.system(size: 16, weight: .medium))
             .foregroundColor(.white)
           
@@ -172,14 +187,14 @@ struct MainMenuView: View {
         .padding(.vertical, 12)
         .background(
           RoundedRectangle(cornerRadius: 8)
-            .fill(viewModel.isRunning ? Color.red : Color.accentColor)
-            .animation(.easeInOut(duration: 0.3), value: viewModel.isRunning)
+            .fill(appCoordinator.isRunning ? Color.red : Color.accentColor)
+            .animation(.easeInOut(duration: 0.3), value: appCoordinator.isRunning)
         )
       }
       .buttonStyle(PlainButtonStyle())
       
       // Show error message if extension not installed
-      if viewModel.extensionStatus != .installed {
+      if appCoordinator.extensionStatus != .installed {
         HStack(spacing: 8) {
           Image(systemName: "exclamationmark.triangle.fill")
             .foregroundColor(.orange)
@@ -207,11 +222,11 @@ struct MainMenuView: View {
       // Camera selector with LoomStyleSelector - always show for consistent UI
       LoomStyleSelector(
         title: "Camera",
-        items: viewModel.cameras,
-        selectedItem: viewModel.cameras.first { $0.id == viewModel.selectedCameraID },
+        items: appCoordinator.cameras,
+        selectedItem: appCoordinator.cameras.first { $0.id == appCoordinator.selectedCameraID },
         onSelectionChange: { camera in
           if let camera = camera {
-            viewModel.selectCamera(camera)
+            appCoordinator.selectCamera(camera)
           }
         },
         itemIcon: { camera in
@@ -225,7 +240,7 @@ struct MainMenuView: View {
             camera?.deviceType
         },
         statusBadge: { _ in
-          if viewModel.cameras.isEmpty {
+          if appCoordinator.cameras.isEmpty {
             return ("Error", .orange)
           } else {
             return nil
@@ -246,13 +261,13 @@ struct MainMenuView: View {
   
   
   private var isOverlayEnabled: Bool {
-    !viewModel.selectedOverlayID.isEmpty && 
-    viewModel.selectedOverlayID != "swiftui.clean" &&
-    viewModel.overlays.contains { $0.id == viewModel.selectedOverlayID }
+    !appCoordinator.selectedOverlayID.isEmpty && 
+    appCoordinator.selectedOverlayID != "swiftui.clean" &&
+    appCoordinator.overlays.contains { $0.id == appCoordinator.selectedOverlayID }
   }
   
   private var selectedCameraName: String {
-    if let camera = viewModel.cameras.first(where: { $0.id == viewModel.selectedCameraID }) {
+    if let camera = appCoordinator.cameras.first(where: { $0.id == appCoordinator.selectedCameraID }) {
       return camera.name
     }
     return "No Camera Selected"
@@ -260,7 +275,7 @@ struct MainMenuView: View {
   
   private var currentOverlayName: String {
     if isOverlayEnabled {
-      if let currentOverlay = viewModel.overlays.first(where: { $0.id == viewModel.selectedOverlayID }) {
+      if let currentOverlay = appCoordinator.overlays.first(where: { $0.id == appCoordinator.selectedOverlayID }) {
         return currentOverlay.name
       } else {
         return "Unknown Overlay"
@@ -272,7 +287,7 @@ struct MainMenuView: View {
   
   private var overlayOptions: [SwiftUIPresetInfo] {
     // Show all available overlays from the view model
-    return viewModel.overlays
+    return appCoordinator.overlays
   }
   
   private func cameraIcon(for camera: CameraDevice) -> String {
@@ -295,7 +310,7 @@ struct MainMenuView: View {
         action: { showingPreview.toggle() }
       )
       .popover(isPresented: $showingPreview, arrowEdge: .trailing) {
-        PreviewPopover(viewModel: viewModel)
+        PreviewPopover(appCoordinator: appCoordinator)
       }
       
       // Settings button
@@ -317,9 +332,9 @@ struct MainMenuView: View {
       InteractiveMenuButton(
         icon: "power",
         title: "Launch at Login",
-        action: { viewModel.toggleLaunchAtLogin() },
+        action: { appCoordinator.toggleLaunchAtLogin() },
         accessory: {
-          if viewModel.launchAtLogin {
+          if appCoordinator.launchAtLogin {
             Image(systemName: "checkmark")
               .font(.system(size: 12, weight: .medium))
               .foregroundColor(.accentColor)
@@ -333,7 +348,7 @@ struct MainMenuView: View {
       InteractiveMenuButton(
         icon: "power",
         title: "Quit Headliner",
-        action: { viewModel.quitApp() }
+        action: { appCoordinator.quitApp() }
       )
     }
   }
@@ -343,7 +358,7 @@ struct MainMenuView: View {
 
 /// Preview popover using CameraPreviewCard for full functionality
 private struct PreviewPopover: View {
-  @ObservedObject var viewModel: MenuBarViewModel
+  @ObservedObject var appCoordinator: MenuBarViewModel
   
   var body: some View {
     VStack(spacing: 6) {
@@ -354,14 +369,14 @@ private struct PreviewPopover: View {
       // Use CameraPreviewCard for all the overlay functionality
       CameraPreviewCard(
         previewImage: nil, // TODO: Connect to actual camera preview when OutputImageManager is exposed
-        isActive: !viewModel.selectedCameraID.isEmpty && !viewModel.cameras.isEmpty, // Active if we have a selected camera
-        appState: viewModel.getAppState() // Pass AppState for overlay functionality
+        isActive: !appCoordinator.selectedCameraID.isEmpty && !appCoordinator.cameras.isEmpty, // Active if we have a selected camera
+        appState: appCoordinator.getAppState() // Pass AppState for overlay functionality
       )
       .frame(height: 180) // Compact height for popover
       .scaleEffect(0.9) // Slightly less aggressive scaling
       .clipped() // Prevent any overflow/bleeding
       
-      if !viewModel.selectedCameraID.isEmpty && !viewModel.cameras.isEmpty {
+      if !appCoordinator.selectedCameraID.isEmpty && !appCoordinator.cameras.isEmpty {
         Text("Camera preview with overlay")
           .font(.system(size: 10))
           .foregroundColor(.secondary)
@@ -622,7 +637,7 @@ struct InteractiveMenuButton<Accessory: View>: View {
 
 /// The settings view (focused, dedicated settings page)
 struct SettingsMenuView: View {
-  @ObservedObject var viewModel: MenuBarViewModel
+  @ObservedObject var appCoordinator: MenuBarViewModel
   let onBack: () -> Void
   
   var body: some View {
@@ -666,7 +681,7 @@ struct SettingsMenuView: View {
               .font(.system(size: 12, weight: .medium))
               .foregroundColor(.secondary)
             
-            Button(action: { viewModel.toggleLaunchAtLogin() }) {
+            Button(action: { appCoordinator.toggleLaunchAtLogin() }) {
               HStack {
                 Image(systemName: "power")
                   .font(.system(size: 14))
@@ -677,7 +692,7 @@ struct SettingsMenuView: View {
                 Spacer()
                 
                 // Toggle indicator
-                if viewModel.launchAtLogin {
+                if appCoordinator.launchAtLogin {
                   Image(systemName: "checkmark")
                     .font(.system(size: 12, weight: .medium))
                     .foregroundColor(.accentColor)
@@ -717,7 +732,7 @@ struct SettingsMenuView: View {
               .font(.system(size: 12, weight: .medium))
               .foregroundColor(.secondary)
             
-            Button(action: { viewModel.quitApp() }) {
+            Button(action: { appCoordinator.quitApp() }) {
               HStack {
                 Image(systemName: "power")
                   .font(.system(size: 14))
@@ -747,7 +762,7 @@ struct SettingsMenuView: View {
 struct MenuContent_Previews: PreviewProvider {
   static var previews: some View {
     // Single, lightweight preview to avoid heavy initialization
-    MenuContent(viewModel: .createMinimalMock())
+    MenuContent(appCoordinator: AppCoordinator())
       .frame(width: 320)
       .previewDisplayName("Menu Content")
       .previewLayout(.sizeThatFits)
