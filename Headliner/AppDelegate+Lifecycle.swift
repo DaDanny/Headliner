@@ -25,8 +25,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
   }
   
   func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
-    // Don't keep app running if window is closed
-    return true
+    // Menu bar apps should stay running even if windows close
+    return false
   }
   
   func applicationWillTerminate(_ notification: Notification) {
@@ -41,17 +41,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     )
   }
   
+  // Temporarily disable this method to debug the termination issue
+  // Menu bar apps shouldn't terminate from normal menu operations
+  /*
   func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
     logger.debug("Should terminate requested")
-    
-    // Perform async cleanup
-    Task { @MainActor in
-      // Give services time to clean up
-      try? await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
-      NSApplication.shared.reply(toApplicationShouldTerminate: true)
-    }
-    
-    // Delay termination for cleanup
-    return .terminateLater
+    return .terminateNow
   }
+  */
 }

@@ -89,10 +89,15 @@ final class AppLifecycleManager {
     }
   }
   
-  /// Check for zombie processes
+  /// Check for zombie processes  
   static func checkForZombieProcesses() {
+    // TODO: Fix this method for modern macOS security - currently disabled to prevent crash
+    logger.debug("Zombie process check temporarily disabled - needs modern Process API")
+    return
+    
+    /* DISABLED - CAUSES POSIX_SPAWN ERROR
     let task = Process()
-    task.launchPath = "/bin/ps"
+    task.launchPath = "/bin/ps"  // This is deprecated and causes security issues
     task.arguments = ["aux"]
     
     let pipe = Pipe()
@@ -111,6 +116,7 @@ final class AppLifecycleManager {
         headlinerProcesses.forEach { logger.debug("\($0)") }
       }
     }
+    */
   }
 }
 

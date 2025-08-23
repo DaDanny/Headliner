@@ -46,17 +46,14 @@ struct MenuContent: View {
           ))
           
         case .overlaySettings:
-          // TODO: Implement OverlaySettingsMenu or use existing overlay settings view
-          VStack {
-            Text("Overlay Settings")
-              .font(.headline)
-            Button("Back") {
+          OverlaySettingsMenu(
+            appCoordinator: appCoordinator,
+            onBack: {
               withAnimation(.easeInOut(duration: 0.3)) {
                 currentDestination = .main
               }
             }
-          }
-          .padding()
+          )
           .transition(.asymmetric(
             insertion: .move(edge: .trailing).combined(with: .opacity),
             removal: .move(edge: .leading).combined(with: .opacity)
