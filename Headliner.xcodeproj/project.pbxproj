@@ -12,6 +12,8 @@
 		C916EE722E52D1F60038F657 /* PersonalInfoReader.swift in Sources */ = {isa = PBXBuildFile; fileRef = C916EE712E52D1F60038F657 /* PersonalInfoReader.swift */; };
 		C916EE732E52D1F60038F657 /* PersonalInfoReader.swift in Sources */ = {isa = PBXBuildFile; fileRef = C916EE712E52D1F60038F657 /* PersonalInfoReader.swift */; };
 		C91B53AF2E3EA3AD006F3D44 /* com.dannyfrancken.Headliner.CameraExtension.systemextension in Embed System Extensions */ = {isa = PBXBuildFile; fileRef = C91B53A52E3EA3AD006F3D44 /* com.dannyfrancken.Headliner.CameraExtension.systemextension */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		C948C6AF2E5A75D80043FDA4 /* AppStateTypes.swift in Sources */ = {isa = PBXBuildFile; fileRef = C948C6AE2E5A75D80043FDA4 /* AppStateTypes.swift */; };
+		C948C6B02E5A75D80043FDA4 /* AppStateTypes.swift in Sources */ = {isa = PBXBuildFile; fileRef = C948C6AE2E5A75D80043FDA4 /* AppStateTypes.swift */; };
 		C95C9F872E5588280027703C /* HybridOverlayRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = C95C9F842E5588280027703C /* HybridOverlayRenderer.swift */; };
 		C9C955B22E51114F00B4025F /* Logger.swift in Sources */ = {isa = PBXBuildFile; fileRef = C9C955B12E51114F00B4025F /* Logger.swift */; };
 		C9C955B32E51114F00B4025F /* Logger.swift in Sources */ = {isa = PBXBuildFile; fileRef = C9C955B12E51114F00B4025F /* Logger.swift */; };
@@ -77,6 +79,7 @@
 		C916EE712E52D1F60038F657 /* PersonalInfoReader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PersonalInfoReader.swift; sourceTree = "<group>"; };
 		C91B53A52E3EA3AD006F3D44 /* com.dannyfrancken.Headliner.CameraExtension.systemextension */ = {isa = PBXFileReference; explicitFileType = "wrapper.system-extension"; includeInIndex = 0; path = com.dannyfrancken.Headliner.CameraExtension.systemextension; sourceTree = BUILT_PRODUCTS_DIR; };
 		C92FB7A42E3EF737001195E9 /* HeadlinerEndToEnd.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = HeadlinerEndToEnd.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		C948C6AE2E5A75D80043FDA4 /* AppStateTypes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppStateTypes.swift; sourceTree = "<group>"; };
 		C95C9F842E5588280027703C /* HybridOverlayRenderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HybridOverlayRenderer.swift; sourceTree = "<group>"; };
 		C9C955B12E51114F00B4025F /* Logger.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Logger.swift; sourceTree = "<group>"; };
 		C9CAFF842E4EF19800FC4672 /* CaptureSessionManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureSessionManager.swift; sourceTree = "<group>"; };
@@ -183,6 +186,7 @@
 		C9CAFF882E4EF19800FC4672 /* HeadlinerShared */ = {
 			isa = PBXGroup;
 			children = (
+				C948C6AE2E5A75D80043FDA4 /* AppStateTypes.swift */,
 				C95C9F842E5588280027703C /* HybridOverlayRenderer.swift */,
 				C914D94D2E55638D00385702 /* Overlay */,
 				C916EE712E52D1F60038F657 /* PersonalInfoReader.swift */,
@@ -454,6 +458,7 @@
 				C9E04E4A2E514601000DE269 /* OverlayRenderer.swift in Sources */,
 				C916EE732E52D1F60038F657 /* PersonalInfoReader.swift in Sources */,
 				C9CAFF8D2E4EF19800FC4672 /* Notifications.swift in Sources */,
+				C948C6B02E5A75D80043FDA4 /* AppStateTypes.swift in Sources */,
 				C9CAFF8E2E4EF19800FC4672 /* OverlaySettings.swift in Sources */,
 				C9CAFF8F2E4EF19800FC4672 /* CaptureSessionManager.swift in Sources */,
 				C9C955B22E51114F00B4025F /* Logger.swift in Sources */,
@@ -477,6 +482,7 @@
 			files = (
 				C9C955B32E51114F00B4025F /* Logger.swift in Sources */,
 				C916EC9C2E52CC9B0038F657 /* PersonalInfoModels.swift in Sources */,
+				C948C6AF2E5A75D80043FDA4 /* AppStateTypes.swift in Sources */,
 				C9CAFF892E4EF19800FC4672 /* Notifications.swift in Sources */,
 				C9E04E4B2E514601000DE269 /* OverlayPresets.swift in Sources */,
 				C9E04E4C2E514601000DE269 /* OverlayModels.swift in Sources */,
@@ -530,7 +536,7 @@
 			buildSettings = {
 				CODE_SIGN_ENTITLEMENTS = CameraExtension/CameraExtension.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 154;
+				CURRENT_PROJECT_VERSION = 155;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = 378NGS49HA;
 				ENABLE_HARDENED_RUNTIME = NO;
@@ -562,7 +568,7 @@
 			buildSettings = {
 				CODE_SIGN_ENTITLEMENTS = CameraExtension/CameraExtension.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 154;
+				CURRENT_PROJECT_VERSION = 155;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = 378NGS49HA;
 				ENABLE_HARDENED_RUNTIME = NO;
@@ -597,7 +603,7 @@
 				CODE_SIGN_ENTITLEMENTS = HeadlinerEndToEnd/HeadlinerEndToEnd.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 154;
+				CURRENT_PROJECT_VERSION = 155;
 				DEVELOPMENT_TEAM = 378NGS49HA;
 				ENABLE_HARDENED_RUNTIME = NO;
 				ENABLE_PREVIEWS = YES;
@@ -630,7 +636,7 @@
 				CODE_SIGN_ENTITLEMENTS = HeadlinerEndToEnd/HeadlinerEndToEnd.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 154;
+				CURRENT_PROJECT_VERSION = 155;
 				DEVELOPMENT_TEAM = 378NGS49HA;
 				ENABLE_HARDENED_RUNTIME = NO;
 				ENABLE_PREVIEWS = YES;
@@ -786,7 +792,7 @@
 				CODE_SIGN_ENTITLEMENTS = Headliner/Headliner.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 154;
+				CURRENT_PROJECT_VERSION = 155;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = 378NGS49HA;
 				ENABLE_HARDENED_RUNTIME = NO;
@@ -824,7 +830,7 @@
 				CODE_SIGN_ENTITLEMENTS = Headliner/Headliner.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 154;
+				CURRENT_PROJECT_VERSION = 155;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = 378NGS49HA;
 				ENABLE_HARDENED_RUNTIME = NO;
@@ -858,7 +864,7 @@
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 154;
+				CURRENT_PROJECT_VERSION = 155;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = 378NGS49HA;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -877,7 +883,7 @@
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 154;
+				CURRENT_PROJECT_VERSION = 155;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = 378NGS49HA;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -895,7 +901,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 154;
+				CURRENT_PROJECT_VERSION = 155;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = 378NGS49HA;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -912,7 +918,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 154;
+				CURRENT_PROJECT_VERSION = 155;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = 378NGS49HA;
 				GENERATE_INFOPLIST_FILE = YES;

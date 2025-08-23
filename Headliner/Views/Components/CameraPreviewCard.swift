@@ -11,7 +11,7 @@ import CoreGraphics
 struct CameraPreviewCard: View {
   let previewImage: CGImage?
   let isActive: Bool
-  let appState: AppState?  // Optional for overlay preview
+  let overlayService: OverlayService?  // Optional for overlay preview
   
   @State private var overlayPreviewImage: CGImage?
 
@@ -43,7 +43,7 @@ struct CameraPreviewCard: View {
           } 
           
           // DEBUG: Visual indicator when overlay should be active
-          if let presetId = appState?.overlaySettings.selectedPresetId, presetId != "none" {
+          if let presetId = overlayService?.settings.selectedPresetId, presetId != "none" {
             VStack {
               HStack {
                 Text("PREVIEW: \(getOverlayName(for: presetId))")
@@ -103,19 +103,19 @@ struct CameraPreviewCard: View {
     .onAppear {
       updateOverlayPreview()
     }
-    .onChange(of: appState?.overlaySettings.selectedPresetId) { _ in
+    .onChange(of: overlayService?.settings.selectedPresetId) { _ in
       updateOverlayPreview()
     }
-    .onChange(of: appState?.overlaySettings.overlayTokens) { _ in
+    .onChange(of: overlayService?.settings.overlayTokens) { _ in
       updateOverlayPreview()
     }
-    .onChange(of: appState?.overlaySettings.overlayAspect) { _ in
+    .onChange(of: overlayService?.settings.overlayAspect) { _ in
       updateOverlayPreview()
     }
-    .onChange(of: appState?.overlaySettings.safeAreaMode) { _ in
+    .onChange(of: overlayService?.settings.safeAreaMode) { _ in
       updateOverlayPreview()
     }
-    .onChange(of: appState?.overlaySettings.selectedSurfaceStyle) { _ in
+    .onChange(of: overlayService?.settings.selectedSurfaceStyle) { _ in
       updateOverlayPreview()
     }
   }
@@ -123,29 +123,29 @@ struct CameraPreviewCard: View {
   // MARK: - Private Methods
   
   private func updateOverlayPreview() {
-    guard let appState = appState else {
+    guard let overlayService = overlayService else {
       overlayPreviewImage = nil
       return
     }
     
-    guard appState.overlaySettings.selectedPresetId != "none" else {
+    guard overlayService.settings.selectedPresetId != "none" else {
       overlayPreviewImage = nil
       return
     }
     
-    guard let tokens = appState.overlaySettings.overlayTokens else {
+    guard let tokens = overlayService.settings.overlayTokens else {
       overlayPreviewImage = nil
       return
     }
     
     // Use actual camera dimensions from cached settings for accurate preview
-    let cameraDimensions = appState.overlaySettings.cameraDimensions
+    let cameraDimensions = overlayService.settings.cameraDimensions
     let previewSize = cameraDimensions.width > 0 && cameraDimensions.height > 0 
       ? cameraDimensions 
       : CGSize(width: 640, height: 360) // Fallback for small cameras
     
     Task {
-      await renderOverlayPreview(tokens: tokens, presetId: appState.overlaySettings.selectedPresetId, size: previewSize)
+      await renderOverlayPreview(tokens: tokens, presetId: overlayService.settings.selectedPresetId, size: previewSize)
     }
   }
   
@@ -157,9 +157,9 @@ struct CameraPreviewCard: View {
       return
     }
     
-    // Get current safe area mode and surface style from appState
-    let safeAreaMode = appState?.overlaySettings.safeAreaMode ?? .balanced
-    let surfaceStyle = appState?.overlaySettings.selectedSurfaceStyle ?? "rounded"
+    // Get current safe area mode and surface style from overlayService
+    let safeAreaMode = overlayService?.settings.safeAreaMode ?? .balanced
+    let surfaceStyle = overlayService?.settings.selectedSurfaceStyle ?? "rounded"
     let renderTokens = RenderTokens(safeAreaMode: safeAreaMode, surfaceStyle: surfaceStyle)
     
     // Get PersonalInfo for previews (optional, could be nil)
@@ -176,7 +176,7 @@ struct CameraPreviewCard: View {
     )
   }
   
-  /// Get current PersonalInfo from App Group storage (same as AppState)
+  /// Get current PersonalInfo from App Group storage
   private func getCurrentPersonalInfo() -> PersonalInfo? {
     guard let userDefaults = UserDefaults(suiteName: Identifiers.appGroup),
           let data = userDefaults.data(forKey: "overlay.personalInfo.v1"),
@@ -236,8 +236,8 @@ struct CameraPreviewCard: View {
 struct CameraPreviewCard_Previews: PreviewProvider {
   static var previews: some View {
     VStack(spacing: 20) {
-      CameraPreviewCard(previewImage: nil, isActive: true, appState: nil)
-      CameraPreviewCard(previewImage: nil, isActive: false, appState: nil)
+      CameraPreviewCard(previewImage: nil, isActive: true, overlayService: nil)
+      CameraPreviewCard(previewImage: nil, isActive: false, overlayService: nil)
     }
     .padding()
     .background(Color.gray.opacity(0.1))

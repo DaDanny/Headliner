@@ -8,7 +8,6 @@
 import SwiftUI
 
 struct SettingsView: View {
-    @ObservedObject var appState: AppState
     @StateObject private var personalInfoVM = PersonalInfoSettingsVM()
     @Environment(\.dismiss) private var dismiss
     @Environment(\.colorScheme) var colorScheme
@@ -48,7 +47,7 @@ struct SettingsView: View {
             ScrollView {
                 VStack(spacing: 16) {
                     // Personal Info Editing Section
-                    PersonalInfoView(appState: appState)
+                    PersonalInfoView()
                         .background(
                             RoundedRectangle(cornerRadius: 10)
                                 .fill(Color(NSColor.controlBackgroundColor))
@@ -59,7 +58,6 @@ struct SettingsView: View {
                     
                     // Location Services Section
                     LocationInfoView(
-                        appState: appState,
                         showHeader: true,
                         showInfoSection: true,
                         showRefreshButton: true
@@ -81,7 +79,7 @@ struct SettingsView: View {
                         .padding(.horizontal, 20)
                     
                     // Overlay Layout Settings Section
-                    OverlayLayoutSettingsView(appState: appState)
+                    OverlayLayoutSettingsView()
                         .background(
                             RoundedRectangle(cornerRadius: 10)
                                 .fill(Color(NSColor.controlBackgroundColor))
@@ -90,7 +88,7 @@ struct SettingsView: View {
                         .padding(.horizontal, 20)
                     
                     // Surface Style Settings Section
-                    SurfaceStyleSettingsView(appState: appState)
+                    SurfaceStyleSettingsView()
                         .background(
                             RoundedRectangle(cornerRadius: 10)
                                 .fill(Color(NSColor.controlBackgroundColor))
@@ -107,7 +105,6 @@ struct SettingsView: View {
         .background(Color(NSColor.windowBackgroundColor))
         .onAppear {
             logger.debug("📋 SettingsView: View appeared")
-            logger.debug("📋 Current location status: \(appState.locationPermissionStatus.rawValue)")
             personalInfoVM.onAppear()
         }
         .onDisappear {
@@ -120,7 +117,7 @@ struct SettingsView: View {
 // MARK: - Overlay Layout Settings Component
 
 struct OverlayLayoutSettingsView: View {
-    @ObservedObject var appState: AppState
+    @EnvironmentObject private var overlayService: OverlayService
     @State private var selectedSafeAreaMode: SafeAreaMode = .balanced
     
     var body: some View {
@@ -160,22 +157,22 @@ struct OverlayLayoutSettingsView: View {
         }
         .padding(16)
         .onAppear {
-            selectedSafeAreaMode = appState.overlaySettings.safeAreaMode
+            selectedSafeAreaMode = overlayService.settings.safeAreaMode
         }
     }
     
     /// Update a specific setting property and apply changes immediately
     private func updateSetting<T>(_ keyPath: WritableKeyPath<OverlaySettings, T>, to value: T) {
-        var updatedSettings = appState.overlaySettings
+        var updatedSettings = overlayService.settings
         updatedSettings[keyPath: keyPath] = value
-        appState.updateOverlaySettings(updatedSettings)
+        overlayService.updateSettings(updatedSettings)
     }
 }
 
 // MARK: - Surface Style Settings Component
 
 struct SurfaceStyleSettingsView: View {
-    @ObservedObject var appState: AppState
+    @EnvironmentObject private var overlayService: OverlayService
     
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -199,7 +196,7 @@ struct SurfaceStyleSettingsView: View {
             HStack(spacing: 16) {
                 ForEach(SurfaceStyle.allCases, id: \.self) { style in
                     Button(action: {
-                        appState.selectSurfaceStyle(style)
+                        overlayService.selectSurfaceStyle(style)
                     }) {
                         VStack(spacing: 8) {
                             // Preview of the style
@@ -208,7 +205,7 @@ struct SurfaceStyleSettingsView: View {
                                 .frame(width: 50, height: 32)
                                 .overlay(
                                     RoundedRectangle(cornerRadius: style == .rounded ? 8 : 0)
-                                        .stroke(Color.accentColor, lineWidth: appState.currentSurfaceStyle == style ? 2 : 1)
+                                        .stroke(Color.accentColor, lineWidth: overlayService.currentSurfaceStyle == style ? 2 : 1)
                                 )
                             
                             Text(style.rawValue.capitalized)
@@ -219,7 +216,7 @@ struct SurfaceStyleSettingsView: View {
                         .padding(.vertical, 8)
                         .background(
                             RoundedRectangle(cornerRadius: 6)
-                                .fill(appState.currentSurfaceStyle == style ? Color.accentColor.opacity(0.1) : Color.clear)
+                                .fill(overlayService.currentSurfaceStyle == style ? Color.accentColor.opacity(0.1) : Color.clear)
                         )
                     }
                     .buttonStyle(PlainButtonStyle())
@@ -235,14 +232,10 @@ struct SurfaceStyleSettingsView: View {
 #if DEBUG
 struct SettingsView_Previews: PreviewProvider {
     static var previews: some View {
-        let appState = AppState(
-            systemExtensionManager: SystemExtensionRequestManager(logText: "Preview"),
-            propertyManager: CustomPropertyManager(),
-            outputImageManager: OutputImageManager()
-        )
-        
-        SettingsView(appState: appState)
-            .environmentObject(appState.themeManager)
+        SettingsView()
+            .environmentObject(OverlayService())
+            .environmentObject(LocationPermissionManager())
+            .environmentObject(ThemeManager())
             .previewDisplayName("Settings View")
     }
 }
