@@ -10,7 +10,8 @@ import SwiftUI
 
 /// A comprehensive location services component that handles permissions and data display
 struct LocationInfoView: View {
-    @ObservedObject var appState: AppState
+    @EnvironmentObject private var locationManager: LocationPermissionManager
+    let coordinator: AppCoordinator?
     let showHeader: Bool
     let showInfoSection: Bool
     let showRefreshButton: Bool
@@ -18,12 +19,12 @@ struct LocationInfoView: View {
     // MARK: - Initialization
     
     init(
-        appState: AppState,
+        coordinator: AppCoordinator? = nil,
         showHeader: Bool = true,
         showInfoSection: Bool = true,
         showRefreshButton: Bool = false
     ) {
-        self.appState = appState
+        self.coordinator = coordinator
         self.showHeader = showHeader
         self.showInfoSection = showInfoSection
         self.showRefreshButton = showRefreshButton
@@ -42,7 +43,7 @@ struct LocationInfoView: View {
                 permissionStatusCard
                 
                 // Current Data Display (if available)
-                if appState.isLocationAvailable {
+                if locationManager.isLocationAvailable {
                     currentDataSection
                 }
                 
@@ -123,17 +124,17 @@ struct LocationInfoView: View {
             if shouldShowPermissionButton {
                 Button(action: {
                     logger.debug("🔵 LocationInfoView: Permission button clicked")
-                    logger.debug("🔵 Current status: \(appState.locationPermissionStatus.rawValue)")
+                    logger.debug("🔵 Current status: \(locationManager.authorizationStatus.rawValue)")
                     
-                    switch appState.locationPermissionStatus {
+                    switch locationManager.authorizationStatus {
                     case .notDetermined:
-                        logger.debug("🔵 Calling appState.requestLocationPermission()")
-                        appState.requestLocationPermission()
+                        logger.debug("🔵 Calling locationManager.requestLocationPermission()")
+                        locationManager.requestLocationPermission()
                     case .denied:
-                        logger.debug("🔵 Calling appState.openLocationSettings()")
-                        appState.openLocationSettings()
+                        logger.debug("🔵 Calling locationManager.openSystemSettings()")
+                        locationManager.openSystemSettings()
                     default:
-                        logger.debug("🔵 No action for status: \(appState.locationPermissionStatus.rawValue)")
+                        logger.debug("🔵 No action for status: \(locationManager.authorizationStatus.rawValue)")
                     }
                 }) {
                     HStack(spacing: 4) {
@@ -302,7 +303,7 @@ struct LocationInfoView: View {
             
             Button(action: {
                 logger.debug("🔄 LocationInfoView: Refresh Now button clicked")
-                appState.refreshPersonalInfoNow()
+                coordinator?.personalInfo.refreshNow()
             }) {
                 HStack(spacing: 4) {
                     Image(systemName: "arrow.clockwise")
@@ -393,7 +394,7 @@ struct LocationInfoView: View {
     // MARK: - Helper Properties for Permission Status
     
     private var statusColor: Color {
-        switch appState.locationPermissionStatus {
+        switch locationManager.authorizationStatus {
         case .authorized, .authorizedAlways, .authorizedWhenInUse:
             return .green
         case .denied, .restricted:
@@ -406,7 +407,7 @@ struct LocationInfoView: View {
     }
     
     private var statusText: String {
-        switch appState.locationPermissionStatus {
+        switch locationManager.authorizationStatus {
         case .notDetermined:
             return "Permission not yet requested"
         case .restricted:
@@ -421,7 +422,7 @@ struct LocationInfoView: View {
     }
     
     private var shouldShowPermissionButton: Bool {
-        switch appState.locationPermissionStatus {
+        switch locationManager.authorizationStatus {
         case .notDetermined, .denied:
             return true
         default:
@@ -430,7 +431,7 @@ struct LocationInfoView: View {
     }
     
     private var buttonTitle: String {
-        switch appState.locationPermissionStatus {
+        switch locationManager.authorizationStatus {
         case .notDetermined:
             return "Enable"
         case .denied:
@@ -441,7 +442,7 @@ struct LocationInfoView: View {
     }
     
     private var buttonIcon: String {
-        switch appState.locationPermissionStatus {
+        switch locationManager.authorizationStatus {
         case .notDetermined:
             return "location.fill"
         case .denied:
@@ -452,7 +453,7 @@ struct LocationInfoView: View {
     }
     
     private var buttonColor: Color {
-        switch appState.locationPermissionStatus {
+        switch locationManager.authorizationStatus {
         case .notDetermined:
             return .blue
         case .denied:
@@ -475,28 +476,20 @@ struct LocationInfoView_Previews: PreviewProvider {
         VStack(spacing: 20) {
             // Full version (like in Settings)
             LocationInfoView(
-                appState: AppState(
-                    systemExtensionManager: SystemExtensionRequestManager(logText: "Preview"),
-                    propertyManager: CustomPropertyManager(),
-                    outputImageManager: OutputImageManager()
-                ),
                 showHeader: true,
                 showInfoSection: true,
                 showRefreshButton: true
             )
+            .environmentObject(LocationPermissionManager())
             .previewDisplayName("Full LocationInfoView")
             
             // Compact version (like in Onboarding)
             LocationInfoView(
-                appState: AppState(
-                    systemExtensionManager: SystemExtensionRequestManager(logText: "Preview"),
-                    propertyManager: CustomPropertyManager(),
-                    outputImageManager: OutputImageManager()
-                ),
                 showHeader: false,
                 showInfoSection: false,
                 showRefreshButton: false
             )
+            .environmentObject(LocationPermissionManager())
             .previewDisplayName("Compact LocationInfoView")
         }
         .frame(width: 500)

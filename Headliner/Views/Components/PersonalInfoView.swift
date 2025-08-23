@@ -9,7 +9,7 @@ import SwiftUI
 
 /// A view for editing personal information (display name and tagline)
 struct PersonalInfoView: View {
-    @ObservedObject var appState: AppState
+    @EnvironmentObject private var overlayService: OverlayService
     @State private var displayName: String = ""
     @State private var tagline: String = ""
     
@@ -76,30 +76,25 @@ struct PersonalInfoView: View {
     // MARK: - Data Management
     
     private func loadCurrentValues() {
-        displayName = appState.overlaySettings.userName.isEmpty ? NSUserName() : appState.overlaySettings.userName
-        if let existingTagline = appState.overlaySettings.overlayTokens?.tagline {
+        displayName = overlayService.settings.userName.isEmpty ? NSUserName() : overlayService.settings.userName
+        if let existingTagline = overlayService.settings.overlayTokens?.tagline {
             tagline = existingTagline
         }
     }
     
     private func saveChanges() {
-        // Update display name
-        if !displayName.isEmpty {
-            appState.overlaySettings.userName = displayName
-        }
-        
         // Update or create overlay tokens with display name and tagline
         let updatedTokens = OverlayTokens(
             displayName: displayName.isEmpty ? NSUserName() : displayName,
             tagline: tagline.isEmpty ? nil : tagline,
-            accentColorHex: appState.overlaySettings.overlayTokens?.accentColorHex ?? "#007AFF",
-            localTime: appState.overlaySettings.overlayTokens?.localTime,
-            logoText: appState.overlaySettings.overlayTokens?.logoText,
-            extras: appState.overlaySettings.overlayTokens?.extras
+            accentColorHex: overlayService.settings.overlayTokens?.accentColorHex ?? "#007AFF",
+            localTime: overlayService.settings.overlayTokens?.localTime,
+            logoText: overlayService.settings.overlayTokens?.logoText,
+            extras: overlayService.settings.overlayTokens?.extras
         )
         
-        // Use AppState's method to properly save and persist changes
-        appState.updateOverlayTokens(updatedTokens)
+        // Use OverlayService's method to properly save and persist changes
+        overlayService.updateTokens(updatedTokens)
         
         logger.debug("PersonalInfoView: Saved and persisted changes - name: \(displayName), tagline: \(tagline)")
     }
@@ -110,13 +105,10 @@ struct PersonalInfoView: View {
 #if DEBUG
 struct PersonalInfoView_Previews: PreviewProvider {
     static var previews: some View {
-        PersonalInfoView(appState: AppState(
-            systemExtensionManager: SystemExtensionRequestManager(logText: ""),
-            propertyManager: CustomPropertyManager(),
-            outputImageManager: OutputImageManager()
-        ))
-        .frame(width: 400)
-        .padding()
+        PersonalInfoView()
+            .environmentObject(OverlayService())
+            .frame(width: 400)
+            .padding()
     }
 }
 #endif
