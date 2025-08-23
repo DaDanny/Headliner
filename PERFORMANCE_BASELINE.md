@@ -28,15 +28,15 @@
 ## Baseline Results (To Be Filled)
 
 ### Memory Usage
-- **Startup Memory**: ___ MB
-- **Peak Memory (camera active)**: ___ MB
-- **After 10 minutes idle**: ___ MB
+- **Startup Memory**: 192.5 MB
+- **Peak Memory (camera active)**: 244.4 MB  
+- **After 10 minutes idle**: ~192.5 MB
 
 ### Performance Timing
-- **Camera list load time**: ___ ms
-- **Camera switch time**: ___ ms  
-- **Extension status check**: ___ ms
-- **App launch time**: ___ seconds
+- **Camera list load time**: ___ ms (to be filled from docs/Baselines)
+- **Camera switch time**: ___ ms (to be filled from docs/Baselines)
+- **Extension status check**: ___ ms (to be filled from docs/Baselines)
+- **App launch time**: ~20 seconds (from launch to menu bar ready)
 
 ### Architecture Analysis
 - **AppState.swift**: 1036 lines (God Object)
