@@ -9,42 +9,32 @@ import SwiftUI
 
 @main
 struct HeadlinerApp: App {
-  // Simple, clean initialization
-  @StateObject private var appState: AppState
-  @StateObject private var menuBarViewModel: MenuBarViewModel
+  @StateObject private var appState = AppCoordinator()  // Just rename to appState for compatibility
+  @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
   
   init() {
-    // Initialize AppState with dependencies
-    let appState = AppState(
-      systemExtensionManager: SystemExtensionRequestManager(logText: ""),
-      propertyManager: CustomPropertyManager(),
-      outputImageManager: OutputImageManager()
-    )
-    self._appState = StateObject(wrappedValue: appState)
-    self._menuBarViewModel = StateObject(wrappedValue: MenuBarViewModel(appState: appState))
+    if !AppLifecycleManager.enforcesSingleInstance() {
+      fatalError("Another instance is already running")
+    }
   }
   
   var body: some Scene {
-    // Menu Bar Scene - The ONLY interface
     MenuBarExtra("Headliner", systemImage: isRunning ? "dot.radiowaves.left.and.right" : "video") {
-      MenuContent(viewModel: menuBarViewModel)
+      MenuContent(appState: appState)
         .onAppear {
-          // Initialize app state for first use
-          appState.initializeForUse()
+          appState.initializeApp()
         }
     }
     .menuBarExtraStyle(.window)
     
-    // Settings Window - Only when needed for complex settings
     Settings {
       SettingsView(appState: appState)
-        .environmentObject(appState.themeManager)
     }
   }
   
-  // MARK: - Computed Properties
-  
+    // TODO: Review if this is needed or should be moved out and into the proper location
+    // My gut is telling me that this should be from either the ExtensionService or CameraService
   private var isRunning: Bool {
-    appState.cameraStatus.isRunning
+    appState.isCameraRunning
   }
 }

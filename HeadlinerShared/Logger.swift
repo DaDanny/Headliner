@@ -28,6 +28,7 @@ public struct HeadlinerLogger {
         case captureSession = "CaptureSession"
         case notifications = "Notifications"
         case overlays = "Overlays"
+        case analytics = "Analytics"
     }
     
     // MARK: - Factory Methods
