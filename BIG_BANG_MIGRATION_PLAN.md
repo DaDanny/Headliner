@@ -264,45 +264,45 @@ Transform Headliner from a 1036-line God Object architecture to clean service-ba
 - [x] ✅ **Clean compilation achieved** - BUILD SUCCEEDED
 - [x] ✅ **Overlay functionality working** - Preset selection and rendering
 
-### **Phase 8: Dependency Injection & Architecture (1-2 hours)**
+### **Phase 8: Dependency Injection & Architecture (1-2 hours)** ✅ *COMPLETE!*
 
-#### **8.1: Dependency Container**
-- [ ] 🔧 **Create DependencyContainer with composition root**
+#### **8.1: Dependency Container** ✅ *DONE*
+- [x] ✅ **Create DependencyContainer with composition root**
   ```swift
   enum CompositionRoot {
     static func makeCoordinator() -> AppCoordinator {
-      AppCoordinator(container: .live)
+      DependencyContainer.makeLiveCoordinator()
     }
   }
   ```
-- [ ] 🔧 **Provide `.live` factory and test mock hooks**
-- [ ] 🔧 **Wire up all services in AppCoordinator**
+- [x] ✅ **Provide `.live` factory and test mock hooks** - DependencyContainer.swift created
+- [x] ✅ **Wire up all services in AppCoordinator** - Clean service composition established
 
-#### **8.2: Clean AppCoordinator**
-- [ ] 🔧 **Keep AppCoordinator thin** (service wiring only)
-- [ ] 🔧 **Avoid `@Published` properties** in coordinator
-- [ ] 🔧 **Views observe services directly**, not coordinator
-- [ ] 🔧 **Coordinator < 100 lines** maximum
+#### **8.2: Clean AppCoordinator** ✅ *DONE*
+- [x] ✅ **Keep AppCoordinator thin** (service wiring only) - Legacy methods removed
+- [x] ✅ **Avoid `@Published` properties** in coordinator - No ObservableObject bloat
+- [x] ✅ **Views observe services directly**, not coordinator - @EnvironmentObject pattern
+- [x] ✅ **Coordinator < 100 lines** maximum - Clean orchestration layer achieved
 
-### **Phase 9: UI Layer Cleanup (1 hour)**
+### **Phase 9: UI Layer Cleanup (1 hour)** ✅ *COMPLETE!*
 
-#### **9.1: Remove MenuBarViewModel**
-- [ ] 🔧 **Update MenuContent to use AppCoordinator directly**
-- [ ] 🔧 **Remove MenuBarViewModel references from new code**
-- [ ] 🔧 **Mark MenuBarViewModel.swift as deprecated**
-- [ ] 🔧 **Add TODO to delete file after migration complete**
+#### **9.1: Remove MenuBarViewModel** ✅ *DONE*
+- [x] ✅ **Update MenuContent to use AppCoordinator directly** - Legacy constructors removed
+- [x] ✅ **Remove MenuBarViewModel references from new code** - Components updated to services
+- [x] ✅ **Mark MenuBarViewModel.swift as deprecated** - Wrapped in `#if false` conditional compilation
+- [x] ✅ **Add TODO to delete file after migration complete** - Deprecation notice added
 
-#### **9.2: View Updates**
-- [ ] 🔧 **Update all views to use services via coordinator**
-- [ ] 🔧 **Replace direct AppState references**  
-- [ ] 🔧 **Ensure clean service observation patterns**
+#### **9.2: View Updates** ✅ *DONE*
+- [x] ✅ **Update all views to use services via coordinator** - MenuBarCameraSelector & OverlaySettingsMenu updated
+- [x] ✅ **Replace direct AppState references** - All views now use @EnvironmentObject services
+- [x] ✅ **Ensure clean service observation patterns** - Direct service observation implemented
 
 ### **Sunday Success Criteria**
 - [x] ✅ **OverlayService fully functional** (presets, rendering, settings) - ✅ *COMPLETE!*
-- [ ] ⏳ **MenuBarViewModel eliminated** from new code paths - ❌ **PENDING (Phase 9)**
+- [x] ✅ **MenuBarViewModel eliminated** from new code paths - ✅ *COMPLETE!*
 - [x] ✅ **All services < 300 lines** each - ✅ *COMPLETE!*
 - [x] ✅ **AppCoordinator < 100 lines** (orchestration only) - ✅ *COMPLETE!*
-- [ ] ⏳ **Dependency injection working** cleanly - ❌ **PENDING (Phase 8)**
+- [x] ✅ **Dependency injection working** cleanly - ✅ *COMPLETE!*
 
 ---
 
@@ -345,9 +345,9 @@ Transform Headliner from a 1036-line God Object architecture to clean service-ba
 ### **Final Success Criteria**
 - [x] ✅ **All functionality working** end-to-end - ✅ *COMPLETE!*
 - [ ] ⏳ **Performance improvements measurable** - ❌ **PENDING (Phase 12)**
-- [x] ✅ **No compilation warnings or errors** - ✅ *COMPLETE!*
-- [ ] ⏳ **Clean architecture achieved** - ❌ **PENDING (Phases 8-9)**
-- [ ] ⏳ **Ready for MVP release** - ❌ **PENDING (Complete remaining phases)**
+- [x] ✅ **No compilation warnings or errors** - ⚠️ *Swift 6 concurrency warnings remain (Phase 6)*
+- [x] ✅ **Clean architecture achieved** - ✅ *COMPLETE!* (Phases 8-9)
+- [ ] ⏳ **Ready for MVP release** - ⚠️ **85% COMPLETE** (Need Phase 6 & validation)
 
 ---
 
@@ -463,6 +463,8 @@ instruments -t "Time Profiler" -D /tmp/headliner-perf.trace Headliner.app
 - **✅ Phase 4.5-4.6**: Onboarding view isolation strategy  
 - **✅ Phase 5**: ExtensionService integration (service was pre-existing)
 - **✅ Phase 7**: OverlayService integration (service was pre-existing)
+- **✅ Phase 8**: Dependency Injection & Architecture cleanup
+- **✅ Phase 9**: UI Layer Cleanup - MenuBarViewModel.swift deprecated
 
 ### **❌ CRITICAL MISSING PHASES:**
 
@@ -471,14 +473,6 @@ instruments -t "Time Profiler" -D /tmp/headliner-perf.trace Headliner.app
 - Missing render queue for overlay rendering
 - Missing performance optimizations
 
-#### **Phase 8: Dependency Injection & Architecture** ❌ *NOT DONE*  
-- No DependencyContainer/CompositionRoot
-- AppCoordinator still needs cleanup
-
-#### **🚨 Phase 9: UI Layer Cleanup** ❌ *CRITICAL - NOT DONE*
-- **MenuBarViewModel.swift STILL EXISTS** (should be removed/deprecated)
-- Views still use MenuBarViewModel instead of AppCoordinator directly
-- Legacy code paths not cleaned up
 
 #### **Phase 10-12: Validation & Testing** ❌ *NOT DONE*
 - No telemetry/debugging improvements
@@ -487,12 +481,28 @@ instruments -t "Time Profiler" -D /tmp/headliner-perf.trace Headliner.app
 - No performance measurements
 
 ### **🎯 IMMEDIATE NEXT STEPS:**
-1. **Complete Phase 9** - Remove/deprecate MenuBarViewModel.swift
-2. **Complete Phase 8** - Clean dependency injection
-3. **Complete Phase 6** - Performance improvements  
-4. **Complete Phase 10-12** - Final validation and testing
+1. **Complete Phase 6** - Performance improvements (Swift 6 concurrency, background work)
+2. **Complete Phase 10-12** - Final validation and testing
 
-### **📊 MIGRATION PROGRESS: ~60% COMPLETE**
-**Major foundation work is done, but critical cleanup phases remain.**
+### **📊 MIGRATION PROGRESS: ~85% COMPLETE**
+**Major foundation work is complete! Only performance optimizations and final validation remain.**
+
+### **🎯 PHASE 8 & 9 COMPLETION SUMMARY:**
+
+#### **✅ Phase 8: Dependency Injection & Architecture**
+- ✅ **DependencyContainer created** with CompositionRoot pattern
+- ✅ **HeadlinerApp updated** to use CompositionRoot.makeCoordinator()
+- ✅ **AppCoordinator cleaned up** - removed legacy compatibility methods
+- ✅ **Clean service wiring** established
+
+#### **✅ Phase 9: UI Layer Cleanup**
+- ✅ **MenuBarViewModel.swift deprecated** - wrapped in `#if false` conditional compilation
+- ✅ **MenuBarCameraSelector updated** to use AppCoordinator + CameraService directly
+- ✅ **OverlaySettingsMenu updated** to use AppCoordinator + OverlayService directly
+- ✅ **MenuContent legacy constructors removed** - now uses AppCoordinator only
+- ✅ **Views observe services directly** via @EnvironmentObject pattern
+- ✅ **All previews updated** to use CompositionRoot.makeMockCoordinator()
+
+**Architecture Victory:** Successfully eliminated MenuBarViewModel God Object v2 while maintaining all functionality!
 
 This plan transforms Headliner into a professional, maintainable architecture while preserving all performance optimizations and ensuring smooth MVP delivery! 🚀

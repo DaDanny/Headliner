@@ -21,19 +21,9 @@ struct MenuContent: View {
   @State private var showingPreview = false
   @State private var currentDestination: MenuDestination = .main
   
-  // Legacy constructor for backward compatibility
-  init(appState: LegacyAppStateBridge) {
-    self.appCoordinator = AppCoordinator() // TODO: Remove this hack
-  }
-  
-  // New constructor for AppCoordinator
+  // Main constructor
   init(appCoordinator: AppCoordinator) {
     self.appCoordinator = appCoordinator
-  }
-  
-  // Legacy constructor for MenuBarViewModel
-  init(appCoordinator: MenuBarViewModel) {
-    self.appCoordinator = AppCoordinator() // TODO: Remove this hack 
   }
   
   var body: some View {

@@ -4,6 +4,12 @@
 //
 //  Created by AI Assistant on 8/22/25.
 //
+//  ⚠️ DEPRECATED: This file is deprecated as of Phase 9 of the Big Bang Migration
+//  Views now use AppCoordinator + Services directly via @EnvironmentObject
+//  TODO: Delete this file after confirming all legacy usage is removed
+//
+
+#if false // DEPRECATED - Remove after migration complete
 
 import SwiftUI
 import AVFoundation
@@ -344,3 +350,5 @@ extension MenuBarViewModel {
   }
 }
 #endif
+
+#endif // DEPRECATED - Remove after migration complete

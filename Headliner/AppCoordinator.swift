@@ -149,10 +149,6 @@ final class AppCoordinator {
     location.requestLocationPermission()
   }
   
-  /// Toggle launch at login
-  func toggleLaunchAtLogin() {
-    // TODO: Implement actual launch at login logic with ServiceManagement
-  }
   
   /// Quit the application
   func quitApp() {
@@ -196,29 +192,13 @@ final class AppCoordinator {
       .store(in: &cancellables)
   }
   
-  // MARK: - Legacy compatibility (to be removed after migration)
+  // MARK: - Launch at Login
   
-  /// Legacy methods for MenuContent compatibility - TEMPORARY
-  /// TODO: Remove these after views observe services directly
-  func toggleCamera() {
-    if camera.cameraStatus == .running {
-      stopCamera()
-    } else {
-      startCamera()
-    }
+  /// Toggle launch at login
+  private func setLaunchAtLogin(_ enabled: Bool) {
+    // TODO: Implement with ServiceManagement framework
+    logger.debug("Launch at login: \(enabled) - not yet implemented")
   }
-  
-  // Legacy properties - views should observe services directly instead
-  var isRunning: Bool { camera.cameraStatus == .running }
-  var cameras: [CameraDevice] { camera.availableCameras }
-  var selectedCameraID: String { camera.selectedCamera?.id ?? "" }
-  var extensionStatus: ExtensionStatus { extensionService.status }
-  var overlays: [SwiftUIPresetInfo] { overlay.availablePresets }
-  var selectedOverlayID: String { overlay.currentPreset?.id ?? "" }
-  var overlaySettings: OverlaySettings { overlay.settings }
-  var launchAtLogin: Bool { false } // TODO: Implement properly
-  
-  func getAppState() -> Any { self } // Legacy hack
 }
 
 // MARK: - SwiftUI Environment Setup
