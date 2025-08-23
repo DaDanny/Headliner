@@ -55,7 +55,6 @@ class AppState: ObservableObject {
   private let personalInfoPump = PersonalInfoPump()
   let locationPermissionManager = LocationPermissionManager()
 
-
   // MARK: - Private Properties
 
   private var cancellables = Set<AnyCancellable>()
@@ -66,6 +65,14 @@ class AppState: ObservableObject {
   private var locationPermissionObserver: NSObjectProtocol?
   private let devicePollWindow: TimeInterval = 60 // seconds
   private let devicePollInterval: TimeInterval = 0.5
+  private var settingsSaveTimer: Timer?
+  
+  // Lazy camera discovery session to avoid repeated expensive device enumeration
+  private lazy var cameraDiscoverySession = AVCaptureDevice.DiscoverySession(
+    deviceTypes: [.builtInWideAngleCamera, .external, .continuityCamera, .deskViewCamera],
+    mediaType: .video,
+    position: .unspecified
+  )
 
   // MARK: - App Group Keys
 
@@ -109,6 +116,7 @@ class AppState: ObservableObject {
 
   deinit {
     devicePollTimer?.invalidate()
+    settingsSaveTimer?.invalidate()
     personalInfoPump.stop()
     if let token = didBecomeActiveObserver {
       NSWorkspace.shared.notificationCenter.removeObserver(token)
@@ -360,15 +368,20 @@ class AppState: ObservableObject {
     // Check if this is a SwiftUI preset and get the appropriate provider
     if let provider = swiftUIProvider(for: presetId) {
       self.logger.debug("🎨 [SwiftUI] Rendering SwiftUI overlay with safeAreaMode: \(self.overlaySettings.safeAreaMode.rawValue), surfaceStyle: \(self.overlaySettings.selectedSurfaceStyle)")
+      // Move rendering to background with main actor context
       Task { @MainActor in
         let renderTokens = RenderTokens(safeAreaMode: self.overlaySettings.safeAreaMode, surfaceStyle: self.overlaySettings.selectedSurfaceStyle)
         let personalInfo = self.getCurrentPersonalInfo()
-        await OverlayRenderBroker.shared.updateOverlay(
-          provider: provider,
-          tokens: tokens,
-          renderTokens: renderTokens,
-          personalInfo: personalInfo
-        )
+        
+        // Perform rendering in background task
+        Task.detached {
+          await OverlayRenderBroker.shared.updateOverlay(
+            provider: provider,
+            tokens: tokens,
+            renderTokens: renderTokens,
+            personalInfo: personalInfo
+          )
+        }
       }
     } else {
       self.logger.debug("⚠️ [SwiftUI] No SwiftUI provider found for preset '\(presetId)'")
@@ -462,10 +475,18 @@ class AppState: ObservableObject {
     locationPermissionManager.openSystemSettings()
   }
   
-
-
   /// Persist `overlaySettings` to the shared app group so the extension can load them.
   private func saveOverlaySettings() {
+    // Cancel existing timer
+    settingsSaveTimer?.invalidate()
+    
+    // Schedule debounced save
+    settingsSaveTimer = Timer.scheduledTimer(withTimeInterval: 0.2, repeats: false) { [weak self] _ in
+      self?.performSettingsSave()
+    }
+  }
+  
+  private func performSettingsSave() {
     // Save to app group defaults for extension access
     guard let appGroupDefaults = UserDefaults(suiteName: Identifiers.appGroup) else {
       self.logger.error("Failed to access app group UserDefaults for saving overlay settings")
@@ -475,7 +496,7 @@ class AppState: ObservableObject {
     do {
       let overlayData = try JSONEncoder().encode(self.overlaySettings)
       appGroupDefaults.set(overlayData, forKey: OverlayUserDefaultsKeys.overlaySettings)
-      appGroupDefaults.synchronize() // Force immediate sync
+      // Remove synchronize() call - let system handle timing
 
       logger
         .debug(
@@ -638,13 +659,8 @@ class AppState: ObservableObject {
       return
     }
     
-    let discoverySession = AVCaptureDevice.DiscoverySession(
-      deviceTypes: [.builtInWideAngleCamera, .external, .continuityCamera, .deskViewCamera],
-      mediaType: .video,
-      position: .unspecified
-    )
-
-    availableCameras = discoverySession.devices
+    // Use shared discovery session instead of creating new one
+    availableCameras = cameraDiscoverySession.devices
       .filter { !$0.localizedName.contains("Headliner") } // Exclude our virtual camera
       .map { device in
         CameraDevice(
@@ -728,14 +744,8 @@ class AppState: ObservableObject {
   private func updateCaptureSessionCamera(deviceID: String) {
     guard let manager = captureSessionManager else { return }
 
-    // Find the camera device by ID
-    let discoverySession = AVCaptureDevice.DiscoverySession(
-      deviceTypes: [.builtInWideAngleCamera, .external, .continuityCamera, .deskViewCamera],
-      mediaType: .video,
-      position: .unspecified
-    )
-
-    guard let device = discoverySession.devices.first(where: { $0.uniqueID == deviceID }) else {
+    // Use shared discovery session
+    guard let device = cameraDiscoverySession.devices.first(where: { $0.uniqueID == deviceID }) else {
       self.logger.error("Camera device with ID \(deviceID) not found")
       return
     }
@@ -782,43 +792,55 @@ class AppState: ObservableObject {
   /// Poll for extension device readiness with a time-bounded timer.
   private func waitForExtensionDeviceAppear() {
     devicePollTimer?.invalidate()
-
+    
     let deadline = Date().addingTimeInterval(devicePollWindow)
-
-    // ensure timer is created on the main run loop
-    let t = Timer(timeInterval: devicePollInterval, repeats: true) { [weak self] _ in
-      Task { @MainActor in
-        guard let self else { return }
-
-        // Prefer provider readiness to avoid noisy device scans once the extension has signaled readiness
-        let providerReady = UserDefaults(suiteName: Identifiers.appGroup)?
-          .bool(forKey: AppGroupKeys.extensionProviderReady) ?? false
-        if providerReady {
-          self.devicePollTimer?.invalidate()
-          self.extensionStatus = .installed
-          self.statusMessage = "Extension installed and ready"
-          self.logger.debug("✅ Virtual camera detected after activation")
-          return
-        }
-
-        // Only scan devices if provider readiness hasn't been signaled yet
-        self.propertyManager_internal.refreshExtensionStatus()
-        if self.propertyManager_internal.deviceObjectID != nil {
-          self.devicePollTimer?.invalidate()
-          self.extensionStatus = .installed
-          self.statusMessage = "Extension installed and ready"
-          self.logger.debug("✅ Virtual camera detected after activation")
-        } else if Date() > deadline {
-          self.devicePollTimer?.invalidate()
-          self.logger.debug("⌛ Timed out waiting for device; user may still be approving or camera is in-use")
+    var currentInterval: TimeInterval = 1.0 // Start with 1 second
+    let maxInterval: TimeInterval = 4.0 // Cap at 4 seconds
+    
+    func scheduleNextPoll() {
+      let timer = Timer(timeInterval: currentInterval, repeats: false) { [weak self] _ in
+        Task { @MainActor in
+          await self?.performExtensionPoll(deadline: deadline, scheduleNext: scheduleNextPoll)
         }
       }
+      
+      devicePollTimer = timer
+      RunLoop.main.add(timer, forMode: .common)
+      
+      // Exponential backoff
+      currentInterval = min(currentInterval * 1.5, maxInterval)
     }
-
-    // keep firing while UI is interacting (scroll/menus)
-    devicePollTimer = t
-    t.tolerance = 0.1
-    RunLoop.main.add(t, forMode: .common)
+    
+    scheduleNextPoll()
+  }
+  
+  private func performExtensionPoll(deadline: Date, scheduleNext: @escaping () -> Void) async {
+    // Prioritize provider readiness flag
+    let providerReady = UserDefaults(suiteName: Identifiers.appGroup)?
+      .bool(forKey: AppGroupKeys.extensionProviderReady) ?? false
+      
+    if providerReady {
+      devicePollTimer?.invalidate()
+      extensionStatus = .installed
+      statusMessage = "Extension installed and ready"
+      logger.debug("✅ Extension ready via provider flag")
+      return
+    }
+    
+    // Fallback to device scan if needed
+    propertyManager_internal.refreshExtensionStatus()
+    if propertyManager_internal.deviceObjectID != nil {
+      devicePollTimer?.invalidate()
+      extensionStatus = .installed
+      statusMessage = "Extension installed and ready"
+      logger.debug("✅ Extension detected via device scan")
+    } else if Date() > deadline {
+      devicePollTimer?.invalidate()
+      logger.debug("⌛ Extension installation timed out")
+    } else {
+      // Schedule next poll with backoff
+      scheduleNext()
+    }
   }
 }
 
