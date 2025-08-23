@@ -47,9 +47,9 @@ class AppState: ObservableObject {
 
   // MARK: - Dependencies
 
-  private let systemExtensionManager: SystemExtensionRequestManager
-  private let propertyManager: CustomPropertyManager
-  private let outputImageManager: OutputImageManager
+  private let systemExtensionRequestManager: SystemExtensionRequestManager
+  private let propertyManager_internal: CustomPropertyManager
+  private let outputImageManager_internal: OutputImageManager
   private let notificationManager = NotificationManager.self
   private let logger = HeadlinerLogger.logger(for: .appState)
   private let personalInfoPump = PersonalInfoPump()
@@ -90,9 +90,9 @@ class AppState: ObservableObject {
     propertyManager: CustomPropertyManager,
     outputImageManager: OutputImageManager
   ) {
-    self.systemExtensionManager = systemExtensionManager
-    self.propertyManager = propertyManager
-    self.outputImageManager = outputImageManager
+    self.systemExtensionRequestManager = systemExtensionManager
+    self.propertyManager_internal = propertyManager
+    self.outputImageManager_internal = outputImageManager
 
     self.logger.debug("Initializing AppState with lazy loading...")
 
@@ -132,7 +132,7 @@ class AppState: ObservableObject {
   func installExtension() {
     extensionStatus = .installing
     statusMessage = "Installing system extension..."
-    systemExtensionManager.install()
+    systemExtensionRequestManager.install()
     // start watching for the device to appear
     waitForExtensionDeviceAppear()
   }
@@ -224,7 +224,7 @@ class AppState: ObservableObject {
     }
 
     // Clear the preview image
-    outputImageManager.videoExtensionStreamOutputImage = nil
+    outputImageManager_internal.videoExtensionStreamOutputImage = nil
 
     // Simulate camera stop completion
     DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
@@ -502,7 +502,7 @@ class AppState: ObservableObject {
 
   /// Wire up Combine bindings and app lifecycle observers.
   private func setupBindings() {
-    systemExtensionManager.$logText
+    systemExtensionRequestManager.$logText
       .receive(on: DispatchQueue.main)
       .sink { [weak self] logText in
         Task { @MainActor in
@@ -511,7 +511,7 @@ class AppState: ObservableObject {
       }
       .store(in: &cancellables)
 
-    systemExtensionManager.$phase
+    systemExtensionRequestManager.$phase
       .receive(on: DispatchQueue.main)
       .sink { [weak self] phase in
         Task { @MainActor in
@@ -613,8 +613,8 @@ class AppState: ObservableObject {
     }
 
     // Fallback to device scan when provider readiness hasn't been set yet
-    propertyManager.refreshExtensionStatus()
-    if propertyManager.deviceObjectID != nil {
+    propertyManager_internal.refreshExtensionStatus()
+    if propertyManager_internal.deviceObjectID != nil {
       self.logger.debug("Extension detected - setting status to installed")
       extensionStatus = .installed
       statusMessage = "Extension is installed and ready"
@@ -683,7 +683,7 @@ class AppState: ObservableObject {
 
       // Set the output image manager as the video output delegate
       manager.videoOutput?.setSampleBufferDelegate(
-        outputImageManager,
+        outputImageManager_internal,
         queue: manager.dataOutputQueue
       )
 
@@ -802,8 +802,8 @@ class AppState: ObservableObject {
         }
 
         // Only scan devices if provider readiness hasn't been signaled yet
-        self.propertyManager.refreshExtensionStatus()
-        if self.propertyManager.deviceObjectID != nil {
+        self.propertyManager_internal.refreshExtensionStatus()
+        if self.propertyManager_internal.deviceObjectID != nil {
           self.devicePollTimer?.invalidate()
           self.extensionStatus = .installed
           self.statusMessage = "Extension installed and ready"
@@ -870,7 +870,7 @@ enum CameraStatus: Equatable {
   }
 }
 
-struct CameraDevice: Identifiable, Equatable {
+struct CameraDevice: Identifiable, Equatable, Hashable {
   let id: String
   let name: String
   let deviceType: String

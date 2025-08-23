@@ -19,7 +19,7 @@ struct OverlaySettings: Codable {
   var versionFontSize: CGFloat = 16
   
   // Preset system fields
-  var selectedPresetId: String = "professional"
+  var selectedPresetId: String = "swiftui.professional.corner"
   var overlayTokens: OverlayTokens?
   var overlayAspect: OverlayAspect = .widescreen
   
