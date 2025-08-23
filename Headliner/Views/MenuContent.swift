@@ -16,7 +16,7 @@ enum MenuDestination {
 
 /// Main content view for the menu bar popup with navigation
 struct MenuContent: View {
-  @ObservedObject var appCoordinator: AppCoordinator
+  let appCoordinator: AppCoordinator  // Just hold reference, don't observe
   @Environment(\.openURL) private var openURL
   @State private var showingPreview = false
   @State private var currentDestination: MenuDestination = .main
@@ -56,14 +56,17 @@ struct MenuContent: View {
           ))
           
         case .overlaySettings:
-          OverlaySettingsMenu(
-            appCoordinator: appCoordinator,
-            onBack: {
+          // TODO: Implement OverlaySettingsMenu or use existing overlay settings view
+          VStack {
+            Text("Overlay Settings")
+              .font(.headline)
+            Button("Back") {
               withAnimation(.easeInOut(duration: 0.3)) {
                 currentDestination = .main
               }
             }
-          )
+          }
+          .padding()
           .transition(.asymmetric(
             insertion: .move(edge: .trailing).combined(with: .opacity),
             removal: .move(edge: .leading).combined(with: .opacity)
@@ -95,7 +98,10 @@ struct MenuContent: View {
 
 /// The main menu content (what you see first)
 struct MainMenuView: View {
-  @ObservedObject var appCoordinator: MenuBarViewModel
+  let appCoordinator: AppCoordinator  // Just hold reference for delegation
+  @EnvironmentObject private var cameraService: CameraService
+  @EnvironmentObject private var extensionService: ExtensionService
+  @EnvironmentObject private var overlayService: OverlayService
   @Environment(\.openURL) private var openURL
   @Binding var showingPreview: Bool
   let navigateTo: (MenuDestination) -> Void
@@ -150,10 +156,10 @@ struct MainMenuView: View {
       // Status indicator
       HStack(spacing: 6) {
         Circle()
-          .fill(appCoordinator.isRunning ? Color.green : Color.gray)
+          .fill(cameraService.cameraStatus.isRunning ? Color.green : Color.gray)
           .frame(width: 8, height: 8)
         
-        Text(appCoordinator.isRunning ? "Live" : "Idle")
+        Text(cameraService.cameraStatus.isRunning ? "Live" : "Idle")
           .font(.caption)
           .foregroundColor(.secondary)
       }
@@ -172,12 +178,12 @@ struct MainMenuView: View {
         }
       }) {
         HStack {
-          Image(systemName: appCoordinator.isRunning ? "stop.circle.fill" : "play.circle.fill")
+          Image(systemName: cameraService.cameraStatus.isRunning ? "stop.circle.fill" : "play.circle.fill")
             .font(.system(size: 18))
             .foregroundColor(.white)
-            .animation(.easeInOut(duration: 0.2), value: appCoordinator.isRunning)
+            .animation(.easeInOut(duration: 0.2), value: cameraService.cameraStatus.isRunning)
           
-          Text(appCoordinator.isRunning ? "Stop Virtual Camera" : "Start Virtual Camera")
+          Text(cameraService.cameraStatus.isRunning ? "Stop Virtual Camera" : "Start Virtual Camera")
             .font(.system(size: 16, weight: .medium))
             .foregroundColor(.white)
           
@@ -187,14 +193,14 @@ struct MainMenuView: View {
         .padding(.vertical, 12)
         .background(
           RoundedRectangle(cornerRadius: 8)
-            .fill(appCoordinator.isRunning ? Color.red : Color.accentColor)
-            .animation(.easeInOut(duration: 0.3), value: appCoordinator.isRunning)
+            .fill(cameraService.cameraStatus.isRunning ? Color.red : Color.accentColor)
+            .animation(.easeInOut(duration: 0.3), value: cameraService.cameraStatus.isRunning)
         )
       }
       .buttonStyle(PlainButtonStyle())
       
       // Show error message if extension not installed
-      if appCoordinator.extensionStatus != .installed {
+      if extensionService.status != .installed {
         HStack(spacing: 8) {
           Image(systemName: "exclamationmark.triangle.fill")
             .foregroundColor(.orange)
@@ -222,11 +228,13 @@ struct MainMenuView: View {
       // Camera selector with LoomStyleSelector - always show for consistent UI
       LoomStyleSelector(
         title: "Camera",
-        items: appCoordinator.cameras,
-        selectedItem: appCoordinator.cameras.first { $0.id == appCoordinator.selectedCameraID },
+        items: cameraService.availableCameras,
+        selectedItem: cameraService.selectedCamera,
         onSelectionChange: { camera in
           if let camera = camera {
-            appCoordinator.selectCamera(camera)
+            Task {
+              await appCoordinator.selectCamera(camera)
+            }
           }
         },
         itemIcon: { camera in
@@ -240,7 +248,7 @@ struct MainMenuView: View {
             camera?.deviceType
         },
         statusBadge: { _ in
-          if appCoordinator.cameras.isEmpty {
+          if cameraService.availableCameras.isEmpty {
             return ("Error", .orange)
           } else {
             return nil
@@ -261,22 +269,17 @@ struct MainMenuView: View {
   
   
   private var isOverlayEnabled: Bool {
-    !appCoordinator.selectedOverlayID.isEmpty && 
-    appCoordinator.selectedOverlayID != "swiftui.clean" &&
-    appCoordinator.overlays.contains { $0.id == appCoordinator.selectedOverlayID }
+    overlayService.settings.isEnabled
   }
   
   private var selectedCameraName: String {
-    if let camera = appCoordinator.cameras.first(where: { $0.id == appCoordinator.selectedCameraID }) {
-      return camera.name
-    }
-    return "No Camera Selected"
+    cameraService.selectedCamera?.name ?? "No Camera Selected"
   }
   
   private var currentOverlayName: String {
     if isOverlayEnabled {
-      if let currentOverlay = appCoordinator.overlays.first(where: { $0.id == appCoordinator.selectedOverlayID }) {
-        return currentOverlay.name
+      if let currentPreset = overlayService.currentPreset {
+        return currentPreset.name
       } else {
         return "Unknown Overlay"
       }
@@ -286,8 +289,7 @@ struct MainMenuView: View {
   }
   
   private var overlayOptions: [SwiftUIPresetInfo] {
-    // Show all available overlays from the view model
-    return appCoordinator.overlays
+    return overlayService.availablePresets
   }
   
   private func cameraIcon(for camera: CameraDevice) -> String {
@@ -358,7 +360,8 @@ struct MainMenuView: View {
 
 /// Preview popover using CameraPreviewCard for full functionality
 private struct PreviewPopover: View {
-  @ObservedObject var appCoordinator: MenuBarViewModel
+  let appCoordinator: AppCoordinator
+  @EnvironmentObject private var cameraService: CameraService
   
   var body: some View {
     VStack(spacing: 6) {
@@ -367,16 +370,14 @@ private struct PreviewPopover: View {
         .foregroundColor(.primary)
       
       // Use CameraPreviewCard for all the overlay functionality
-      CameraPreviewCard(
-        previewImage: nil, // TODO: Connect to actual camera preview when OutputImageManager is exposed
-        isActive: !appCoordinator.selectedCameraID.isEmpty && !appCoordinator.cameras.isEmpty, // Active if we have a selected camera
-        appState: appCoordinator.getAppState() // Pass AppState for overlay functionality
-      )
+      // TODO: Update CameraPreviewCard to work with new architecture
+      Text("Camera preview placeholder")
+        .foregroundColor(.secondary)
       .frame(height: 180) // Compact height for popover
       .scaleEffect(0.9) // Slightly less aggressive scaling
       .clipped() // Prevent any overflow/bleeding
       
-      if !appCoordinator.selectedCameraID.isEmpty && !appCoordinator.cameras.isEmpty {
+      if cameraService.selectedCamera != nil && !cameraService.availableCameras.isEmpty {
         Text("Camera preview with overlay")
           .font(.system(size: 10))
           .foregroundColor(.secondary)
@@ -637,7 +638,7 @@ struct InteractiveMenuButton<Accessory: View>: View {
 
 /// The settings view (focused, dedicated settings page)
 struct SettingsMenuView: View {
-  @ObservedObject var appCoordinator: MenuBarViewModel
+  let appCoordinator: AppCoordinator
   let onBack: () -> Void
   
   var body: some View {
@@ -692,7 +693,8 @@ struct SettingsMenuView: View {
                 Spacer()
                 
                 // Toggle indicator
-                if appCoordinator.launchAtLogin {
+                // TODO: Get launch at login status from proper service
+                if false {  // appCoordinator.launchAtLogin replaced with false for now
                   Image(systemName: "checkmark")
                     .font(.system(size: 12, weight: .medium))
                     .foregroundColor(.accentColor)

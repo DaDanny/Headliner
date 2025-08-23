@@ -8,6 +8,7 @@
 import Foundation
 import Combine
 import SystemExtensions
+import AppKit
 
 // MARK: - Protocol
 
@@ -152,7 +153,7 @@ final class ExtensionService: ObservableObject {
     }
   }
   
-  private func handleInstallationPhase(_ phase: ExtensionStatus) {
+  private func handleInstallationPhase(_ phase: ExtensionInstallPhase) {
     switch phase {
     case .needsApproval:
       status = .installing
@@ -196,7 +197,7 @@ final class ExtensionService: ObservableObject {
       pollTimer?.invalidate()
       status = .installed
       statusMessage = "Extension installed and ready"
-      logger.debug("✅ Extension ready (poll #\(pollCount))")
+      logger.debug("✅ Extension ready (poll #\(self.pollCount))")
       return
     }
     
@@ -206,10 +207,10 @@ final class ExtensionService: ObservableObject {
       pollTimer?.invalidate()
       status = .installed
       statusMessage = "Extension installed and ready"
-      logger.debug("✅ Extension detected (poll #\(pollCount))")
+      logger.debug("✅ Extension detected (poll #\(self.pollCount))")
     } else if Date() > deadline {
       pollTimer?.invalidate()
-      logger.debug("⌛ Extension polling timed out after \(pollCount) attempts")
+      logger.debug("⌛ Extension polling timed out after \(self.pollCount) attempts")
     } else {
       scheduleNextPoll(deadline: deadline)
     }

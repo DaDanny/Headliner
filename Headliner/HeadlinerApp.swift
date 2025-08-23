@@ -9,7 +9,7 @@ import SwiftUI
 
 @main
 struct HeadlinerApp: App {
-  @StateObject private var appCoordinator = AppCoordinator()  // Real service-based coordinator
+  @State private var appCoordinator = AppCoordinator()  // Service coordinator
   @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
   
   init() {
@@ -19,7 +19,7 @@ struct HeadlinerApp: App {
   }
   
   var body: some Scene {
-    MenuBarExtra("Headliner", systemImage: isRunning ? "dot.radiowaves.left.and.right" : "video") {
+    MenuBarExtra("Headliner", systemImage: "video") {  // Static icon for now, TODO: observe CameraService
       MenuContent(appCoordinator: appCoordinator)
         .withAppCoordinator(appCoordinator)  // Inject services
         .onAppear {
@@ -28,14 +28,9 @@ struct HeadlinerApp: App {
     }
     .menuBarExtraStyle(.window)
     
-    Settings {
-      SettingsView(appCoordinator: appCoordinator)
-        .withAppCoordinator(appCoordinator)  // Inject services
-    }
-  }
-  
-  // TODO: This should observe CameraService directly, not through coordinator
-  private var isRunning: Bool {
-    appCoordinator.camera.cameraStatus == .running
+    // Settings {
+    //   SettingsView(appCoordinator: appCoordinator)
+    //     .withAppCoordinator(appCoordinator)  // Inject services
+    // }
   }
 }

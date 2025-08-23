@@ -108,7 +108,7 @@ final class AppLifecycleManager {
       
       if headlinerProcesses.count > 1 {
         logger.warning("⚠️ Found \(headlinerProcesses.count) Headliner processes:")
-        headlinerProcesses.forEach { logger.debug($0) }
+        headlinerProcesses.forEach { logger.debug("\($0)") }
       }
     }
   }

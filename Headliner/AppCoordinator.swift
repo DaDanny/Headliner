@@ -113,14 +113,7 @@ final class AppCoordinator {
     analytics.track(.cameraStopped)
   }
   
-  /// Toggle camera on/off - for MenuContent compatibility
-  func toggleCamera() {
-    if isRunning {
-      stopCamera()
-    } else {
-      startCamera()
-    }
-  }
+  // Removed duplicate toggleCamera - see legacy compatibility section
   
   /// Install the system extension
   func installExtension() {
