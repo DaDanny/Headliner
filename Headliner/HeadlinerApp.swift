@@ -29,18 +29,24 @@ struct HeadlinerApp: App {
       OnboardingView(appCoordinator: appCoordinator) {
         hasCompletedOnboarding = true
         appCoordinator.completeOnboarding()
+        
+        // Close the onboarding window
+        DispatchQueue.main.async {
+          NSApp.keyWindow?.close()
+        }
+        
         // Switch back to accessory so the app behaves like a menu-bar app
         NSApp.setActivationPolicy(.accessory)
       }
       .withAppCoordinator(appCoordinator)
-      .frame(minWidth: 1000, idealWidth: 1200, minHeight: 700, idealHeight: 800)
+      .frame(minWidth: 1000, idealWidth: 1100, minHeight: 700, idealHeight: 800)
       .onAppear {
         // Ensure the onboarding window is visible and focused on first show
         NSApp.setActivationPolicy(.regular)               // show Dock during onboarding
         NSApp.activate(ignoringOtherApps: true)
       }
     }
-    .defaultSize(width: 1200, height: 800)
+    .defaultSize(width: 1100, height: 800)
     .windowResizability(.contentSize)
     .windowStyle(.hiddenTitleBar)
     .windowToolbarStyle(.unifiedCompact)

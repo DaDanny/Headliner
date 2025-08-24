@@ -101,6 +101,44 @@ final class CameraService: NSObject, ObservableObject {
     logger.debug("Camera and self-preview started")
   }
   
+  /// Start preview mode for onboarding - shows camera with overlays but doesn't affect main camera state
+  func startOnboardingPreview() async {
+    guard hasCameraPermission else { 
+      logger.debug("No camera permission for onboarding preview")
+      return 
+    }
+    
+    logger.debug("Starting onboarding preview...")
+    
+    // Notify extension to start capturing from physical camera
+    notificationManager.postNotification(named: .startStream)
+    
+    // Start self-preview from virtual camera to show user what they'll look like
+    setupSelfPreviewFromVirtualCamera()
+    
+    // Wait for extension to start
+    try? await Task.sleep(nanoseconds: 1_500_000_000) // 1.5 seconds for extension startup
+    logger.debug("Onboarding preview started")
+  }
+  
+  /// Stop onboarding preview
+  func stopOnboardingPreview() {
+    logger.debug("Stopping onboarding preview...")
+    
+    // Stop extension camera capture
+    notificationManager.postNotification(named: .stopStream)
+    
+    // Stop self-preview capture session
+    selfPreviewCaptureSession?.stopRunning()
+    selfPreviewCaptureSession = nil
+    selfPreviewOutput = nil
+    
+    // Clear current frame
+    currentPreviewFrame = nil
+    
+    logger.debug("Onboarding preview stopped")
+  }
+  
   func stopCamera() {
     guard cameraStatus == .running else { return }
     
@@ -342,7 +380,7 @@ extension CameraService: @preconcurrency AVCaptureVideoDataOutputSampleBufferDel
       }
       
       let ciImage = CIImage(ioSurface: ioSurface.takeUnretainedValue())
-        .oriented(.upMirrored) // Match main app mirroring
+        .transformed(by: CGAffineTransform(scaleX: -1, y: 1)) // Mirror for natural preview experience
       
       let context = CIContext(options: nil)
       
