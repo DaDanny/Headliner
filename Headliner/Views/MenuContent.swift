@@ -349,6 +349,7 @@ struct MainMenuView: View {
 private struct PreviewPopover: View {
   let appCoordinator: AppCoordinator
   @EnvironmentObject private var cameraService: CameraService
+  @EnvironmentObject private var overlayService: OverlayService
   
   var body: some View {
     VStack(spacing: 6) {
@@ -356,16 +357,18 @@ private struct PreviewPopover: View {
         .font(.system(size: 13, weight: .medium))
         .foregroundColor(.primary)
       
-      // Use CameraPreviewCard for all the overlay functionality
-      // TODO: Update CameraPreviewCard to work with new architecture
-      Text("Camera preview placeholder")
-        .foregroundColor(.secondary)
+      // Use CameraPreviewCard with new self-preview architecture
+      CameraPreviewCard(
+        previewImage: cameraService.currentPreviewFrame,
+        isActive: cameraService.cameraStatus == .running,
+        overlayService: overlayService
+      )
       .frame(height: 180) // Compact height for popover
       .scaleEffect(0.9) // Slightly less aggressive scaling
       .clipped() // Prevent any overflow/bleeding
       
       if cameraService.selectedCamera != nil && !cameraService.availableCameras.isEmpty {
-        Text("Camera preview with overlay")
+        Text("Self-preview: exactly what Google Meet sees")
           .font(.system(size: 10))
           .foregroundColor(.secondary)
       } else {

@@ -36,16 +36,11 @@ final class AppCoordinator {
   // MARK: - Initialization
   
   init() {
-    let captureManager = CaptureSessionManager(capturingHeadliner: false)
-    let outputManager = OutputImageManager()
     let extensionRequestManager = SystemExtensionRequestManager(logText: "")
     let propertyManager = CustomPropertyManager()
     
-    // Initialize services
-    self.camera = CameraService(
-      captureSessionManager: captureManager,
-      outputImageManager: outputManager
-    )
+    // Initialize services with simplified architecture
+    self.camera = CameraService() // No longer needs capture session manager
     
     self.extensionService = ExtensionService(
       requestManager: extensionRequestManager,

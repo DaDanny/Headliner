@@ -98,10 +98,13 @@ class CameraExtensionDeviceSource: NSObject, CMIOExtensionDeviceSource, AVCaptur
 			fatalError("Failed to add stream: \(error.localizedDescription)")
 		}
 		
-		// Initialize capture session using shared CaptureSessionManager
-		extensionLogger.debug("🚀 CameraExtensionDeviceSource init - about to call setupCaptureSession")
-		setupCaptureSession()
-		extensionLogger.debug("✅ CameraExtensionDeviceSource init - setupCaptureSession completed")
+		// ❌ CRITICAL FIX: Remove immediate camera initialization 
+		// This was causing camera to run on app launch even when not needed
+		// Implement lazy initialization - camera only starts when external app requests it
+		//
+		// OLD PROBLEMATIC CODE: setupCaptureSession()
+		
+		extensionLogger.debug("✅ CameraExtensionDeviceSource init - using lazy camera initialization")
 		
 		// Load overlay settings
 		loadOverlaySettings()
@@ -203,6 +206,13 @@ class CameraExtensionDeviceSource: NSObject, CMIOExtensionDeviceSource, AVCaptur
 		print("🎬 [Camera Extension] Starting real camera capture...")
 		extensionLogger.debug("Starting real camera capture...")
 		
+		// Lazy initialization: setup capture session on first use
+		if captureSessionManager == nil {
+			print("🔧 [Camera Extension] First camera start - initializing capture session...")
+			extensionLogger.debug("Lazy initializing capture session on first camera start")
+			setupCaptureSession()
+		}
+		
 		if let manager = captureSessionManager, manager.configured {
 			print("✅ [Camera Extension] CaptureSessionManager is configured")
 			extensionLogger.debug("CaptureSessionManager is configured and ready")
@@ -222,9 +232,8 @@ class CameraExtensionDeviceSource: NSObject, CMIOExtensionDeviceSource, AVCaptur
 				extensionLogger.debug("Capture session already running")
 			}
 		} else {
-			print("❌ [Camera Extension] CaptureSessionManager not configured - retrying setup")
-			extensionLogger.error("CaptureSessionManager not configured - attempting retry")
-			setupCaptureSession()
+			print("❌ [Camera Extension] CaptureSessionManager not configured - setup failed")
+			extensionLogger.error("CaptureSessionManager configuration failed even after setup attempt")
 		}
 	}
 	
@@ -260,13 +269,23 @@ class CameraExtensionDeviceSource: NSObject, CMIOExtensionDeviceSource, AVCaptur
 				extensionLogger.debug("Stopped virtual camera frame generation timer")
 			}
 			
-			// Stop real camera capture session
-			stopCameraCapture()
+			// ❌ CRITICAL FIX: Don't reset app state when external apps stop
+			// This was causing Google Meet toggle issues - when Meet stops/starts video,
+			// it would reset _isAppControlledStreaming = false, causing splash screen
+			// 
+			// OLD BROKEN CODE: _isAppControlledStreaming = false
 			
-			// Also disable app-controlled streaming
+			// Only stop camera if app explicitly wants it stopped
 			_streamStateLock.lock()
-			_isAppControlledStreaming = false
+			let shouldStopCamera = !_isAppControlledStreaming
 			_streamStateLock.unlock()
+			
+			if shouldStopCamera {
+				stopCameraCapture()
+				extensionLogger.debug("Stopped camera capture - app not streaming")
+			} else {
+				extensionLogger.debug("Keeping camera active - app still wants streaming")
+			}
 		}
 	}
 	
