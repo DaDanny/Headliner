@@ -9,6 +9,7 @@ import Foundation
 import Combine
 import SystemExtensions
 import AppKit
+import AVFoundation
 
 // MARK: - Protocol
 
@@ -33,19 +34,18 @@ final class ExtensionService: ObservableObject {
   // MARK: - Dependencies
   
   private let requestManager: SystemExtensionRequestManager
-  private let propertyManager: CustomPropertyManager
   private let logger = HeadlinerLogger.logger(for: .systemExtension)
+  
+  // Phase 3.1: Direct device detection (replaced CustomPropertyManager)
+  private lazy var discoverySession = AVCaptureDevice.DiscoverySession(
+    deviceTypes: [.builtInWideAngleCamera, .external, .continuityCamera, .deskViewCamera],
+    mediaType: .video,
+    position: .unspecified
+  )
   
   // MARK: - Private Properties
   
   private var cancellables = Set<AnyCancellable>()
-  private var pollTimer: Timer?
-  private var pollCount = 0
-  
-  // Smart polling configuration
-  private var currentPollInterval: TimeInterval = 1.0
-  private let maxPollInterval: TimeInterval = 4.0
-  private let pollWindow: TimeInterval = 60.0
   
   // Phase 2.4: Health monitoring & heartbeat system
   private var healthMonitorTimer: Timer?
@@ -58,17 +58,14 @@ final class ExtensionService: ObservableObject {
   
   // MARK: - Initialization
   
-  init(requestManager: SystemExtensionRequestManager,
-       propertyManager: CustomPropertyManager) {
+  init(requestManager: SystemExtensionRequestManager) {
     self.requestManager = requestManager
-    self.propertyManager = propertyManager
     
     setupBindings()
     checkStatus()
   }
   
   deinit {
-    pollTimer?.invalidate()
     healthMonitorTimer?.invalidate()
   }
   
@@ -78,7 +75,6 @@ final class ExtensionService: ObservableObject {
     status = .installing
     statusMessage = "Installing system extension..."
     requestManager.install()
-    startPolling()
   }
   
   func checkStatus() {
@@ -94,8 +90,7 @@ final class ExtensionService: ObservableObject {
     }
     
     // Fallback to device scan
-    propertyManager.refreshExtensionStatus()
-    if propertyManager.deviceObjectID != nil {
+    if isExtensionDeviceAvailable() {
       status = .installed
       statusMessage = "Extension is installed and ready"
       startHealthMonitoring()
@@ -121,20 +116,24 @@ final class ExtensionService: ObservableObject {
   // MARK: - Private Methods
   
   private func setupBindings() {
-    // Monitor installation progress
-    requestManager.$logText
-      .receive(on: DispatchQueue.main)
-      .sink { [weak self] logText in
-        self?.handleInstallationLog(logText)
-      }
-      .store(in: &cancellables)
-    
+    // Phase 3.2: Monitor installation progress via phases (more reliable than log parsing)
     requestManager.$phase
       .receive(on: DispatchQueue.main)
       .sink { [weak self] phase in
         self?.handleInstallationPhase(phase)
       }
       .store(in: &cancellables)
+    
+    // Phase 3.2: Monitor extension runtime status changes (replaces log parsing)
+    // TODO: Re-enable once notification system is stabilized
+    /*
+    NotificationCenter.default.publisher(for: NotificationName.statusChanged.nsNotificationName)
+      .receive(on: DispatchQueue.main)
+      .sink { [weak self] _ in
+        self?.handleExtensionStatusChange()
+      }
+      .store(in: &cancellables)
+    */
     
     // Recheck on app activation
     NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)
@@ -145,18 +144,31 @@ final class ExtensionService: ObservableObject {
       .store(in: &cancellables)
   }
   
-  private func handleInstallationLog(_ logText: String) {
-    statusMessage = logText
+  // Phase 3.2: Handle extension runtime status changes (replaces log parsing)
+  private func handleExtensionStatusChange() {
+    let runtimeStatus = ExtensionStatusManager.readStatus()
     
-    if logText.contains("success") {
-      status = .installed
-      Task {
-        try? await Task.sleep(nanoseconds: 1_000_000_000)
-        checkStatus()
-      }
-    } else if logText.contains("fail") || logText.contains("error") {
-      status = .notInstalled
+    // Only update status messages based on runtime status if extension is installed
+    guard status == .installed else {
+      logger.debug("Ignoring runtime status change - extension not installed")
+      return
     }
+    
+    // Update status message based on runtime status without affecting installation status
+    switch runtimeStatus {
+    case .idle:
+      statusMessage = "Extension ready"
+    case .starting:
+      statusMessage = "Extension starting camera..."
+    case .streaming:
+      statusMessage = "Extension streaming"
+    case .stopping:
+      statusMessage = "Extension stopping..."
+    case .error:
+      statusMessage = "Extension error - check logs"
+    }
+    
+    logger.debug("📊 Extension runtime status: \(runtimeStatus.rawValue) -> '\(self.statusMessage)'")
   }
   
   private func handleInstallationPhase(_ phase: ExtensionInstallPhase) {
@@ -167,60 +179,45 @@ final class ExtensionService: ObservableObject {
     case .installed:
       status = .installed
       statusMessage = "Extension installed. Finalizing…"
-      startPolling()
+      // Phase 3.2: Simplified verification instead of complex polling
+      verifyInstallationCompletion()
     default:
       break
     }
   }
   
-  // MARK: - Smart Polling
+  // MARK: - Phase 3.2: Simplified Installation Verification
   
-  private func startPolling() {
-    pollTimer?.invalidate()
-    pollCount = 0
-    currentPollInterval = 1.0
-    
-    let deadline = Date().addingTimeInterval(pollWindow)
-    scheduleNextPoll(deadline: deadline)
-  }
-  
-  private func scheduleNextPoll(deadline: Date) {
-    pollTimer = Timer.scheduledTimer(withTimeInterval: currentPollInterval, repeats: false) { [weak self] _ in
-      Task { @MainActor in
-        self?.performPoll(deadline: deadline)
-      }
+  /// Simple verification that extension is fully operational (replaces complex polling)
+  private func verifyInstallationCompletion() {
+    // Give extension a moment to initialize, then verify
+    Task {
+      try? await Task.sleep(nanoseconds: 2_000_000_000) // 2 seconds
+      await finalizeInstallation()
     }
-    
-    // Exponential backoff
-    currentPollInterval = min(currentPollInterval * 1.5, maxPollInterval)
   }
   
-  private func performPoll(deadline: Date) {
-    pollCount += 1
-    
-    // Check provider flag first (fast)
+  @MainActor
+  private func finalizeInstallation() {
+    // Check provider flag first (fastest)
     if isProviderReady {
-      pollTimer?.invalidate()
       status = .installed
       statusMessage = "Extension installed and ready"
-      logger.debug("✅ Extension ready (poll #\(self.pollCount))")
       startHealthMonitoring()
+      logger.debug("✅ Extension verified via provider flag")
       return
     }
     
     // Device scan fallback
-    propertyManager.refreshExtensionStatus()
-    if propertyManager.deviceObjectID != nil {
-      pollTimer?.invalidate()
+    if isExtensionDeviceAvailable() {
       status = .installed
       statusMessage = "Extension installed and ready"
-      logger.debug("✅ Extension detected (poll #\(self.pollCount))")
       startHealthMonitoring()
-    } else if Date() > deadline {
-      pollTimer?.invalidate()
-      logger.debug("⌛ Extension polling timed out after \(self.pollCount) attempts")
+      logger.debug("✅ Extension verified via device scan")
     } else {
-      scheduleNextPoll(deadline: deadline)
+      // Extension may need more time or manual intervention
+      statusMessage = "Extension installed but not yet ready - check System Settings"
+      logger.debug("⚠️ Extension installed but virtual camera not detected")
     }
   }
   
@@ -291,6 +288,22 @@ final class ExtensionService: ObservableObject {
   
   var isInstalling: Bool {
     status == .installing
+  }
+  
+  // MARK: - Private Extension Detection
+  
+  private func isExtensionDeviceAvailable() -> Bool {
+    let headlinerDevice = discoverySession.devices.first {
+      $0.localizedName.contains("Headliner")
+    }
+    
+    if let device = headlinerDevice {
+      logger.debug("Found Headliner extension device: \(device.localizedName)")
+      return true
+    } else {
+      logger.debug("Headliner extension device not found")
+      return false
+    }
   }
 }
 

@@ -37,14 +37,12 @@ final class AppCoordinator {
   
   init() {
     let extensionRequestManager = SystemExtensionRequestManager(logText: "")
-    let propertyManager = CustomPropertyManager()
     
     // Initialize services with simplified architecture
     self.camera = CameraService() // No longer needs capture session manager
     
     self.extensionService = ExtensionService(
-      requestManager: extensionRequestManager,
-      propertyManager: propertyManager
+      requestManager: extensionRequestManager
     )
     
     self.overlay = OverlayService()

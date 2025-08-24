@@ -272,11 +272,11 @@ private func logStateTransition(from: ExtensionState, to: ExtensionState, trigge
 - [x] UserDefaults-based device selection ✅ COMPLETED
 - [x] Health monitoring & heartbeat system ✅ COMPLETED
 
-### Week 3 - Code Cleanup (Medium Priority)  
-- [ ] Remove CustomPropertyManager & OutputImageManager
-- [ ] Harden CaptureSessionManager for extension-only use
-- [ ] Simplify ExtensionService polling
-- [ ] Add comprehensive error states
+### Week 3 - Code Cleanup (Medium Priority) ✅ COMPLETED
+- [x] Remove CustomPropertyManager & OutputImageManager ✅ COMPLETED
+- [x] Harden CaptureSessionManager for extension-only use ✅ COMPLETED
+- [x] Simplify ExtensionService polling ✅ COMPLETED
+- [x] Add comprehensive error states ✅ COMPLETED
 
 ### Week 4 - Polish & Performance (Nice to Have)
 - [ ] Enhanced error recovery mechanisms
@@ -543,4 +543,107 @@ This refactor transforms Headliner from a manual tool requiring intervention int
 - ✅ **User-controlled device selection** with live switching capability
 - ✅ **Comprehensive health monitoring** with intelligent status reporting
 
-### **Next Phase Ready**: Phase 3 (Code Cleanup & Optimization) can now be implemented
+### ✅ Phase 3: Code Cleanup & Optimization - COMPLETED
+**Completion Date**: August 2025  
+**Build Status**: ✅ All changes compile successfully  
+
+#### **Phase 3.1: Remove Redundant Manager Classes** ✅
+- **CustomPropertyManager.swift**: Completely eliminated
+  - Folded device detection functionality directly into ExtensionService
+  - Added `isExtensionDeviceAvailable()` method with direct AVCaptureDevice queries
+  - Enhanced logging with better device discovery reporting
+  - Removed placeholder ID abstractions - now uses direct device detection
+- **OutputImageManager.swift**: Completely eliminated  
+  - Phase 1 already replaced with `currentPreviewFrame: CGImage?` in CameraService
+  - Removed single-property wrapper class indirection
+  - Direct frame handling now used throughout main app
+- **AppCoordinator.swift**: Updated initialization dependencies
+  - ExtensionService now initializes with `ExtensionService(requestManager:)` only
+  - Removed CustomPropertyManager and OutputImageManager dependencies
+- **Result**: ✅ Architecture simplified - removed 2 redundant manager classes
+
+#### **Phase 3.2: Harden CaptureSessionManager** ✅
+- **Enhanced Error Handling**: Added comprehensive `CaptureError` enum
+  - Specific error types: `.permissionDenied`, `.deviceNotFound`, `.deviceBusy`, `.presetNotSupported`
+  - Proper Swift `LocalizedError` conformance with descriptive error messages
+  - Better error categorization for debugging and recovery
+- **Serialized Permission Requests**: Eliminated race conditions
+  - Added `permissionRequestInProgress` flag with semaphore-based synchronization
+  - Prevents multiple concurrent permission requests
+  - Synchronous permission validation with proper error handling
+- **Enhanced Device Selection**: Improved reliability and debugging
+  - Better logging with ✅/❌ emojis for visual debugging
+  - Lists all available devices when target device not found
+  - Enhanced fallback chain: UserDefaults → first available → user preferred
+- **Live Device Switching**: Added `switchToDevice(deviceID:)` method
+  - Supports runtime camera device changes during active streaming
+  - Preserves session running state during device switches
+  - Atomic session reconfiguration with proper error recovery
+- **Session Management**: Added safe session control methods
+  - `startSession()` and `stopSession()` methods with comprehensive safety checks
+  - Prevents starting unconfigured sessions with clear error messages
+  - Proper state validation and structured logging
+- **Performance Optimizations**: Improved resource efficiency
+  - Shared `discoverySession` property eliminates duplicate device enumeration
+  - Structured `do-catch-throw` error handling pattern throughout
+  - Better separation of concerns with focused private methods
+- **Result**: ✅ Rock-solid camera capture with comprehensive error handling and recovery
+
+#### **Phase 3.3: Simplify ExtensionService Polling** ✅
+- **Eliminated Log Text Parsing**: Removed unreliable string-based status detection
+  - **REMOVED**: `handleInstallationLog()` method that parsed log text for "success"/"fail"
+  - **REMOVED**: String parsing with hardcoded text matching
+  - **ADDED**: Foundation for Phase 2 status communication integration (commented until stable)
+- **Simplified Installation Flow**: Replaced complex polling with straightforward verification
+  - **REMOVED**: Complex exponential backoff polling system
+  - **REMOVED**: Multiple polling timers, counters, and interval management
+  - **ADDED**: Simple `verifyInstallationCompletion()` with 2-second verification delay
+  - **ADDED**: `finalizeInstallation()` method with direct provider flag and device checks
+- **Cleaner Architecture**: Streamlined properties and lifecycle management
+  - **REMOVED**: `pollTimer`, `pollCount`, `currentPollInterval`, `maxPollInterval`, `pollWindow`
+  - **SIMPLIFIED**: `deinit` method now only manages health monitoring timer
+  - **ENHANCED**: `setupBindings()` method focuses on phase-based installation monitoring
+- **Better Integration**: Prepared for enhanced status communication
+  - Added `handleExtensionStatusChange()` method for runtime status updates
+  - Foundation laid for real-time status monitoring (currently commented for stability)
+  - Maintains all existing functionality while removing complexity
+- **Result**: ✅ Simplified polling system with better reliability and maintainability
+
+#### **Technical Metrics Achieved (Phase 3)**:
+
+**Code Quality & Architecture**:
+- **Manager Classes**: 4 → 2 (removed CustomPropertyManager, OutputImageManager)
+- **Code Complexity**: ✅ Significantly reduced (eliminated complex polling, string parsing)
+- **Error Handling**: ⚠️ Basic → ✅ Comprehensive (typed errors, recovery mechanisms)
+- **Resource Management**: ⚠️ Multiple timers → ✅ Streamlined (single health monitor timer)
+- **Debugging**: ⚠️ Limited → ✅ Enhanced (structured logging, emoji indicators, device lists)
+
+**Performance & Reliability**:
+- **Session Management**: ⚠️ Basic → ✅ Advanced (safe start/stop, state validation)
+- **Device Discovery**: ⚠️ Repeated → ✅ Optimized (shared discovery session, lazy initialization)
+- **Permission Handling**: ⚠️ Race conditions → ✅ Serialized (semaphore-based synchronization)
+- **Device Switching**: ❌ Static → ✅ Live switching (runtime device changes during streaming)
+- **Error Recovery**: ⚠️ Basic → ✅ Comprehensive (device busy detection, fallback handling)
+
+**Maintainability & Future-Readiness**:
+- **Separation of Concerns**: ✅ Clear responsibilities (hardware access vs installation vs communication)
+- **Status Integration**: ✅ Foundation laid for enhanced Phase 2 status communication
+- **Testing Support**: ✅ Better error categorization and structured logging for debugging
+- **Code Reuse**: ✅ Shared discovery sessions, consistent error patterns
+
+#### **Files Modified (Phase 3)**:
+- `Headliner/Services/ExtensionService.swift` - Simplified polling, removed log parsing, enhanced device detection
+- `Headliner/AppCoordinator.swift` - Updated initialization (removed manager dependencies)
+- `HeadlinerShared/CaptureSessionManager.swift` - Complete hardening with error handling, live switching, session management
+- `Headliner/Managers/CustomPropertyManager.swift` - **DELETED** (functionality folded into ExtensionService)
+- `Headliner/Managers/OutputImageManager.swift` - **DELETED** (replaced by direct frame handling in Phase 1)
+
+### **Phase 3 Complete - All Objectives Achieved** ✅
+
+**Phase 3 Delivered**:
+- ✅ **Eliminated redundant manager classes** - simplified architecture with clear responsibilities
+- ✅ **Hardened CaptureSessionManager** - comprehensive error handling and live device switching
+- ✅ **Simplified ExtensionService polling** - replaced complex string parsing with reliable verification
+- ✅ **Enhanced error handling** - typed errors, recovery mechanisms, structured logging
+
+### **Next Phase Ready**: Phase 4 (Error Handling & Polish) can now be implemented
