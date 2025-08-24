@@ -80,25 +80,34 @@ final class ExtensionService: ObservableObject {
   func checkStatus() {
     logger.debug("Checking extension status...")
     
-    // Fast check via provider flag
-    if isProviderReady {
-      status = .installed
-      statusMessage = "Extension is installed and ready"
-      logger.debug("Extension ready via provider flag")
-      startHealthMonitoring()
-      return
-    }
+    // More robust detection - check both flags and device presence
+    let providerReady = isProviderReady
+    let deviceAvailable = isExtensionDeviceAvailable()
     
-    // Fallback to device scan
-    if isExtensionDeviceAvailable() {
+    logger.debug("Status check: providerReady=\(providerReady), deviceAvailable=\(deviceAvailable)")
+    
+    // Only consider installed if BOTH provider is ready AND device is available
+    if providerReady && deviceAvailable {
       status = .installed
       statusMessage = "Extension is installed and ready"
+      logger.debug("✅ Extension confirmed installed (provider + device)")
       startHealthMonitoring()
-      logger.debug("Extension detected via device scan")
+    } else if providerReady && !deviceAvailable {
+      // Provider flag set but no device - possible stale state
+      status = .notInstalled
+      statusMessage = "Extension needs to be reinstalled"
+      logger.debug("⚠️ Provider flag set but no device found - clearing stale state")
+      clearProviderFlag()
+    } else if !providerReady && deviceAvailable {
+      // Device exists but no provider flag - extension may be initializing
+      status = .installing
+      statusMessage = "Extension found, checking readiness..."
+      logger.debug("⏳ Device found but provider not ready - extension may be starting")
     } else {
+      // Neither flag nor device - definitely not installed
       status = .notInstalled
       statusMessage = "Extension needs to be installed"
-      logger.debug("Extension not detected")
+      logger.debug("❌ Extension not detected")
     }
   }
   
@@ -114,6 +123,32 @@ final class ExtensionService: ObservableObject {
   }
   
   // MARK: - Private Methods
+  
+  /// Conservative status refresh on app activation - doesn't reset installed status
+  private func refreshStatusOnAppActivation() {
+    logger.debug("App became active - refreshing extension status...")
+    
+    // If already installed, just verify it's still working
+    if status == .installed {
+      let deviceAvailable = isExtensionDeviceAvailable()
+      let providerReady = isProviderReady
+      
+      if !deviceAvailable && !providerReady {
+        // Both checks failed - extension may have been uninstalled
+        logger.warning("⚠️ Extension appears to have been uninstalled - both device and provider checks failed")
+        status = .notInstalled
+        statusMessage = "Extension needs to be reinstalled"
+        stopHealthMonitoring()
+      } else {
+        // At least one check passed - keep installed status but update message
+        logger.debug("✅ Extension still available (device: \(deviceAvailable), provider: \(providerReady))")
+        statusMessage = "Extension is installed and ready"
+      }
+    } else {
+      // Not currently installed - do full check
+      checkStatus()
+    }
+  }
   
   private func setupBindings() {
     // Phase 3.2: Monitor installation progress via phases (more reliable than log parsing)
@@ -135,11 +170,11 @@ final class ExtensionService: ObservableObject {
       .store(in: &cancellables)
     */
     
-    // Recheck on app activation
+    // Recheck on app activation (but don't reset if already installed)
     NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)
       .receive(on: DispatchQueue.main)
       .sink { [weak self] _ in
-        self?.checkStatus()
+        self?.refreshStatusOnAppActivation()
       }
       .store(in: &cancellables)
   }
@@ -282,6 +317,13 @@ final class ExtensionService: ObservableObject {
       .bool(forKey: Keys.extensionProviderReady) ?? false
   }
   
+  /// Clear stale provider flag when device is not available
+  private func clearProviderFlag() {
+    UserDefaults(suiteName: Identifiers.appGroup)?
+      .removeObject(forKey: Keys.extensionProviderReady)
+    logger.debug("🧹 Cleared stale provider flag")
+  }
+  
   var isInstalled: Bool {
     status == .installed
   }
@@ -293,6 +335,13 @@ final class ExtensionService: ObservableObject {
   // MARK: - Private Extension Detection
   
   private func isExtensionDeviceAvailable() -> Bool {
+    // Refresh the discovery session to ensure we have latest devices
+    discoverySession = AVCaptureDevice.DiscoverySession(
+      deviceTypes: [.builtInWideAngleCamera, .external, .continuityCamera, .deskViewCamera],
+      mediaType: .video,
+      position: .unspecified
+    )
+    
     let headlinerDevice = discoverySession.devices.first {
       $0.localizedName.contains("Headliner")
     }

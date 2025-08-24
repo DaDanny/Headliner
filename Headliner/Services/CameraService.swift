@@ -70,7 +70,8 @@ final class CameraService: NSObject, ObservableObject {
   
   override init() {
     super.init()
-    loadSavedCameraSelection()
+    // Don't load saved camera selection here - wait until cameras are discovered
+    // This prevents the "Saved camera device not found" error on startup
     // No longer setup capture session immediately - lazy initialization
   }
   
@@ -129,14 +130,27 @@ final class CameraService: NSObject, ObservableObject {
     switchStartTime = Date()
     selectedCamera = camera
     
+    logger.debug("📷 Selecting camera: \(camera.name) (ID: \(camera.id))")
+    
     // Save selection to both local and app group UserDefaults
     userDefaults.set(camera.id, forKey: Keys.selectedCameraID)
     if let appGroupDefaults = UserDefaults(suiteName: Identifiers.appGroup) {
       appGroupDefaults.set(camera.id, forKey: Keys.selectedCameraID)
-      logger.debug("Saved camera selection to app group: \(camera.name)")
+      appGroupDefaults.synchronize() // Ensure immediate write
+      logger.debug("✅ Saved camera selection to app group: \(camera.name) (ID: \(camera.id))")
+      
+      // Verify the write was successful
+      if let savedID = appGroupDefaults.string(forKey: Keys.selectedCameraID) {
+        logger.debug("✅ Verified camera selection saved: \(savedID)")
+      } else {
+        logger.error("❌ Failed to verify camera selection save")
+      }
       
       // Notify extension of camera device change
       notificationManager.postNotification(named: .setCameraDevice)
+      logger.debug("📡 Sent setCameraDevice notification to extension")
+    } else {
+      logger.error("❌ Failed to access app group UserDefaults")
     }
     
     statusMessage = "Selected camera: \(camera.name)"
@@ -149,6 +163,7 @@ final class CameraService: NSObject, ObservableObject {
     
     // Restart camera if currently running to apply device change
     if cameraStatus == .running {
+      logger.debug("🔄 Restarting camera to apply device change")
       stopCamera()
       try? await Task.sleep(nanoseconds: 2_000_000_000)
       try? await startCamera()
@@ -207,8 +222,16 @@ final class CameraService: NSObject, ObservableObject {
       userDefaults.set(first.id, forKey: Keys.selectedCameraID)
       if let appGroupDefaults = UserDefaults(suiteName: Identifiers.appGroup) {
         appGroupDefaults.set(first.id, forKey: Keys.selectedCameraID)
-        logger.debug("Saved default camera selection to app group: \(first.name)")
+        appGroupDefaults.synchronize() // Ensure immediate write
+        logger.debug("✅ Saved default camera selection to app group: \(first.name) (ID: \(first.id))")
       }
+    }
+    
+    // Log final camera selection state
+    if let selected = selectedCamera {
+      logger.debug("📷 Final camera selection: \(selected.name) (ID: \(selected.id))")
+    } else {
+      logger.warning("⚠️ No camera selected after loading available cameras")
     }
   }
   
@@ -284,9 +307,10 @@ final class CameraService: NSObject, ObservableObject {
   private func restoreSelectedCamera(withID deviceID: String) {
     if let matchingCamera = availableCameras.first(where: { $0.id == deviceID }) {
       selectedCamera = matchingCamera
-      logger.debug("Restored camera selection: \(matchingCamera.name)")
+      logger.debug("✅ Restored camera selection: \(matchingCamera.name) (ID: \(deviceID))")
     } else {
-      logger.debug("Saved camera device not found in available cameras: \(deviceID)")
+      logger.warning("⚠️ Saved camera device not found in available cameras: \(deviceID)")
+      logger.debug("Available cameras: \(self.availableCameras.map { "\($0.name) (\($0.id))" }.joined(separator: ", "))")
       // selectedCamera remains nil, will be set to default in loadAvailableCameras
     }
   }

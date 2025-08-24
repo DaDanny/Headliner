@@ -68,8 +68,8 @@ class CameraExtensionDeviceSource: NSObject, CMIOExtensionDeviceSource, AVCaptur
 	
 	// Camera capture components - using shared CaptureSessionManager
 	private var captureSessionManager: CaptureSessionManager?
-	// UNUSED: Legacy camera device reference - can be removed
-	private var selectedCameraDevice: AVCaptureDevice?
+	// Device selection tracking for proper initialization
+	private var selectedCameraDeviceID: String?
 	
 	// Overlay settings
 	private var overlaySettings: OverlaySettings = OverlaySettings()
@@ -278,12 +278,20 @@ class CameraExtensionDeviceSource: NSObject, CMIOExtensionDeviceSource, AVCaptur
 		// Phase 2: Report status to main app
 		ExtensionStatusManager.writeStatus(.starting)
 		
-		// Lazy initialization: setup capture session on first use
-		if captureSessionManager == nil {
-			print("🔧 [Camera Extension] First camera start - initializing capture session...")
-			extensionLogger.debug("Lazy initializing capture session on first camera start")
-			setupCaptureSession()
+			// Lazy initialization: setup capture session on first use
+	if captureSessionManager == nil {
+		print("🔧 [Camera Extension] First camera start - initializing capture session...")
+		extensionLogger.debug("Lazy initializing capture session on first camera start")
+		
+		// Check if we have a stored device selection before initializing
+		if let userDefaults = UserDefaults(suiteName: Identifiers.appGroup),
+		   let deviceID = userDefaults.string(forKey: ExtensionStatusKeys.selectedDeviceID) {
+			extensionLogger.debug("📷 Found stored device selection: \(deviceID) - will apply during initialization")
+			selectedCameraDeviceID = deviceID
 		}
+		
+		setupCaptureSession()
+	}
 		
 		if let manager = captureSessionManager, manager.configured {
 			print("✅ [Camera Extension] CaptureSessionManager is configured")
@@ -805,29 +813,52 @@ class CameraExtensionDeviceSource: NSObject, CMIOExtensionDeviceSource, AVCaptur
 					kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA
 				]
 				videoOutput.alwaysDiscardsLateVideoFrames = true
-				print("✅ [Camera Extension] Video output configured for virtual camera")
-			}
-		} else {
-			print("❌ [Camera Extension] Failed to configure CaptureSessionManager")
-			extensionLogger.error("Failed to configure CaptureSessionManager for Camera Extension")
+							print("✅ [Camera Extension] Video output configured for virtual camera")
 		}
+		
+		// If we have a stored device ID, verify it's applied to the new capture session
+		if let deviceID = selectedCameraDeviceID {
+			extensionLogger.debug("Verifying stored device selection: \(deviceID) in new capture session")
+			if let input = manager.captureSession.inputs.first as? AVCaptureDeviceInput {
+				extensionLogger.debug("Capture session configured with device: \(input.device.localizedName) (ID: \(input.device.uniqueID))")
+				if input.device.uniqueID == deviceID {
+					extensionLogger.debug("✅ Device selection correctly applied to capture session")
+				} else {
+					extensionLogger.warning("⚠️ Device selection mismatch - expected: \(deviceID), got: \(input.device.uniqueID)")
+				}
+			}
+		}
+	} else {
+		print("❌ [Camera Extension] Failed to configure CaptureSessionManager")
+		extensionLogger.error("Failed to configure CaptureSessionManager for Camera Extension")
+	}
 	}
 	
-	// UNUSED: Legacy camera device selection method - can be removed
+	// Enhanced device selection method with better error handling and fallback
 	func setCameraDevice(_ deviceID: String) {
 		print("📷 [Camera Extension] Setting camera device to: \(deviceID)")
 		extensionLogger.debug("Setting camera device to: \(deviceID)")
+		
+		// Store the selected device ID for when capture session initializes
+		selectedCameraDeviceID = deviceID
 		
 		// Phase 2.3: Enhanced device switching with live camera reconfiguration
 		if let manager = captureSessionManager {
 			// If camera is currently running, perform live device switch
 			if manager.captureSession.isRunning {
 				extensionLogger.debug("Performing live camera device switch during streaming")
+				
+				// Manual configuration for better control and debugging
 				manager.captureSession.beginConfiguration()
 				
 				// Remove existing camera input
 				if let currentInput = manager.captureSession.inputs.first {
 					manager.captureSession.removeInput(currentInput)
+					if let deviceInput = currentInput as? AVCaptureDeviceInput {
+						extensionLogger.debug("Removed existing camera input: \(deviceInput.device.localizedName)")
+					} else {
+						extensionLogger.debug("Removed existing camera input")
+					}
 				}
 				
 				// Add new camera input
@@ -843,6 +874,14 @@ class CameraExtensionDeviceSource: NSObject, CMIOExtensionDeviceSource, AVCaptur
 				} else {
 					manager.captureSession.commitConfiguration()
 					extensionLogger.error("❌ Failed to switch to device: \(deviceID)")
+					
+					// Enhanced error reporting
+					if let newDevice = findDeviceByID(deviceID) {
+						extensionLogger.error("Device found but input creation failed: \(newDevice.localizedName)")
+					} else {
+						extensionLogger.error("Device not found: \(deviceID)")
+					}
+					
 					ExtensionStatusManager.writeStatus(.error, error: "Failed to switch camera device")
 				}
 			} else {
@@ -1261,7 +1300,7 @@ class CameraExtensionProviderSource: NSObject, CMIOExtensionProviderSource {
             extensionLogger.debug("App requesting camera stream stop")
             deviceSource.stopAppControlledStreaming()
         case .setCameraDevice:
-            extensionLogger.debug("Camera device selection changed")
+            extensionLogger.debug("📡 Camera device selection changed - processing notification")
             handleCameraDeviceChange()
         case .updateOverlaySettings:
             extensionLogger.debug("🎨 Overlay settings changed - updating now")
@@ -1313,8 +1352,21 @@ class CameraExtensionProviderSource: NSObject, CMIOExtensionProviderSource {
         // Read camera device ID from UserDefaults
         if let userDefaults = UserDefaults(suiteName: Identifiers.appGroup),
            let deviceID = userDefaults.string(forKey: ExtensionStatusKeys.selectedDeviceID) {
-            extensionLogger.debug("Setting camera device to: \(deviceID)")
-            deviceSource.setCameraDevice(deviceID)
+            extensionLogger.debug("📡 Camera device change notification - setting device to: \(deviceID)")
+            
+            // Add a small delay to ensure UserDefaults are fully written
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                // Re-read to ensure we have the latest value
+                if let latestDeviceID = userDefaults.string(forKey: ExtensionStatusKeys.selectedDeviceID),
+                   latestDeviceID == deviceID {
+                    extensionLogger.debug("✅ Confirmed device selection: \(latestDeviceID)")
+                    self.deviceSource.setCameraDevice(latestDeviceID)
+                } else {
+                    extensionLogger.warning("⚠️ Device ID changed during processing - expected: \(deviceID)")
+                }
+            }
+        } else {
+            extensionLogger.warning("⚠️ No device ID found in UserDefaults for camera change")
         }
     }
 }

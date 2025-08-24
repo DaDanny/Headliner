@@ -9,7 +9,7 @@
 //  Re-enable after migration complete by removing #if false wrapper.
 //
 
-#if false // 🚧 DISABLED DURING BIG BANG MIGRATION - RE-ENABLE LATER
+// Re-enabled for updated architecture integration
 
 import SwiftUI
 import CoreLocation
@@ -31,11 +31,23 @@ enum OnboardingStep: Int, CaseIterable {
 }
 
 struct OnboardingView: View {
-  @ObservedObject var appState: AppState
+  let appCoordinator: AppCoordinator
+  let onComplete: (() -> Void)?
+  
+  @EnvironmentObject private var extensionService: ExtensionService
+  @EnvironmentObject private var cameraService: CameraService
+  @EnvironmentObject private var overlayService: OverlayService
+  @EnvironmentObject private var locationManager: LocationPermissionManager
+  
   @State private var currentStep: OnboardingStep = .welcome
   @State private var hasInitialized = false
   @State private var selectedCameraID: String = ""
   @State private var selectedPresetId: String = "professional"
+  
+  init(appCoordinator: AppCoordinator, onComplete: (() -> Void)? = nil) {
+    self.appCoordinator = appCoordinator
+    self.onComplete = onComplete
+  }
 
   var body: some View {
     VStack(spacing: 0) {
@@ -53,19 +65,19 @@ struct OnboardingView: View {
             nextStep()
           }
         case .installExtension:
-          ExtensionStepView(appState: appState) {
+          ExtensionStepView(appCoordinator: appCoordinator) {
             nextStep()
           }
         case .cameraSetup:
           CameraSetupStepView(
-            appState: appState,
+            appCoordinator: appCoordinator,
             selectedCameraID: $selectedCameraID,
             selectedPresetId: $selectedPresetId
           ) {
             nextStep()
           }
         case .personalization:
-          PersonalizationStepView(appState: appState) {
+          PersonalizationStepView(appCoordinator: appCoordinator) {
             completeOnboarding()
           }
         }
@@ -75,7 +87,7 @@ struct OnboardingView: View {
     .background(Color(NSColor.windowBackgroundColor))
     .onAppear {
       if !hasInitialized {
-        appState.initializeForUse()
+        appCoordinator.initializeApp()
         hasInitialized = true
       }
     }
@@ -94,16 +106,25 @@ struct OnboardingView: View {
   private func completeOnboarding() {
     // Apply selected camera and preset
     if !selectedCameraID.isEmpty {
-      if let camera = appState.availableCameras.first(where: { $0.id == selectedCameraID }) {
-        appState.selectCamera(camera)
+      if let camera = cameraService.availableCameras.first(where: { $0.id == selectedCameraID }) {
+        appCoordinator.selectCamera(camera)
       }
     }
     
     // Convert "clean" to "none" to match the system's preset naming
     let systemPresetId = selectedPresetId == "clean" ? "none" : selectedPresetId
-    appState.selectPreset(systemPresetId)
+    appCoordinator.selectOverlayPreset(systemPresetId)
     
-    // Onboarding complete - ContentView will switch to MainAppView
+    // Mark onboarding as complete
+    UserDefaults.standard.set(true, forKey: "OnboardingCompleted")
+    
+    // Call completion handler if provided (for app-level state management)
+    if let onComplete = onComplete {
+      onComplete()
+    } else {
+      // Fallback to old approach
+      appCoordinator.completeOnboarding()
+    }
   }
 }
 
@@ -324,16 +345,18 @@ private struct FeatureRow: View {
 // MARK: - Step 2: Extension Installation
 
 struct ExtensionStepView: View {
-  @ObservedObject var appState: AppState
+  let appCoordinator: AppCoordinator
   let onContinue: () -> Void
+  
+  @EnvironmentObject private var extensionService: ExtensionService
 
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
   @State private var isAnimating = false
   @State private var showSteps = false
 
   // Derived state
-  private var isInstalling: Bool { appState.extensionStatus == .installing }
-  private var isInstalled: Bool { appState.extensionStatus.isInstalled }
+  private var isInstalling: Bool { extensionService.status == .installing }
+  private var isInstalled: Bool { extensionService.status == .installed }
   
   private var canContinue: Bool { isInstalled }
 
@@ -467,7 +490,7 @@ struct ExtensionStepView: View {
             }
           } else {
             ModernButton("Install Extension", style: .primary) {
-              appState.installExtension()
+              appCoordinator.installExtension()
             }
             .keyboardShortcut(.defaultAction)
             .disabled(isInstalling)
@@ -476,8 +499,8 @@ struct ExtensionStepView: View {
           }
 
           // Status message
-          if !appState.statusMessage.isEmpty {
-            Text(appState.statusMessage)
+          if !extensionService.statusMessage.isEmpty {
+            Text(extensionService.statusMessage)
               .font(.footnote)
               .foregroundStyle(.secondary)
               .multilineTextAlignment(.center)
@@ -558,11 +581,12 @@ private struct InstallationStep: View {
 // MARK: - Step 3: Camera Setup
 
 struct CameraSetupStepView: View {
-  @ObservedObject var appState: AppState
+  let appCoordinator: AppCoordinator
   @Binding var selectedCameraID: String
   @Binding var selectedPresetId: String
   let onContinue: () -> Void
   
+  @EnvironmentObject private var cameraService: CameraService
   @State private var isAnimating = false
   
   var body: some View {
@@ -605,7 +629,7 @@ struct CameraSetupStepView: View {
       // Content Container - Left aligned with consistent width
       VStack(alignment: .leading, spacing: 32) {
         // Camera Selection (if permission granted)
-        if appState.hasCameraPermission {
+        if cameraService.hasCameraPermission {
           VStack(alignment: .leading, spacing: 16) {
             Text("Camera Device")
               .font(.system(size: 18, weight: .semibold))
@@ -621,7 +645,7 @@ struct CameraSetupStepView: View {
           // Camera Permission Request
           CameraPermissionView(onRequestPermission: {
             Task {
-              _ = await appState.requestCameraPermission()
+              _ = await cameraService.requestPermission()
             }
           })
             .opacity(isAnimating ? 1.0 : 0.0)
@@ -761,9 +785,10 @@ private struct CameraPermissionView: View {
 // MARK: - Step 4: Personalization
 
 struct PersonalizationStepView: View {
-  @ObservedObject var appState: AppState
+  let appCoordinator: AppCoordinator
   let onContinue: () -> Void
   
+  @EnvironmentObject private var locationManager: LocationPermissionManager
   @State private var isAnimating = false
   
   var body: some View {
@@ -802,7 +827,7 @@ struct PersonalizationStepView: View {
              // Content Container - Centered with fixed width
        VStack(spacing: 28) {
          // Personal Info Section
-         PersonalInfoView(appState: appState)
+         PersonalInfoView()
            .background(
              RoundedRectangle(cornerRadius: 10)
                .fill(Color(NSColor.controlBackgroundColor))
@@ -814,7 +839,7 @@ struct PersonalizationStepView: View {
          
          // Location Services Section
          LocationInfoView(
-           appState: appState,
+           coordinator: appCoordinator,
            showHeader: false,
            showInfoSection: false,
            showRefreshButton: false
@@ -865,8 +890,9 @@ struct PersonalizationStepView: View {
 
 #if DEBUG
 
-// MARK: - Preview-Only Mock AppState
+// MARK: - Preview-Only Mock - Disabled for new architecture
 
+/*
 private class PreviewAppState: AppState {
   override init(
     systemExtensionManager: SystemExtensionRequestManager = SystemExtensionRequestManager(logText: "Preview"),
@@ -1165,6 +1191,8 @@ struct OverlayPresetCardPreview: PreviewProvider {
   }
 }
 
+*/
+
 #endif
 
-#endif // 🚧 END DISABLED SECTION - Re-enable after Big Bang Migration complete
+// End OnboardingView implementation
