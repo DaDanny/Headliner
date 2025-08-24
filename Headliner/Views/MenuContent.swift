@@ -90,6 +90,7 @@ struct MainMenuView: View {
   @EnvironmentObject private var extensionService: ExtensionService
   @EnvironmentObject private var overlayService: OverlayService
   @Environment(\.openURL) private var openURL
+  @Environment(\.openWindow) private var openWindow
   @Binding var showingPreview: Bool
   let navigateTo: (MenuDestination) -> Void
   
@@ -119,7 +120,7 @@ struct MainMenuView: View {
         .padding(.horizontal)
         .padding(.vertical, 8)
       }
-      .frame(maxHeight: 400) // Prevent excessive height
+      .frame(minHeight: 400, maxHeight: 480) // Ensure minimum spacious height with reasonable max
     }
   }
   
@@ -186,19 +187,39 @@ struct MainMenuView: View {
       }
       .buttonStyle(PlainButtonStyle())
       
-      // Show error message if extension not installed
+      // Show actionable message if extension not installed
       if extensionService.status != .installed {
-        HStack(spacing: 8) {
-          Image(systemName: "exclamationmark.triangle.fill")
-            .foregroundColor(.orange)
-            .font(.caption)
+        VStack(spacing: 8) {
+          HStack(spacing: 8) {
+            Image(systemName: "exclamationmark.triangle.fill")
+              .foregroundColor(.orange)
+              .font(.caption)
+            
+            Text("Extension not installed")
+              .font(.caption)
+              .foregroundColor(.secondary)
+              .multilineTextAlignment(.leading)
+            
+            Spacer()
+          }
           
-          Text("Extension not installed - launch main app first")
-            .font(.caption)
-            .foregroundColor(.secondary)
-            .multilineTextAlignment(.leading)
-          
-          Spacer()
+          // Action button to launch onboarding
+          Button(action: {
+            launchOnboarding()
+          }) {
+            HStack(spacing: 6) {
+              Image(systemName: "gear")
+                .font(.system(size: 12, weight: .medium))
+              Text("Install Extension")
+                .font(.system(size: 12, weight: .medium))
+            }
+            .foregroundColor(.white)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 6)
+            .background(Color.orange)
+            .cornerRadius(6)
+          }
+          .buttonStyle(PlainButtonStyle())
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
@@ -333,6 +354,19 @@ struct MainMenuView: View {
       
       Divider()
       
+      #if DEBUG
+      // Debug section - only in debug builds
+      InteractiveMenuButton(
+        icon: "trash.fill",
+        title: "🛠 Reset App State (Debug)",
+        action: { 
+          resetAppState()
+        }
+      )
+      
+      Divider()
+      #endif
+      
       // Quit button
       InteractiveMenuButton(
         icon: "power",
@@ -341,6 +375,56 @@ struct MainMenuView: View {
       )
     }
   }
+  
+  // MARK: - Debug Functions
+  
+  // MARK: - Action Functions
+  
+  /// Launch the onboarding window to install the extension
+  private func launchOnboarding() {
+    // Use the OnboardingWindowManager to prevent duplicate windows
+    appCoordinator.onboardingManager.showOnboarding(appCoordinator: appCoordinator)
+    
+    // Clear onboarding completion flag so user can go through flow again
+    if let appGroupDefaults = UserDefaults(suiteName: Identifiers.appGroup) {
+      appGroupDefaults.removeObject(forKey: "HL.hasCompletedOnboarding")
+      appGroupDefaults.synchronize()
+    }
+    
+    // Clear local onboarding completion flag
+    UserDefaults.standard.removeObject(forKey: "OnboardingCompleted")
+    
+    print("🛠 [DEBUG] App state reset - onboarding will show")
+  }
+  
+  #if DEBUG
+  /// Reset app state for debugging - clears UserDefaults and related state
+  private func resetAppState() {
+    // Clear App Group UserDefaults
+    if let appGroupDefaults = UserDefaults(suiteName: Identifiers.appGroup) {
+      // Clear onboarding completion flag
+      appGroupDefaults.removeObject(forKey: "HL.hasCompletedOnboarding")
+      
+      // Clear any other app group settings
+      appGroupDefaults.removeObject(forKey: "ExtensionProviderReady")
+      appGroupDefaults.removeObject(forKey: "SelectedCameraDeviceID")
+      
+      appGroupDefaults.synchronize()
+    }
+    
+    // Clear standard UserDefaults (in case there are any legacy settings)
+    UserDefaults.standard.removeObject(forKey: "OnboardingCompleted")
+    UserDefaults.standard.synchronize()
+    
+    // Optional: You could also reset other state here
+    // For example: clear selected camera, reset overlay settings, etc.
+    
+    print("🛠 [DEBUG] App state reset - onboarding will show on next launch")
+    
+    // Optional: Show a brief confirmation
+    // Since we're in a menu, we could add a subtle animation or log message
+  }
+  #endif
 }
 
 // MARK: - Preview Popover Component
@@ -349,6 +433,7 @@ struct MainMenuView: View {
 private struct PreviewPopover: View {
   let appCoordinator: AppCoordinator
   @EnvironmentObject private var cameraService: CameraService
+  @EnvironmentObject private var overlayService: OverlayService
   
   var body: some View {
     VStack(spacing: 6) {
@@ -356,16 +441,18 @@ private struct PreviewPopover: View {
         .font(.system(size: 13, weight: .medium))
         .foregroundColor(.primary)
       
-      // Use CameraPreviewCard for all the overlay functionality
-      // TODO: Update CameraPreviewCard to work with new architecture
-      Text("Camera preview placeholder")
-        .foregroundColor(.secondary)
+      // Use CameraPreviewCard with new self-preview architecture
+      CameraPreviewCard(
+        previewImage: cameraService.currentPreviewFrame,
+        isActive: cameraService.cameraStatus == .running,
+        overlayService: overlayService
+      )
       .frame(height: 180) // Compact height for popover
       .scaleEffect(0.9) // Slightly less aggressive scaling
       .clipped() // Prevent any overflow/bleeding
       
       if cameraService.selectedCamera != nil && !cameraService.availableCameras.isEmpty {
-        Text("Camera preview with overlay")
+        Text("Self-preview: exactly what Google Meet sees")
           .font(.system(size: 10))
           .foregroundColor(.secondary)
       } else {

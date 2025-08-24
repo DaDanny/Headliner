@@ -25,6 +25,9 @@ final class AppCoordinator {
   // MARK: - Services (for view injection)
   // Views observe these directly, not the coordinator
   
+  // MARK: - Onboarding
+  let onboardingManager = OnboardingWindowManager()
+  
   // MARK: - Shared utilities  
   let themeManager = ThemeManager()
   
@@ -36,20 +39,13 @@ final class AppCoordinator {
   // MARK: - Initialization
   
   init() {
-    let captureManager = CaptureSessionManager(capturingHeadliner: false)
-    let outputManager = OutputImageManager()
     let extensionRequestManager = SystemExtensionRequestManager(logText: "")
-    let propertyManager = CustomPropertyManager()
     
-    // Initialize services
-    self.camera = CameraService(
-      captureSessionManager: captureManager,
-      outputImageManager: outputManager
-    )
+    // Initialize services with simplified architecture
+    self.camera = CameraService() // No longer needs capture session manager
     
     self.extensionService = ExtensionService(
-      requestManager: extensionRequestManager,
-      propertyManager: propertyManager
+      requestManager: extensionRequestManager
     )
     
     self.overlay = OverlayService()
@@ -68,7 +64,17 @@ final class AppCoordinator {
     analytics.trackAppLaunch()
     
     // Check extension status
+    logger.debug("🔧 Checking extension status...")
     extensionService.checkStatus()
+    logger.debug("🔧 Extension status after check: \(String(describing: self.extensionService.status))")
+    
+    // Show onboarding if needed (handled by SwiftUI WindowGroup in HeadlinerApp)
+    logger.debug("🔧 Evaluating if onboarding is needed...")
+    if needsOnboarding {
+      logger.debug("✅ Onboarding needed - extension not installed or first run")
+    } else {
+      logger.debug("❌ Onboarding not needed - extension installed and onboarding completed")
+    }
     
     // Load cameras if we have permission
     if camera.hasCameraPermission {
@@ -174,6 +180,25 @@ final class AppCoordinator {
   /// Quit the application
   func quitApp() {
     NSApplication.shared.terminate(nil)
+  }
+  
+  // MARK: - Onboarding
+  
+  /// Whether the app needs to show onboarding
+  var needsOnboarding: Bool {
+    let isExtensionInstalled = extensionService.isInstalled
+    let hasCompletedOnboarding = UserDefaults(suiteName: Identifiers.appGroup)?.bool(forKey: "HL.hasCompletedOnboarding") ?? false
+    let needsOnboarding = !isExtensionInstalled || !hasCompletedOnboarding
+    
+    logger.debug("🔍 Onboarding check: status=\(String(describing: self.extensionService.status)), isExtensionInstalled=\(isExtensionInstalled), onboardingCompleted=\(hasCompletedOnboarding), needsOnboarding=\(needsOnboarding)")
+    
+    return needsOnboarding
+  }
+  
+  /// Mark onboarding as complete 
+  func completeOnboarding() {
+    UserDefaults(suiteName: Identifiers.appGroup)?.set(true, forKey: "HL.hasCompletedOnboarding")
+    logger.debug("✅ Onboarding marked as completed in App Group")
   }
   
   // MARK: - Private Methods

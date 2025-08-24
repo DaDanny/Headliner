@@ -27,7 +27,7 @@ protocol CameraServiceProtocol: ObservableObject {
 // MARK: - Implementation
 
 @MainActor
-final class CameraService: ObservableObject {
+final class CameraService: NSObject, ObservableObject {
   // MARK: - Published Properties
   
   @Published private(set) var availableCameras: [CameraDevice] = []
@@ -37,10 +37,16 @@ final class CameraService: ObservableObject {
   
   // MARK: - Dependencies
   
-  private let captureSessionManager: CaptureSessionManager
-  private let outputImageManager: OutputImageManager
+  // NOTE: Removed CaptureSessionManager - main app no longer captures directly
+  // Extension owns camera exclusively, app shows self-preview from virtual camera
+  private var selfPreviewCaptureSession: AVCaptureSession?
+  private var selfPreviewOutput: AVCaptureVideoDataOutput?
+  private let selfPreviewQueue = DispatchQueue(label: "com.headliner.selfpreview", qos: .userInitiated)
   private let notificationManager = NotificationManager.self
   private let logger = HeadlinerLogger.logger(for: .captureSession)
+  
+  // Direct frame handling (replaces OutputImageManager)
+  @Published private(set) var currentPreviewFrame: CGImage?
   
   // MARK: - Private Properties
   
@@ -57,18 +63,16 @@ final class CameraService: ObservableObject {
   // MARK: - Constants
   
   private enum Keys {
-    static let selectedCameraID = "SelectedCameraID"
+    static let selectedCameraID = ExtensionStatusKeys.selectedDeviceID // Use consistent key from ExtensionStatusKeys
   }
   
   // MARK: - Initialization
   
-  init(captureSessionManager: CaptureSessionManager,
-       outputImageManager: OutputImageManager) {
-    self.captureSessionManager = captureSessionManager
-    self.outputImageManager = outputImageManager
-    
-    loadSavedCameraSelection()
-    setupCaptureSession()
+  override init() {
+    super.init()
+    // Don't load saved camera selection here - wait until cameras are discovered
+    // This prevents the "Saved camera device not found" error on startup
+    // No longer setup capture session immediately - lazy initialization
   }
   
   // MARK: - Public Methods
@@ -80,24 +84,59 @@ final class CameraService: ObservableObject {
     
     guard cameraStatus != .running && cameraStatus != .starting else { return }
     
-    logger.debug("Starting camera...")
+    logger.debug("Starting camera and self-preview...")
     cameraStatus = .starting
     statusMessage = "Starting camera..."
     
-    // Notify extension
+    // Notify extension to start capturing from physical camera
     notificationManager.postNotification(named: .startStream)
     
-    // Start capture session
-    if !captureSessionManager.captureSession.isRunning {
-      captureSessionManager.captureSession.startRunning()
-      logger.debug("Started preview capture session")
-    }
+    // Start self-preview from virtual camera (shows exactly what Google Meet sees)
+    setupSelfPreviewFromVirtualCamera()
     
-    // Update status after brief delay
-    try await Task.sleep(nanoseconds: 1_000_000_000) // 1 second
+    // Wait for extension to start and virtual camera to be available
+    try await Task.sleep(nanoseconds: 2_000_000_000) // 2 seconds for extension startup
     cameraStatus = .running
     statusMessage = "Camera is running"
-    logger.debug("Camera status updated to running")
+    logger.debug("Camera and self-preview started")
+  }
+  
+  /// Start preview mode for onboarding - shows camera with overlays but doesn't affect main camera state
+  func startOnboardingPreview() async {
+    guard hasCameraPermission else { 
+      logger.debug("No camera permission for onboarding preview")
+      return 
+    }
+    
+    logger.debug("Starting onboarding preview...")
+    
+    // Notify extension to start capturing from physical camera
+    notificationManager.postNotification(named: .startStream)
+    
+    // Start self-preview from virtual camera to show user what they'll look like
+    setupSelfPreviewFromVirtualCamera()
+    
+    // Wait for extension to start
+    try? await Task.sleep(nanoseconds: 1_500_000_000) // 1.5 seconds for extension startup
+    logger.debug("Onboarding preview started")
+  }
+  
+  /// Stop onboarding preview
+  func stopOnboardingPreview() {
+    logger.debug("Stopping onboarding preview...")
+    
+    // Stop extension camera capture
+    notificationManager.postNotification(named: .stopStream)
+    
+    // Stop self-preview capture session
+    selfPreviewCaptureSession?.stopRunning()
+    selfPreviewCaptureSession = nil
+    selfPreviewOutput = nil
+    
+    // Clear current frame
+    currentPreviewFrame = nil
+    
+    logger.debug("Onboarding preview stopped")
   }
   
   func stopCamera() {
@@ -106,14 +145,15 @@ final class CameraService: ObservableObject {
     cameraStatus = .stopping
     statusMessage = "Stopping camera..."
     
+    // Stop extension camera capture
     notificationManager.postNotification(named: .stopStream)
     
-    if captureSessionManager.captureSession.isRunning {
-      captureSessionManager.captureSession.stopRunning()
-      logger.debug("Stopped preview capture session")
-    }
+    // Stop self-preview capture session
+    selfPreviewCaptureSession?.stopRunning()
+    logger.debug("Stopped self-preview capture session")
     
-    outputImageManager.videoExtensionStreamOutputImage = nil
+    // Clear current frame
+    currentPreviewFrame = nil
     
     Task {
       try? await Task.sleep(nanoseconds: 1_000_000_000)
@@ -128,17 +168,30 @@ final class CameraService: ObservableObject {
     switchStartTime = Date()
     selectedCamera = camera
     
-    // Save selection
+    logger.debug("📷 Selecting camera: \(camera.name) (ID: \(camera.id))")
+    
+    // Save selection to both local and app group UserDefaults
     userDefaults.set(camera.id, forKey: Keys.selectedCameraID)
     if let appGroupDefaults = UserDefaults(suiteName: Identifiers.appGroup) {
       appGroupDefaults.set(camera.id, forKey: Keys.selectedCameraID)
+      appGroupDefaults.synchronize() // Ensure immediate write
+      logger.debug("✅ Saved camera selection to app group: \(camera.name) (ID: \(camera.id))")
+      
+      // Verify the write was successful
+      if let savedID = appGroupDefaults.string(forKey: Keys.selectedCameraID) {
+        logger.debug("✅ Verified camera selection saved: \(savedID)")
+      } else {
+        logger.error("❌ Failed to verify camera selection save")
+      }
+      
+      // Notify extension of camera device change
       notificationManager.postNotification(named: .setCameraDevice)
+      logger.debug("📡 Sent setCameraDevice notification to extension")
+    } else {
+      logger.error("❌ Failed to access app group UserDefaults")
     }
     
     statusMessage = "Selected camera: \(camera.name)"
-    
-    // Update capture session
-    updateCaptureSession(with: camera.id)
     
     // Log performance
     if let startTime = switchStartTime {
@@ -146,8 +199,9 @@ final class CameraService: ObservableObject {
       logger.debug("📊 Camera switch completed in \(String(format: "%.2f", duration))s")
     }
     
-    // Restart if running
+    // Restart camera if currently running to apply device change
     if cameraStatus == .running {
+      logger.debug("🔄 Restarting camera to apply device change")
       stopCamera()
       try? await Task.sleep(nanoseconds: 2_000_000_000)
       try? await startCamera()
@@ -165,7 +219,7 @@ final class CameraService: ObservableObject {
           if granted {
             self?.logger.debug("Camera permission granted")
             self?.loadAvailableCameras()
-            self?.setupCaptureSession()
+            // No longer setup main app capture session - extension handles camera exclusively
           } else {
             self?.logger.error("Camera permission denied")
             self?.cameraStatus = .error(.cameraPermissionDenied)
@@ -195,67 +249,107 @@ final class CameraService: ObservableObject {
         )
       }
     
-    // Set default if needed
+    // Phase 2.3: Try to restore saved camera selection with newly loaded cameras
+    loadSavedCameraSelection()
+    
+    // Set default if needed (after trying to restore saved selection)
     if selectedCamera == nil, let first = availableCameras.first {
       selectedCamera = first
-      updateCaptureSession(with: first.id)
-    }
-  }
-  
-  private func setupCaptureSession() {
-    guard hasCameraPermission else {
-      logger.debug("No camera permission, skipping setup")
-      return
-    }
-    
-    guard captureSessionManager.configured else {
-      logger.warning("Failed to configure capture session")
-      statusMessage = "No suitable camera found for preview"
-      return
-    }
-    
-    captureSessionManager.videoOutput?.setSampleBufferDelegate(
-      outputImageManager,
-      queue: captureSessionManager.dataOutputQueue
-    )
-    
-    logger.debug("Capture session ready for use")
-  }
-  
-  private func updateCaptureSession(with deviceID: String) {
-    guard let device = discoverySession.devices.first(where: { $0.uniqueID == deviceID }) else {
-      logger.error("Camera device not found: \(deviceID)")
-      statusMessage = "Camera not found"
-      return
-    }
-    
-    captureSessionManager.captureSession.beginConfiguration()
-    
-    // Remove existing inputs
-    captureSessionManager.captureSession.inputs
-      .compactMap { $0 as? AVCaptureDeviceInput }
-      .filter { $0.device.hasMediaType(.video) }
-      .forEach { captureSessionManager.captureSession.removeInput($0) }
-    
-    // Add new input
-    do {
-      let input = try AVCaptureDeviceInput(device: device)
-      if captureSessionManager.captureSession.canAddInput(input) {
-        captureSessionManager.captureSession.addInput(input)
-        logger.debug("Updated capture session with: \(device.localizedName)")
+      
+      // Phase 2.3: Save default selection to UserDefaults so extension can use it
+      userDefaults.set(first.id, forKey: Keys.selectedCameraID)
+      if let appGroupDefaults = UserDefaults(suiteName: Identifiers.appGroup) {
+        appGroupDefaults.set(first.id, forKey: Keys.selectedCameraID)
+        appGroupDefaults.synchronize() // Ensure immediate write
+        logger.debug("✅ Saved default camera selection to app group: \(first.name) (ID: \(first.id))")
       }
-    } catch {
-      logger.error("Failed to create camera input: \(error)")
     }
     
-    captureSessionManager.captureSession.commitConfiguration()
+    // Log final camera selection state
+    if let selected = selectedCamera {
+      logger.debug("📷 Final camera selection: \(selected.name) (ID: \(selected.id))")
+    } else {
+      logger.warning("⚠️ No camera selected after loading available cameras")
+    }
   }
+  
+  // Self-preview setup: captures from virtual camera to show user exactly what Google Meet sees
+  private func setupSelfPreviewFromVirtualCamera() {
+    guard hasCameraPermission else {
+      logger.debug("No camera permission, skipping self-preview setup")
+      return
+    }
+    
+    // Find "Headliner" virtual camera device
+    let virtualCamera = discoverySession.devices.first { device in
+      device.localizedName.contains("Headliner")
+    }
+    
+    guard let virtualCamera = virtualCamera else {
+      logger.debug("Headliner virtual camera not found - extension may not be running")
+      return
+    }
+    
+    logger.debug("Found Headliner virtual camera: \(virtualCamera.localizedName)")
+    
+    // Setup capture session for self-preview
+    selfPreviewCaptureSession = AVCaptureSession()
+    
+    do {
+      let input = try AVCaptureDeviceInput(device: virtualCamera)
+      if selfPreviewCaptureSession?.canAddInput(input) == true {
+        selfPreviewCaptureSession?.addInput(input)
+      }
+      
+      selfPreviewOutput = AVCaptureVideoDataOutput()
+      selfPreviewOutput?.setSampleBufferDelegate(self, queue: selfPreviewQueue)
+      
+      if selfPreviewCaptureSession?.canAddOutput(selfPreviewOutput!) == true {
+        selfPreviewCaptureSession?.addOutput(selfPreviewOutput!)
+      }
+      
+      selfPreviewCaptureSession?.startRunning()
+      logger.debug("Self-preview capture session started from virtual camera")
+      
+    } catch {
+      logger.error("Failed to setup self-preview: \(error)")
+      selfPreviewCaptureSession = nil
+      selfPreviewOutput = nil
+    }
+  }
+  
   
   private func loadSavedCameraSelection() {
-    if let savedID = userDefaults.string(forKey: Keys.selectedCameraID),
-       !savedID.isEmpty {
-      // Will be matched when cameras load
+    // Phase 2.3: Load from both local and app group UserDefaults
+    var savedID: String?
+    
+    // Try app group first (more reliable for extension communication)
+    if let appGroupDefaults = UserDefaults(suiteName: Identifiers.appGroup),
+       let groupSavedID = appGroupDefaults.string(forKey: Keys.selectedCameraID),
+       !groupSavedID.isEmpty {
+      savedID = groupSavedID
+    }
+    // Fall back to local UserDefaults
+    else if let localSavedID = userDefaults.string(forKey: Keys.selectedCameraID),
+            !localSavedID.isEmpty {
+      savedID = localSavedID
+    }
+    
+    if let savedID = savedID {
       logger.debug("Loaded saved camera selection: \(savedID)")
+      // Try to match with current available cameras
+      restoreSelectedCamera(withID: savedID)
+    }
+  }
+  
+  private func restoreSelectedCamera(withID deviceID: String) {
+    if let matchingCamera = availableCameras.first(where: { $0.id == deviceID }) {
+      selectedCamera = matchingCamera
+      logger.debug("✅ Restored camera selection: \(matchingCamera.name) (ID: \(deviceID))")
+    } else {
+      logger.warning("⚠️ Saved camera device not found in available cameras: \(deviceID)")
+      logger.debug("Available cameras: \(self.availableCameras.map { "\($0.name) (\($0.id))" }.joined(separator: ", "))")
+      // selectedCamera remains nil, will be set to default in loadAvailableCameras
     }
   }
   
@@ -270,6 +364,39 @@ final class CameraService: ObservableObject {
   }
 }
 
+// MARK: - AVCaptureVideoDataOutputSampleBufferDelegate
+
+extension CameraService: @preconcurrency AVCaptureVideoDataOutputSampleBufferDelegate {
+  func captureOutput(_ output: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection) {
+    autoreleasepool {
+      guard let cvImageBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) else {
+        logger.debug("Couldn't get image buffer from self-preview")
+        return
+      }
+      
+      guard let ioSurface = CVPixelBufferGetIOSurface(cvImageBuffer) else {
+        logger.debug("Self-preview pixel buffer had no IOSurface")
+        return
+      }
+      
+      let ciImage = CIImage(ioSurface: ioSurface.takeUnretainedValue())
+        .transformed(by: CGAffineTransform(scaleX: -1, y: 1)) // Mirror for natural preview experience
+      
+      let context = CIContext(options: nil)
+      
+      guard let cgImage = context.createCGImage(ciImage, from: ciImage.extent) else {
+        logger.debug("Failed to create CGImage from self-preview CIImage")
+        return
+      }
+      
+      // Update preview frame on main thread
+      DispatchQueue.main.async {
+        self.currentPreviewFrame = cgImage
+      }
+    }
+  }
+}
+
 // MARK: - CameraServiceProtocol Conformance
 
-extension CameraService: CameraServiceProtocol {}
+extension CameraService: @preconcurrency CameraServiceProtocol {}
