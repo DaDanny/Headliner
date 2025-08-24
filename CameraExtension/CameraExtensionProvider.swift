@@ -10,13 +10,17 @@ import CoreMediaIO
 import IOKit.audio
 import AVFoundation
 import Cocoa
+import OSLog
 
 	// UNUSED: Legacy constant from Core Graphics overlay system - can be removed
 	let kWhiteStripeHeight: Int = 10
 	let kFrameRate: Int = 60
 
 
-private let extensionLogger = HeadlinerLogger.logger(for: .cameraExtension)
+private let extensionLogger = Logger(subsystem: "com.dannyfrancken.Headliner", category: "Extension")
+
+// Phase 4.2: Import dedicated managers for better separation of concerns
+// Error types and performance types are now defined in their respective manager files
 
 // MARK: - ExtensionDeviceSourceDelegate
 
@@ -44,7 +48,14 @@ class CameraExtensionDeviceSource: NSObject, CMIOExtensionDeviceSource, AVCaptur
 	private var _heartbeatTimer: DispatchSourceTimer?
 	private let _heartbeatQueue = DispatchQueue(label: "heartbeatQueue", qos: .utility)
 	
-	// Current camera frame storage
+	// Phase 4.2: Dedicated managers for error handling and performance optimization
+	private var errorManager: CameraExtensionErrorManager?
+	private var performanceManager: CameraExtensionPerformanceManager?
+	
+	// Phase 4.3: Diagnostic system for structured logging and performance metrics
+	private var diagnostics: CameraExtensionDiagnostics?
+	
+	// Phase 4.2: Lazy frame storage managed by performance manager
 	private var _currentCameraFrame: CVPixelBuffer?
 	private let _cameraFrameLock = NSLock()
 	
@@ -64,15 +75,35 @@ class CameraExtensionDeviceSource: NSObject, CMIOExtensionDeviceSource, AVCaptur
 	private var overlaySettings: OverlaySettings = OverlaySettings()
 	private let overlaySettingsLock = NSLock()
 	
-	// NOTE: These properties are REQUIRED for overlay rendering system
-	private var overlayRenderer: OverlayRenderer?
-	private var overlayPresetStore: OverlayPresetStore?
+	// Phase 4.2: Lazy-loaded overlay system components
+	private lazy var overlayRenderer: OverlayRenderer = CameraOverlayRenderer()
+	private lazy var overlayPresetStore: OverlayPresetStore = OverlayPresetStore()
+	
+	// Phase 4.2: Overlay caching optimized by performance manager
 	private var lastRenderedOverlay: CIImage?
 	private var lastAspectRatio: OverlayAspect?
+	
+	// Phase 4.3: Overlay render timing tracking
+	private var lastOverlayRenderTime: TimeInterval = 0
 	
 	init(localizedName: String) {
 		
 		super.init()
+		
+		// Phase 4.1: Add capture session interruption notifications
+		NotificationCenter.default.addObserver(
+			self,
+			selector: #selector(captureSessionWasInterrupted(_:)),
+			name: AVCaptureSession.wasInterruptedNotification,
+			object: nil
+		)
+		
+		NotificationCenter.default.addObserver(
+			self,
+			selector: #selector(captureSessionInterruptionEnded(_:)),
+			name: AVCaptureSession.interruptionEndedNotification,
+			object: nil
+		)
 		let deviceID = UUID() // replace this with your device UUID
 		self.device = CMIOExtensionDevice(localizedName: localizedName, deviceID: deviceID, legacyDeviceID: nil, source: self)
 		
@@ -114,11 +145,16 @@ class CameraExtensionDeviceSource: NSObject, CMIOExtensionDeviceSource, AVCaptur
 		loadOverlaySettings()
 		extensionLogger.debug("✅ CameraExtensionDeviceSource init - overlay settings loaded")
 		
-		// NOTE: REQUIRED initialization for overlay rendering system
-		overlayRenderer = CameraOverlayRenderer()
-
-		overlayPresetStore = OverlayPresetStore()
-		extensionLogger.debug("✅ Initialized camera overlay renderer (thread-safe, Metal-backed)")
+		// Phase 4.2: Initialize dedicated managers
+		errorManager = CameraExtensionErrorManager(delegate: self)
+		performanceManager = CameraExtensionPerformanceManager(delegate: self)
+		
+		// Phase 4.3: Initialize diagnostic system
+		diagnostics = CameraExtensionDiagnostics(delegate: self)
+		extensionLogger.debug("✅ Initialized error, performance, and diagnostic managers")
+		
+		// Phase 4.2: Lazy initialization - overlay components created on first use
+		extensionLogger.debug("✅ Setup lazy overlay system initialization (Metal-backed)")
 	}
 	
 	var availableProperties: Set<CMIOExtensionProperty> {
@@ -148,8 +184,12 @@ class CameraExtensionDeviceSource: NSObject, CMIOExtensionDeviceSource, AVCaptur
 	func startStreaming() {
 		extensionLogger.debug("Virtual camera requested by external app - starting frame generation")
 		
+		// Phase 4.3: Log streaming start event
+		diagnostics?.logEvent(.sessionStarted)
+		
 		guard let _ = _bufferPool else {
 			extensionLogger.error("No buffer pool available")
+			diagnostics?.recordError(CameraExtensionError.configurationFailed, context: "startStreaming - no buffer pool")
 			return
 		}
 		
@@ -176,6 +216,9 @@ class CameraExtensionDeviceSource: NSObject, CMIOExtensionDeviceSource, AVCaptur
 		
 		// Phase 2.4: Start heartbeat monitoring when streaming begins
 		startHeartbeatTimer()
+		
+		// Phase 4.2: Reset error tracking when streaming starts
+		errorManager?.recordSuccess()
 		
 		// Phase 2.2: Auto-start camera feature for seamless Google Meet integration
 		_streamStateLock.lock()
@@ -225,6 +268,13 @@ class CameraExtensionDeviceSource: NSObject, CMIOExtensionDeviceSource, AVCaptur
 		print("🎬 [Camera Extension] Starting real camera capture...")
 		extensionLogger.debug("Starting real camera capture...")
 		
+		// Phase 4.2: Check camera permissions using error manager
+		guard errorManager?.checkCameraPermissions() ?? false else {
+			extensionLogger.error("❌ Camera permission denied - cannot start capture")
+			ExtensionStatusManager.writeStatus(.error, error: "Camera permission denied")
+			return
+		}
+		
 		// Phase 2: Report status to main app
 		ExtensionStatusManager.writeStatus(.starting)
 		
@@ -263,6 +313,9 @@ class CameraExtensionDeviceSource: NSObject, CMIOExtensionDeviceSource, AVCaptur
 		} else {
 			print("❌ [Camera Extension] CaptureSessionManager not configured - setup failed")
 			extensionLogger.error("CaptureSessionManager configuration failed even after setup attempt")
+			
+			// Phase 4.2: Handle configuration failure through error manager
+			errorManager?.handleError(.configurationFailed)
 		}
 	}
 	
@@ -285,6 +338,9 @@ class CameraExtensionDeviceSource: NSObject, CMIOExtensionDeviceSource, AVCaptur
 	func stopStreaming() {
 		extensionLogger.debug("External app stopping virtual camera streaming")
 		
+		// Phase 4.3: Log streaming stop event
+		diagnostics?.logEvent(.sessionStopped)
+		
 		if _streamingCounter > 1 {
 			_streamingCounter -= 1
 			extensionLogger.debug("Virtual camera streaming counter: \(self._streamingCounter)")
@@ -300,6 +356,8 @@ class CameraExtensionDeviceSource: NSObject, CMIOExtensionDeviceSource, AVCaptur
 			
 			// Phase 2.4: Stop heartbeat monitoring when streaming ends completely
 			stopHeartbeatTimer()
+			
+			// Phase 4.2: Frame generation monitoring is now handled by error manager
 			
 			// ❌ CRITICAL FIX: Don't reset app state when external apps stop
 			// This was causing Google Meet toggle issues - when Meet stops/starts video,
@@ -368,6 +426,12 @@ class CameraExtensionDeviceSource: NSObject, CMIOExtensionDeviceSource, AVCaptur
 	private func generateVirtualCameraFrame() {
 		guard _streamingCounter > 0 else { return }
 		
+		// Phase 4.3: Track frame generation timing
+		let frameStartTime = Date()
+		
+		// Phase 4.2: Update frame generation timestamp in error manager
+		errorManager?.recordFrameGenerated()
+		
 		var err: OSStatus = 0
 		var pixelBuffer: CVPixelBuffer?
 		
@@ -381,11 +445,15 @@ class CameraExtensionDeviceSource: NSObject, CMIOExtensionDeviceSource, AVCaptur
 		
 		if err != 0 {
 			extensionLogger.error("Failed to create pixel buffer: \(err)")
+			// Phase 4.2: Handle pixel buffer creation error
+			errorManager?.handleError(.pixelBufferCreationFailed(err))
 			return
 		}
 		
 		guard let pixelBuffer = pixelBuffer else {
 			extensionLogger.error("Pixel buffer is nil")
+			// Phase 4.2: Handle nil pixel buffer error
+			errorManager?.handleError(.pixelBufferCreationFailed(-1))
 			return
 		}
 		
@@ -459,8 +527,18 @@ class CameraExtensionDeviceSource: NSObject, CMIOExtensionDeviceSource, AVCaptur
 				discontinuity: [],
 				hostTimeInNanoseconds: UInt64(timingInfo.presentationTimeStamp.seconds * Double(NSEC_PER_SEC))
 			)
+			
+			// Phase 4.3: Record successful frame generation with timing
+			let frameProcessingTime = Date().timeIntervalSince(frameStartTime)
+			// Note: overlayTime will be calculated in drawOverlaysWithPresetSystem and passed via a property
+			diagnostics?.recordFrameGenerated(processingTime: frameProcessingTime, overlayTime: lastOverlayRenderTime)
+			
 		} else {
 			extensionLogger.error("Failed to create sample buffer: \(err)")
+			// Phase 4.2: Handle sample buffer creation error
+			errorManager?.handleError(.sampleBufferCreationFailed(err))
+			// Phase 4.3: Record frame drop due to sample buffer creation failure
+			diagnostics?.recordFrameDropped(reason: "Sample buffer creation failed: \(err)")
 		}
 	}
 	
@@ -612,20 +690,36 @@ class CameraExtensionDeviceSource: NSObject, CMIOExtensionDeviceSource, AVCaptur
 	
 	// MARK: Preset System Support
 	
-	// NOTE: This method is REQUIRED - renders overlays onto video frames using CameraOverlayRenderer
+	// Phase 4.2: Optimized overlay rendering with performance management
 	private func drawOverlaysWithPresetSystem(pixelBuffer: CVPixelBuffer, context: CGContext, rect: CGRect) {
-		guard let renderer = overlayRenderer,
-		      let presetStore = overlayPresetStore else {
-			extensionLogger.error("Preset system components not initialized")
+		// Phase 4.2: Skip overlay rendering under memory pressure for performance
+		if performanceManager?.shouldSkipOverlayFrame() == true {
+			// Phase 4.3: Log overlay frame skip for performance
+			diagnostics?.logEvent(.overlaySkipped, metadata: ["reason": "performance_optimization"])
+			lastOverlayRenderTime = 0
+			
+			// Use cached overlay if available
+			if let cachedOverlay = lastRenderedOverlay {
+				if let cgImage = CIContext().createCGImage(cachedOverlay, from: cachedOverlay.extent) {
+					context.draw(cgImage, in: rect)
+				}
+			}
 			return
 		}
+		
+		// Phase 4.2: Overlay components are now lazy-loaded automatically
+		let renderer = overlayRenderer
+		let presetStore = overlayPresetStore
 		
 		overlaySettingsLock.lock()
 		let settings = self.overlaySettings
 		overlaySettingsLock.unlock()
 		
 		// Only draw overlays if enabled
-		guard settings.isEnabled else { return }
+		guard settings.isEnabled else { 
+			lastOverlayRenderTime = 0
+			return 
+		}
 		
 		// Get current preset and tokens
 		var preset = presetStore.selectedPreset
@@ -661,6 +755,9 @@ class CameraExtensionDeviceSource: NSObject, CMIOExtensionDeviceSource, AVCaptur
 			renderer.notifyAspectChanged()
 		}
 		
+		// Phase 4.3: Track overlay rendering timing
+		let overlayStartTime = Date()
+		
 		// Render overlay using Core Image renderer
 		let overlayImage = renderer.render(
 			pixelBuffer: pixelBuffer,
@@ -668,6 +765,15 @@ class CameraExtensionDeviceSource: NSObject, CMIOExtensionDeviceSource, AVCaptur
 			tokens: tokens,
 			previousFrame: aspectChanged ? lastRenderedOverlay : nil
 		)
+		
+		// Phase 4.3: Record overlay rendering time
+		let overlayRenderTime = Date().timeIntervalSince(overlayStartTime)
+		lastOverlayRenderTime = overlayRenderTime
+		diagnostics?.logEvent(.overlayRendered, metadata: [
+			"render_time_ms": overlayRenderTime * 1000,
+			"preset": preset.name,
+			"aspect_changed": aspectChanged
+		])
 		
 		// Cache the rendered overlay and aspect
 		lastRenderedOverlay = overlayImage
@@ -800,8 +906,13 @@ class CameraExtensionDeviceSource: NSObject, CMIOExtensionDeviceSource, AVCaptur
 		// Store the latest camera frame for use by the virtual camera timer
 		guard let pixelBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) else {
 			print("❌ [Camera Extension] Failed to get pixel buffer from sample buffer")
+			// Phase 4.2: Handle frame extraction error
+			errorManager?.handleError(.sampleBufferCreationFailed(-1))
 			return
 		}
+		
+		// Phase 4.2: Reset error tracking on successful frame capture
+		errorManager?.recordSuccess()
 		
 		// UNUSED: Legacy overlay sizing debug logging - can be removed
 		// Log camera input resolution for debugging overlay sizing
@@ -812,9 +923,11 @@ class CameraExtensionDeviceSource: NSObject, CMIOExtensionDeviceSource, AVCaptur
 			extensionLogger.debug("Camera input resolution: \(inputWidth)x\(inputHeight), Virtual output: 1920x1080")
 		}
 		
-		// Store the current camera frame (thread-safe)
+		// Phase 4.2: Store camera frame using performance manager's retention policy
 		_cameraFrameLock.lock()
-		_currentCameraFrame = pixelBuffer
+		if performanceManager?.shouldRetainFrame(frameCount: _frameCount) == true || _currentCameraFrame == nil {
+			_currentCameraFrame = pixelBuffer
+		}
 		_cameraFrameLock.unlock()
 		
 		// UNUSED: Legacy frame counting for overlay sizing - can be removed
@@ -828,6 +941,149 @@ class CameraExtensionDeviceSource: NSObject, CMIOExtensionDeviceSource, AVCaptur
 			return nil
 		}
 		return input.device.localizedName
+	}
+	
+	/// Health check using error manager
+	func performHealthCheck() -> Bool {
+		return errorManager?.isSystemHealthy() ?? false
+	}
+	
+	// MARK: - Phase 4.2: Capture Session Interruption Handling
+	
+	@objc private func captureSessionWasInterrupted(_ notification: Notification) {
+		extensionLogger.warning("⚠️ Capture session was interrupted")
+		
+		// Phase 4.2: Handle interruption through error manager
+		errorManager?.handleError(.captureSessionInterrupted)
+	}
+	
+	@objc private func captureSessionInterruptionEnded(_ notification: Notification) {
+		extensionLogger.debug("✅ Capture session interruption ended - attempting recovery")
+		
+		// Phase 4.2: Reset error tracking through error manager
+		errorManager?.recordSuccess()
+		
+		// Ensure session is running if we should be streaming
+		_streamStateLock.lock()
+		let shouldBeStreaming = _isAppControlledStreaming || (_streamingCounter > 0 && ExtensionStatusManager.getAutoStartEnabled())
+		_streamStateLock.unlock()
+		
+		if shouldBeStreaming {
+			if let manager = captureSessionManager, !manager.captureSession.isRunning {
+				manager.captureSession.startRunning()
+				extensionLogger.debug("🚀 Restarted capture session after interruption ended")
+			}
+		}
+	}
+	
+	deinit {
+		// Phase 4.2: Cleanup dedicated managers
+		errorManager = nil
+		performanceManager = nil
+		
+		// Phase 2.4: Cleanup heartbeat timer
+		stopHeartbeatTimer()
+		
+		NotificationCenter.default.removeObserver(self)
+		extensionLogger.debug("🧼 Cleaned up CameraExtensionDeviceSource resources")
+	}
+}
+
+// MARK: - Phase 4.2: Error Manager Delegate
+
+extension CameraExtensionDeviceSource: CameraExtensionErrorManagerDelegate {
+	
+	func errorManager(_ manager: CameraExtensionErrorManager, needsLightweightRecovery completion: @escaping (Bool) -> Void) {
+		guard let captureManager = captureSessionManager else {
+			completion(false)
+			return
+		}
+		
+		// Reconnect video output delegate
+		if let videoOutput = captureManager.videoOutput {
+			videoOutput.setSampleBufferDelegate(nil, queue: nil)
+			videoOutput.setSampleBufferDelegate(self, queue: captureManager.dataOutputQueue)
+			extensionLogger.debug("🔗 Reconnected video output delegate")
+		}
+		
+		// Clear current frame to reset state
+		_cameraFrameLock.lock()
+		_currentCameraFrame = nil
+		_cameraFrameLock.unlock()
+		
+		completion(true)
+	}
+	
+	func errorManager(_ manager: CameraExtensionErrorManager, needsFullRecovery completion: @escaping (Bool) -> Void) {
+		// Stop current session if running
+		if let captureManager = captureSessionManager, captureManager.captureSession.isRunning {
+			captureManager.captureSession.stopRunning()
+			extensionLogger.debug("🛑 Stopped existing capture session for full recovery")
+		}
+		
+		// Reinitialize capture session
+		captureSessionManager = nil
+		setupCaptureSession()
+		
+		// Restart if we have a valid session
+		let success = captureSessionManager?.configured == true
+		if success, let manager = captureSessionManager {
+			manager.videoOutput?.setSampleBufferDelegate(self, queue: manager.dataOutputQueue)
+			manager.captureSession.startRunning()
+			extensionLogger.debug("✅ Full recovery completed successfully")
+		} else {
+			extensionLogger.error("💥 Full recovery failed - capture session still not configured")
+		}
+		
+		completion(success)
+	}
+	
+	func errorManager(_ manager: CameraExtensionErrorManager, permissionsCheckRequired completion: @escaping (Bool) -> Void) {
+		let hasPermission = AVCaptureDevice.authorizationStatus(for: .video) == .authorized
+		completion(hasPermission)
+	}
+}
+
+// MARK: - Phase 4.2: Performance Manager Delegate
+
+extension CameraExtensionDeviceSource: CameraExtensionPerformanceManagerDelegate {
+	
+	func performanceManager(_ manager: CameraExtensionPerformanceManager, shouldClearCaches: Bool) {
+		if shouldClearCaches {
+			// Cast to CameraOverlayRenderer to access clearCaches method
+			if let cameraRenderer = overlayRenderer as? CameraOverlayRenderer {
+				cameraRenderer.clearCaches()
+				extensionLogger.debug("🧼 Cleared overlay caches due to performance optimization")
+			}
+		}
+	}
+	
+	func performanceManager(_ manager: CameraExtensionPerformanceManager, shouldDropCurrentFrame: Bool) {
+		if shouldDropCurrentFrame {
+			_cameraFrameLock.lock()
+			_currentCameraFrame = nil
+			_cameraFrameLock.unlock()
+			extensionLogger.debug("💥 Dropped current frame for memory optimization")
+		}
+	}
+}
+
+// MARK: - Diagnostic System Delegate
+
+extension CameraExtensionDeviceSource: CameraExtensionDiagnosticsDelegate {
+	
+	func diagnostics(_ manager: CameraExtensionDiagnostics, didUpdateMetrics metrics: DiagnosticMetrics) {
+		// Log periodic metrics updates for monitoring
+		extensionLogger.debug("📊 Metrics Update: FPS=\(String(format: "%.1f", metrics.frameRate)), Memory=\(String(format: "%.1f", metrics.memoryUsageMB))MB, Health=\(metrics.systemHealth.emoji)\(metrics.systemHealth.rawValue)")
+	}
+	
+	func diagnostics(_ manager: CameraExtensionDiagnostics, didDetectIssue issue: String, severity: OSLogType) {
+		switch severity {
+		case .error:
+			extensionLogger.error("🚨 Diagnostic Issue: \(issue, privacy: .public)")
+		default:
+			extensionLogger.warning("⚠️ Diagnostic Issue: \(issue, privacy: .public)")
+		}
 	}
 }
 
