@@ -47,6 +47,9 @@ final class ExtensionService: ObservableObject {
   private let maxPollInterval: TimeInterval = 4.0
   private let pollWindow: TimeInterval = 60.0
   
+  // Phase 2.4: Health monitoring & heartbeat system
+  private var healthMonitorTimer: Timer?
+  
   // MARK: - Constants
   
   private enum Keys {
@@ -66,6 +69,7 @@ final class ExtensionService: ObservableObject {
   
   deinit {
     pollTimer?.invalidate()
+    healthMonitorTimer?.invalidate()
   }
   
   // MARK: - Public Methods
@@ -85,6 +89,7 @@ final class ExtensionService: ObservableObject {
       status = .installed
       statusMessage = "Extension is installed and ready"
       logger.debug("Extension ready via provider flag")
+      startHealthMonitoring()
       return
     }
     
@@ -93,6 +98,7 @@ final class ExtensionService: ObservableObject {
     if propertyManager.deviceObjectID != nil {
       status = .installed
       statusMessage = "Extension is installed and ready"
+      startHealthMonitoring()
       logger.debug("Extension detected via device scan")
     } else {
       status = .notInstalled
@@ -198,6 +204,7 @@ final class ExtensionService: ObservableObject {
       status = .installed
       statusMessage = "Extension installed and ready"
       logger.debug("✅ Extension ready (poll #\(self.pollCount))")
+      startHealthMonitoring()
       return
     }
     
@@ -208,12 +215,67 @@ final class ExtensionService: ObservableObject {
       status = .installed
       statusMessage = "Extension installed and ready"
       logger.debug("✅ Extension detected (poll #\(self.pollCount))")
+      startHealthMonitoring()
     } else if Date() > deadline {
       pollTimer?.invalidate()
       logger.debug("⌛ Extension polling timed out after \(self.pollCount) attempts")
     } else {
       scheduleNextPoll(deadline: deadline)
     }
+  }
+  
+  // MARK: - Phase 2.4: Health Monitoring & Heartbeat System
+  
+  func startHealthMonitoring() {
+    guard healthMonitorTimer == nil else { return }
+    
+    healthMonitorTimer = Timer.scheduledTimer(withTimeInterval: 5.0, repeats: true) { [weak self] _ in
+      Task { @MainActor in
+        self?.checkExtensionHealth()
+      }
+    }
+    
+    logger.debug("✅ Started extension health monitoring (5s interval)")
+  }
+  
+  func stopHealthMonitoring() {
+    healthMonitorTimer?.invalidate()
+    healthMonitorTimer = nil
+    logger.debug("🛑 Stopped extension health monitoring")
+  }
+  
+  private func checkExtensionHealth() {
+    guard status == .installed else {
+      // Only monitor health if extension is installed
+      return
+    }
+    
+    let isHealthy = ExtensionStatusManager.isExtensionHealthy(timeoutSeconds: 15.0)
+    let currentStatus = ExtensionStatusManager.readStatus()
+    
+    if isHealthy {
+      // Extension is healthy - update status message with runtime status
+      statusMessage = "Extension active: \(currentStatus.displayText)"
+      
+      if let deviceName = ExtensionStatusManager.getCurrentDeviceName() {
+        statusMessage += " (\(deviceName))"
+      }
+      
+      if let errorMessage = ExtensionStatusManager.getErrorMessage() {
+        statusMessage += " - Error: \(errorMessage)"
+      }
+    } else {
+      // Extension appears unresponsive
+      if currentStatus == .streaming || currentStatus == .starting {
+        statusMessage = "Extension may be unresponsive (no heartbeat for >15s)"
+        logger.warning("⚠️ Extension health check failed - no recent heartbeat")
+      } else {
+        // Extension is idle, which is normal - no heartbeat expected
+        statusMessage = "Extension idle"
+      }
+    }
+    
+    logger.debug("🩺 Health check: \(isHealthy ? "healthy" : "unhealthy") - \(currentStatus.displayText)")
   }
   
   // MARK: - Computed Properties

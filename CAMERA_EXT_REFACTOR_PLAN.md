@@ -266,11 +266,11 @@ private func logStateTransition(from: ExtensionState, to: ExtensionState, trigge
 - [x] Fix extension state management bugs
 - [x] Add lazy camera initialization
 
-### Week 2 - Communication & Features (High Priority)
-- [ ] Reliable status communication system
-- [ ] Auto-start camera feature
-- [ ] UserDefaults-based device selection
-- [ ] Health monitoring & heartbeat
+### Week 2 - Communication & Features (High Priority) ✅ COMPLETED
+- [x] Reliable status communication system ✅ COMPLETED
+- [x] Auto-start camera feature ✅ COMPLETED
+- [x] UserDefaults-based device selection ✅ COMPLETED
+- [x] Health monitoring & heartbeat system ✅ COMPLETED
 
 ### Week 3 - Code Cleanup (Medium Priority)  
 - [ ] Remove CustomPropertyManager & OutputImageManager
@@ -433,4 +433,114 @@ This refactor transforms Headliner from a manual tool requiring intervention int
 - `Headliner/Views/MenuContent.swift` - Updated preview integration
 - `CameraExtension/CameraExtensionProvider.swift` - State management fix & lazy init
 
-### **Next Phase Ready**: Phase 2 can now be implemented with solid architectural foundation
+### ✅ Phase 2: Communication & Features - COMPLETED
+**Completion Date**: August 2025  
+**Build Status**: ✅ All changes compile successfully  
+
+#### **Phase 2.1: Reliable Status Communication System** ✅
+- **ExtensionStatusManager.swift**: Complete bidirectional communication system
+  - Status writing methods for extension (writeStatus, updateHeartbeat)
+  - Status reading methods for main app (readStatus, isExtensionHealthy)
+  - Auto-start preference management (getAutoStartEnabled, setAutoStartEnabled)
+- **AppStateTypes.swift**: Enhanced with Phase 2 types
+  - `ExtensionRuntimeStatus` enum (idle/starting/streaming/stopping/error)
+  - `ExtensionStatusKeys` enum for UserDefaults keys
+  - Distinguished from installation status (`ExtensionStatus`)
+- **Enhanced Darwin Notifications**: Added Phase 2 notification types
+  - `.requestStart`, `.requestStop`, `.requestSwitchDevice`, `.statusChanged`
+- **CameraExtensionProvider.swift**: Integrated status reporting
+  - Status reports on camera start (.starting) and streaming (.streaming)
+  - Enhanced notification handling for new Darwin notification types
+  - Added getCurrentDeviceName() method for device name reporting
+- **Result**: ✅ Reliable bidirectional communication replacing one-way notifications
+
+#### **Phase 2.2: Auto-Start Camera Feature** ✅
+- **Seamless Google Meet Integration**: Auto-start when external apps request virtual camera
+  - Checks `ExtensionStatusManager.getAutoStartEnabled()` preference (defaults to true)
+  - Automatically sets `_isAppControlledStreaming = true` when auto-starting
+  - Maintains camera state during Google Meet video toggles
+- **Smart Behavior Logic**:
+  - Auto-start enabled: Camera starts automatically on external app request
+  - Auto-start disabled: Shows splash screen until manual activation
+  - Preserves all existing manual controls and app overrides
+- **Status Integration**: Reports proper status transitions during auto-start
+- **Result**: ✅ Zero-friction Google Meet experience - just select "Headliner" and it works
+
+#### **Phase 2.3: UserDefaults-based Device Selection** ✅
+- **Unified Key System**: Fixed key consistency between main app and extension
+  - Both components now use `ExtensionStatusKeys.selectedDeviceID`
+  - Eliminated mismatched keys that caused device selection issues
+- **Enhanced CaptureSessionManager**: Extension reads device selection from App Group UserDefaults
+  - Uses stable `device.uniqueID` instead of localized names for reliable matching
+  - Falls back to "first available" if no device selected
+  - Supports self-preview capture from Headliner virtual camera
+- **Live Device Switching**: Real-time camera changes during active streaming
+  - Atomic session reconfiguration with proper input removal/addition
+  - Status reporting with device name changes and error handling
+  - Graceful handling of device not found or unavailable scenarios
+- **Smart Selection Management**: Enhanced main app device persistence
+  - Loads saved device from App Group UserDefaults on startup
+  - Saves default device automatically so extension can use it
+  - Dual UserDefaults support (App Group + local) for robustness
+- **Result**: ✅ User-controlled, persistent device selection with live switching capability
+
+#### **Phase 2.4: Health Monitoring & Heartbeat System** ✅
+- **Extension Heartbeat Timer**: 2-second interval heartbeat on utility queue
+  - Smart logic: only sends heartbeats when extension is actively streaming
+  - Integrated with streaming lifecycle (starts/stops with camera activity)
+  - Efficient resource usage with proper timer cleanup
+- **Main App Health Monitoring**: 5-second interval health checks in ExtensionService
+  - Intelligent health assessment distinguishes idle vs unresponsive states
+  - 15-second timeout for heartbeat freshness during streaming
+  - Updates UI with runtime status, device name, and health information
+- **Comprehensive Status Display**: Enhanced extension status visibility
+  - Real-time runtime status (idle/starting/streaming/stopping/error)
+  - Current camera device name display when available
+  - Extension error messages surfaced to main app UI
+  - Health warnings only when extension should be active (no false alarms)
+- **Automatic Lifecycle Integration**: Health monitoring starts when extension installation detected
+  - Multiple detection points: provider flag, device scan, polling success
+  - Proper timer management with cleanup in deinit
+- **Result**: ✅ Proactive extension health monitoring with intelligent status reporting
+
+#### **Technical Metrics Achieved (Phase 2)**:
+
+**Communication & Status System**:
+- **Status Communication**: ❌ One-way → ✅ Bidirectional with acknowledgments
+- **Health Monitoring**: ❌ None → ✅ Real-time heartbeat system (2s/5s intervals)
+- **Device Information**: ❌ Unknown → ✅ Current device name reporting with live updates
+- **User Preferences**: ❌ Hardcoded → ✅ UserDefaults-based auto-start control
+- **Error Reporting**: ❌ Silent failures → ✅ Extension error messages in main app UI
+
+**Device Selection & Management**:
+- **Device Selection**: ⚠️ First available → ✅ User-controlled persistent selection
+- **Device Switching**: ❌ Static → ✅ Live switching during active streaming
+- **Device Persistence**: ❌ Lost on restart → ✅ Survives app/system restarts
+- **Key Consistency**: ❌ Mismatched keys → ✅ Unified UserDefaults key system
+- **Device Matching**: ⚠️ Localized names → ✅ Stable uniqueID-based matching
+
+**User Experience & Automation**:
+- **Google Meet UX**: ⚠️ Manual "Start Camera" → ✅ Automatic seamless activation
+- **State Persistence**: ✅ Maintained (leverages Phase 1 Google Meet toggle fix)
+- **User Control**: ✅ Preserved (can disable auto-start, manual override works)
+- **Status Visibility**: ✅ Enhanced (runtime status, health, device info in UI)
+- **Live Device Changes**: ❌ Restart required → ✅ Instant switching during calls
+
+#### **Files Modified (Phase 2)**:
+- `HeadlinerShared/ExtensionStatusManager.swift` - Complete bidirectional communication system
+- `HeadlinerShared/AppStateTypes.swift` - Enhanced with runtime status types and UserDefaults keys
+- `HeadlinerShared/Notifications.swift` - Added Phase 2 Darwin notification types
+- `HeadlinerShared/CaptureSessionManager.swift` - UserDefaults-based device selection logic
+- `CameraExtension/CameraExtensionProvider.swift` - Status reporting, auto-start, heartbeat, live device switching
+- `Headliner/Services/CameraService.swift` - Enhanced device selection persistence and restoration
+- `Headliner/Services/ExtensionService.swift` - Health monitoring and status display integration
+
+### **Phase 2 Complete - All Objectives Achieved** ✅
+
+**Phase 2 Delivered**:
+- ✅ **Reliable bidirectional communication** replacing one-way Darwin notifications
+- ✅ **Seamless auto-start feature** for zero-friction Google Meet integration  
+- ✅ **User-controlled device selection** with live switching capability
+- ✅ **Comprehensive health monitoring** with intelligent status reporting
+
+### **Next Phase Ready**: Phase 3 (Code Cleanup & Optimization) can now be implemented

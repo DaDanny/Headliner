@@ -60,7 +60,7 @@ enum AppStateError: LocalizedError, Equatable {
 
 // MARK: - Status Types
 
-/// System extension operational status
+/// System extension operational status (installation)
 enum ExtensionStatus: Equatable {
   case unknown
   case notInstalled
@@ -82,6 +82,35 @@ enum ExtensionStatus: Equatable {
     if case .installed = self { return true }
     return false
   }
+}
+
+/// Extension runtime status for reliable app-extension communication
+/// (Different from ExtensionStatus which tracks installation)
+enum ExtensionRuntimeStatus: String, CaseIterable, Codable {
+    case idle = "idle"
+    case starting = "starting" 
+    case streaming = "streaming"
+    case stopping = "stopping"
+    case error = "error"
+    
+    var displayText: String {
+        switch self {
+        case .idle:
+            return "Ready"
+        case .starting:
+            return "Starting..."
+        case .streaming:
+            return "Streaming"
+        case .stopping:
+            return "Stopping..."
+        case .error:
+            return "Error"
+        }
+    }
+    
+    var isActive: Bool {
+        return self == .streaming
+    }
 }
 
 /// Camera service operational status
@@ -130,3 +159,18 @@ extension AVCaptureDevice.DeviceType {
     }
   }
 }
+
+// MARK: - App Group UserDefaults Keys
+
+/// Keys for reliable status communication via App Group UserDefaults
+enum ExtensionStatusKeys {
+    static let status = "HL.ext.status"
+    static let lastHeartbeat = "HL.ext.lastHeartbeat"
+    static let selectedDeviceID = "HL.selectedDeviceID"
+    static let autoStartCamera = "HL.autoStartCamera"
+    
+    // Additional status info
+    static let currentDeviceName = "HL.ext.currentDeviceName"
+    static let errorMessage = "HL.ext.errorMessage"
+}
+

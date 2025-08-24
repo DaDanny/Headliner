@@ -63,7 +63,7 @@ final class CameraService: NSObject, ObservableObject {
   // MARK: - Constants
   
   private enum Keys {
-    static let selectedCameraID = "SelectedCameraID"
+    static let selectedCameraID = ExtensionStatusKeys.selectedDeviceID // Use consistent key from ExtensionStatusKeys
   }
   
   // MARK: - Initialization
@@ -196,10 +196,19 @@ final class CameraService: NSObject, ObservableObject {
         )
       }
     
-    // Set default if needed
+    // Phase 2.3: Try to restore saved camera selection with newly loaded cameras
+    loadSavedCameraSelection()
+    
+    // Set default if needed (after trying to restore saved selection)
     if selectedCamera == nil, let first = availableCameras.first {
       selectedCamera = first
-      // No longer update capture session - main app doesn't capture directly
+      
+      // Phase 2.3: Save default selection to UserDefaults so extension can use it
+      userDefaults.set(first.id, forKey: Keys.selectedCameraID)
+      if let appGroupDefaults = UserDefaults(suiteName: Identifiers.appGroup) {
+        appGroupDefaults.set(first.id, forKey: Keys.selectedCameraID)
+        logger.debug("Saved default camera selection to app group: \(first.name)")
+      }
     }
   }
   
@@ -250,10 +259,35 @@ final class CameraService: NSObject, ObservableObject {
   
   
   private func loadSavedCameraSelection() {
-    if let savedID = userDefaults.string(forKey: Keys.selectedCameraID),
-       !savedID.isEmpty {
-      // Will be matched when cameras load
+    // Phase 2.3: Load from both local and app group UserDefaults
+    var savedID: String?
+    
+    // Try app group first (more reliable for extension communication)
+    if let appGroupDefaults = UserDefaults(suiteName: Identifiers.appGroup),
+       let groupSavedID = appGroupDefaults.string(forKey: Keys.selectedCameraID),
+       !groupSavedID.isEmpty {
+      savedID = groupSavedID
+    }
+    // Fall back to local UserDefaults
+    else if let localSavedID = userDefaults.string(forKey: Keys.selectedCameraID),
+            !localSavedID.isEmpty {
+      savedID = localSavedID
+    }
+    
+    if let savedID = savedID {
       logger.debug("Loaded saved camera selection: \(savedID)")
+      // Try to match with current available cameras
+      restoreSelectedCamera(withID: savedID)
+    }
+  }
+  
+  private func restoreSelectedCamera(withID deviceID: String) {
+    if let matchingCamera = availableCameras.first(where: { $0.id == deviceID }) {
+      selectedCamera = matchingCamera
+      logger.debug("Restored camera selection: \(matchingCamera.name)")
+    } else {
+      logger.debug("Saved camera device not found in available cameras: \(deviceID)")
+      // selectedCamera remains nil, will be set to default in loadAvailableCameras
     }
   }
   

@@ -40,6 +40,10 @@ class CameraExtensionDeviceSource: NSObject, CMIOExtensionDeviceSource, AVCaptur
 	private var _timer: DispatchSourceTimer?
 	private let _timerQueue = DispatchQueue(label: "timerQueue", qos: .userInteractive, attributes: [], autoreleaseFrequency: .workItem, target: .global(qos: .userInteractive))
 	
+	// Phase 2.4: Health monitoring & heartbeat system
+	private var _heartbeatTimer: DispatchSourceTimer?
+	private let _heartbeatQueue = DispatchQueue(label: "heartbeatQueue", qos: .utility)
+	
 	// Current camera frame storage
 	private var _currentCameraFrame: CVPixelBuffer?
 	private let _cameraFrameLock = NSLock()
@@ -170,15 +174,30 @@ class CameraExtensionDeviceSource: NSObject, CMIOExtensionDeviceSource, AVCaptur
 			extensionLogger.debug("Started virtual camera frame generation timer")
 		}
 		
-		// Only start real camera capture if app has enabled streaming
-		_streamStateLock.lock()
-		let shouldStartCameraCapture = _isAppControlledStreaming
-		_streamStateLock.unlock()
+		// Phase 2.4: Start heartbeat monitoring when streaming begins
+		startHeartbeatTimer()
 		
-		if shouldStartCameraCapture {
+		// Phase 2.2: Auto-start camera feature for seamless Google Meet integration
+		_streamStateLock.lock()
+		let currentAppControlledStreaming = _isAppControlledStreaming
+		
+		// Check if auto-start is enabled and we're not already streaming
+		if !currentAppControlledStreaming && ExtensionStatusManager.getAutoStartEnabled() {
+			extensionLogger.debug("Auto-start enabled - automatically starting camera capture for external app")
+			_isAppControlledStreaming = true
+			_streamStateLock.unlock()
+			
+			// Report auto-start status
+			ExtensionStatusManager.writeStatus(.starting, error: nil)
 			startCameraCapture()
 		} else {
-			extensionLogger.debug("App-controlled streaming not enabled - showing splash screen")
+			_streamStateLock.unlock()
+			
+			if currentAppControlledStreaming {
+				startCameraCapture()
+			} else {
+				extensionLogger.debug("Auto-start disabled - showing splash screen until app enables streaming")
+			}
 		}
 	}
 	
@@ -206,6 +225,9 @@ class CameraExtensionDeviceSource: NSObject, CMIOExtensionDeviceSource, AVCaptur
 		print("🎬 [Camera Extension] Starting real camera capture...")
 		extensionLogger.debug("Starting real camera capture...")
 		
+		// Phase 2: Report status to main app
+		ExtensionStatusManager.writeStatus(.starting)
+		
 		// Lazy initialization: setup capture session on first use
 		if captureSessionManager == nil {
 			print("🔧 [Camera Extension] First camera start - initializing capture session...")
@@ -227,6 +249,13 @@ class CameraExtensionDeviceSource: NSObject, CMIOExtensionDeviceSource, AVCaptur
 				manager.captureSession.startRunning()
 				print("✅ [Camera Extension] Started real camera capture session")
 				extensionLogger.debug("Started real camera capture session for content")
+				
+				// Phase 2: Report streaming status with device name
+				if let deviceName = getCurrentDeviceName() {
+					ExtensionStatusManager.writeStatus(.streaming, deviceName: deviceName)
+				} else {
+					ExtensionStatusManager.writeStatus(.streaming)
+				}
 			} else {
 				print("✅ [Camera Extension] Capture session already running")
 				extensionLogger.debug("Capture session already running")
@@ -269,6 +298,9 @@ class CameraExtensionDeviceSource: NSObject, CMIOExtensionDeviceSource, AVCaptur
 				extensionLogger.debug("Stopped virtual camera frame generation timer")
 			}
 			
+			// Phase 2.4: Stop heartbeat monitoring when streaming ends completely
+			stopHeartbeatTimer()
+			
 			// ❌ CRITICAL FIX: Don't reset app state when external apps stop
 			// This was causing Google Meet toggle issues - when Meet stops/starts video,
 			// it would reset _isAppControlledStreaming = false, causing splash screen
@@ -281,11 +313,53 @@ class CameraExtensionDeviceSource: NSObject, CMIOExtensionDeviceSource, AVCaptur
 			_streamStateLock.unlock()
 			
 			if shouldStopCamera {
+				// Phase 2.2: Report stopping status
+				ExtensionStatusManager.writeStatus(.stopping)
 				stopCameraCapture()
+				// Phase 2.2: Report idle status after stopping
+				ExtensionStatusManager.writeStatus(.idle)
 				extensionLogger.debug("Stopped camera capture - app not streaming")
 			} else {
-				extensionLogger.debug("Keeping camera active - app still wants streaming")
+				extensionLogger.debug("Keeping camera active - app still wants streaming (including auto-start)")
 			}
+		}
+	}
+	
+	// MARK: - Phase 2.4: Health Monitoring & Heartbeat System
+	
+	private func startHeartbeatTimer() {
+		guard _heartbeatTimer == nil else { return }
+		
+		_heartbeatTimer = DispatchSource.makeTimerSource(queue: _heartbeatQueue)
+		_heartbeatTimer!.schedule(deadline: .now(), repeating: 2.0, leeway: .milliseconds(500))
+		
+		_heartbeatTimer!.setEventHandler { [weak self] in
+			guard let self = self else { return }
+			
+			// Only send heartbeat if extension is actively doing something
+			_streamStateLock.lock()
+			let isActivelyStreaming = _streamingCounter > 0 || _isAppControlledStreaming
+			_streamStateLock.unlock()
+			
+			if isActivelyStreaming {
+				ExtensionStatusManager.updateHeartbeat()
+				extensionLogger.debug("💓 Heartbeat sent - extension is healthy")
+			}
+		}
+		
+		_heartbeatTimer!.setCancelHandler {
+			// Cleanup handled in stopHeartbeatTimer
+		}
+		
+		_heartbeatTimer!.resume()
+		extensionLogger.debug("✅ Started heartbeat timer (2s interval)")
+	}
+	
+	private func stopHeartbeatTimer() {
+		if let timer = _heartbeatTimer {
+			timer.cancel()
+			_heartbeatTimer = nil
+			extensionLogger.debug("🛑 Stopped heartbeat timer")
 		}
 	}
 	
@@ -638,15 +712,50 @@ class CameraExtensionDeviceSource: NSObject, CMIOExtensionDeviceSource, AVCaptur
 		print("📷 [Camera Extension] Setting camera device to: \(deviceID)")
 		extensionLogger.debug("Setting camera device to: \(deviceID)")
 		
-		// Store the selected device ID in UserDefaults so CaptureSessionManager can use it
-        if let userDefaults = UserDefaults(suiteName: Identifiers.appGroup) {
-			userDefaults.set(deviceID, forKey: "SelectedCameraID")
-			userDefaults.synchronize()
-			print("✅ [Camera Extension] Saved camera device selection to UserDefaults")
+		// Phase 2.3: Enhanced device switching with live camera reconfiguration
+		if let manager = captureSessionManager {
+			// If camera is currently running, perform live device switch
+			if manager.captureSession.isRunning {
+				extensionLogger.debug("Performing live camera device switch during streaming")
+				manager.captureSession.beginConfiguration()
+				
+				// Remove existing camera input
+				if let currentInput = manager.captureSession.inputs.first {
+					manager.captureSession.removeInput(currentInput)
+				}
+				
+				// Add new camera input
+				if let newDevice = findDeviceByID(deviceID),
+				   let newInput = try? AVCaptureDeviceInput(device: newDevice),
+				   manager.captureSession.canAddInput(newInput) {
+					manager.captureSession.addInput(newInput)
+					manager.captureSession.commitConfiguration()
+					extensionLogger.debug("✅ Live camera device switch successful")
+					
+					// Report device switch success with device name  
+					ExtensionStatusManager.writeStatus(.streaming, deviceName: newDevice.localizedName)
+				} else {
+					manager.captureSession.commitConfiguration()
+					extensionLogger.error("❌ Failed to switch to device: \(deviceID)")
+					ExtensionStatusManager.writeStatus(.error, error: "Failed to switch camera device")
+				}
+			} else {
+				// Camera not running - device change will take effect on next start
+				extensionLogger.debug("Camera not active - device change will apply on next start")
+			}
+		} else {
+			extensionLogger.debug("No capture session manager - device change will apply on camera initialization")
 		}
+	}
+	
+	private func findDeviceByID(_ deviceID: String) -> AVCaptureDevice? {
+		let discoverySession = AVCaptureDevice.DiscoverySession(
+			deviceTypes: [.builtInWideAngleCamera, .deskViewCamera, .external, .continuityCamera],
+			mediaType: .video,
+			position: .unspecified
+		)
 		
-		// UNUSED: Legacy camera device change handling - can be removed
-		// setupCaptureSession() // This entire call can be removed
+		return discoverySession.devices.first { $0.uniqueID == deviceID }
 	}
 	
 
@@ -711,6 +820,14 @@ class CameraExtensionDeviceSource: NSObject, CMIOExtensionDeviceSource, AVCaptur
 		// UNUSED: Legacy frame counting for overlay sizing - can be removed
 		// Log occasionally to avoid spam
 		self._frameCount += 1
+	}
+	
+	private func getCurrentDeviceName() -> String? {
+		guard let manager = captureSessionManager,
+		      let input = manager.captureSession.inputs.first as? AVCaptureDeviceInput else {
+			return nil
+		}
+		return input.device.localizedName
 	}
 }
 
@@ -895,6 +1012,18 @@ class CameraExtensionProviderSource: NSObject, CMIOExtensionProviderSource {
             deviceSource.updateOverlaySettings()
         case .overlayUpdated:
             extensionLogger.debug("📡 Pre-rendered overlay updated - will be refreshed on next frame")
+        // Phase 2: New enhanced notifications
+        case .requestStart:
+            extensionLogger.debug("📡 Request start - same as startStream")
+            deviceSource.startAppControlledStreaming()
+        case .requestStop:
+            extensionLogger.debug("📡 Request stop - same as stopStream")
+            deviceSource.stopAppControlledStreaming()
+        case .requestSwitchDevice:
+            extensionLogger.debug("📡 Request switch device - same as setCameraDevice")
+            handleCameraDeviceChange()
+        case .statusChanged:
+            extensionLogger.debug("📡 Status changed notification - no action needed (app-side notification)")
         }
     }
 
@@ -927,7 +1056,7 @@ class CameraExtensionProviderSource: NSObject, CMIOExtensionProviderSource {
     private func handleCameraDeviceChange() {
         // Read camera device ID from UserDefaults
         if let userDefaults = UserDefaults(suiteName: Identifiers.appGroup),
-           let deviceID = userDefaults.string(forKey: "SelectedCameraID") {
+           let deviceID = userDefaults.string(forKey: ExtensionStatusKeys.selectedDeviceID) {
             extensionLogger.debug("Setting camera device to: \(deviceID)")
             deviceSource.setCameraDevice(deviceID)
         }

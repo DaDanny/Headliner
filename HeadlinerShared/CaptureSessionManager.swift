@@ -63,8 +63,18 @@ final class CaptureSessionManager: NSObject {
     
     captureSession.sessionPreset = sessionPreset
 
-    guard let camera = getCameraIfAvailable(camera: captureHeadliner ? .headliner : .anyCamera) else {
-      logger.error("Can't create default camera, returning")
+    // Phase 2.3: UserDefaults-based device selection instead of "first available"
+    let camera: AVCaptureDevice?
+    if captureHeadliner {
+      // For main app self-preview: find Headliner virtual camera
+      camera = getCameraIfAvailable(camera: .headliner)
+    } else {
+      // For extension: use UserDefaults-selected device
+      camera = getSelectedCameraFromUserDefaults() ?? getCameraIfAvailable(camera: .anyCamera)
+    }
+    
+    guard let camera = camera else {
+      logger.error("Can't create camera device, returning")
       captureSession.commitConfiguration()
       return false
     }
@@ -113,6 +123,32 @@ final class CaptureSessionManager: NSObject {
 
     captureSession.commitConfiguration()
     return false
+  }
+
+  // Phase 2.3: UserDefaults-based device selection
+  private func getSelectedCameraFromUserDefaults() -> AVCaptureDevice? {
+    guard let sharedDefaults = UserDefaults(suiteName: Identifiers.appGroup),
+          let selectedDeviceID = sharedDefaults.string(forKey: ExtensionStatusKeys.selectedDeviceID) else {
+      logger.debug("No camera device selected in UserDefaults")
+      return nil
+    }
+    
+    let discoverySession = AVCaptureDevice.DiscoverySession(
+      deviceTypes: [.builtInWideAngleCamera, .deskViewCamera, .external, .continuityCamera],
+      mediaType: .video,
+      position: .unspecified
+    )
+    
+    // Find device by stable uniqueID, not localized name
+    let selectedDevice = discoverySession.devices.first { $0.uniqueID == selectedDeviceID }
+    
+    if let device = selectedDevice {
+      logger.debug("Found selected camera device: \(device.localizedName) (ID: \(selectedDeviceID))")
+      return device
+    } else {
+      logger.error("Selected camera device not found: \(selectedDeviceID)")
+      return nil
+    }
   }
 
   private func getCameraIfAvailable(camera: Camera) -> AVCaptureDevice? {

@@ -1,12 +1,19 @@
 import Foundation
 import OSLog
 
+// MARK: - Darwin Notifications
+
 enum NotificationName: String, CaseIterable {
   case startStream
   case stopStream
   case setCameraDevice
   case updateOverlaySettings
   case overlayUpdated
+  // Phase 2: Enhanced bidirectional notifications
+  case requestStart
+  case requestStop
+  case requestSwitchDevice
+  case statusChanged
   
   var rawValue: String {
     switch self {
@@ -20,12 +27,22 @@ enum NotificationName: String, CaseIterable {
       return "\(Identifiers.notificationPrefix).updateOverlaySettings"
     case .overlayUpdated:
       return "\(Identifiers.notificationPrefix).overlayUpdated"
+    // Phase 2: Enhanced bidirectional notifications
+    case .requestStart:
+      return "\(Identifiers.notificationPrefix).request.start"
+    case .requestStop:
+      return "\(Identifiers.notificationPrefix).request.stop"
+    case .requestSwitchDevice:
+      return "\(Identifiers.notificationPrefix).request.switchDevice"
+    case .statusChanged:
+      return "\(Identifiers.notificationPrefix).status.changed"
     }
   }
   
   // Required for CaseIterable when we override rawValue
   static var allCases: [NotificationName] {
-    [.startStream, .stopStream, .setCameraDevice, .updateOverlaySettings, .overlayUpdated]
+    [.startStream, .stopStream, .setCameraDevice, .updateOverlaySettings, .overlayUpdated,
+     .requestStart, .requestStop, .requestSwitchDevice, .statusChanged]
   }
   
   // Support for initialization from string (used in CameraExtension)
@@ -86,5 +103,6 @@ final class NotificationManager {
     )
   }
 }
+
 
 
