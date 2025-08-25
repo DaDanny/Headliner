@@ -30,32 +30,53 @@ struct ModernOnboardingView: View {
             isNextPrimary: viewModel.isNextButtonPrimary,
             canGoNext: viewModel.canContinue
         ) {
-            HStack(alignment: .top, spacing: 20) {
-                // Left: Explainer card
-                ExplainerCard(
-                    title: viewModel.currentStep.explainerTitle,
-                    subtitle: viewModel.currentStep.explainerSubtitle,
-                    bullets: viewModel.currentStep.explainerBullets,
-                    timeEstimate: viewModel.currentStep.timeEstimate,
-                    learnMoreAction: nil
-                )
-                
-                // Center: Media pane
-                MediaPane {
-                    stepMedia
-                        .transition(stepTransition)
+            if viewModel.currentStep == .preview {
+                // Preview step: Full width layout with preset rail + preview + step rail
+                HStack(alignment: .top, spacing: 20) {
+                    // Center: Full media pane (includes PresetRail + LivePreview)
+                    MediaPane {
+                        stepMedia
+                            .transition(stepTransition)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .mask(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 16, style: .continuous)
+                            .stroke(.quaternary, lineWidth: 1)
+                    )
+                    
+                    // Right: Step rail
+                    StepRail(steps: OnboardingStep.allCases, current: viewModel.currentStep, showsProgressCaption: true)
                 }
-                .frame(maxWidth: .infinity)
-                .mask(RoundedRectangle(cornerRadius: 16, style: .continuous))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 16, style: .continuous)
-                        .stroke(.quaternary, lineWidth: 1)
-                )
-                
-                // Right: Step rail
-                StepRail(steps: OnboardingStep.allCases, current: viewModel.currentStep, showsProgressCaption: true)
+            } else {
+                // All other steps: Explainer + Media + Step rail layout
+                HStack(alignment: .top, spacing: 20) {
+                    // Left: Explainer card
+                    ExplainerCard(
+                        title: viewModel.currentStep.explainerTitle,
+                        subtitle: viewModel.currentStep.explainerSubtitle,
+                        bullets: viewModel.currentStep.explainerBullets,
+                        timeEstimate: viewModel.currentStep.timeEstimate,
+                        learnMoreAction: nil
+                    )
+                    
+                    // Center: Media pane
+                    MediaPane {
+                        stepMedia
+                            .transition(stepTransition)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .mask(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 16, style: .continuous)
+                            .stroke(.quaternary, lineWidth: 1)
+                    )
+                    
+                    // Right: Step rail
+                    StepRail(steps: OnboardingStep.allCases, current: viewModel.currentStep, showsProgressCaption: true)
+                }
+                .animation(.spring(response: 0.35, dampingFraction: 0.9), value: viewModel.currentStep)
             }
-            .animation(.spring(response: 0.35, dampingFraction: 0.9), value: viewModel.currentStep)
         }
         .onAppear {
             setupViewModel()
@@ -86,14 +107,19 @@ struct ModernOnboardingView: View {
                 displayName: $viewModel.displayName,
                 displayTitle: $viewModel.displayTitle,
                 selectedCameraID: $viewModel.selectedCameraID,
-                style: $viewModel.styleShape
+                onCameraSelect: viewModel.selectCamera
             )
             
         case .preview:
             PreviewMedia(
                 name: viewModel.displayName,
                 title: viewModel.displayTitle,
-                style: viewModel.styleShape
+                style: $viewModel.styleShape,
+                availablePresets: viewModel.availablePresets,
+                selectedPresetID: $viewModel.selectedPresetID,
+                onPresetSelect: { preset in
+                    viewModel.selectPreset(preset)
+                }
             )
             
         case .done:
@@ -156,11 +182,11 @@ struct ModernOnboardingView: View {
     private func completeOnboarding() {
         viewModel.complete()
         
-        // Call the completion handler
+        // Call the completion handler which handles window closure and menubar activation
         if let onComplete = onComplete {
             onComplete()
         } else {
-            // Close the onboarding window if no custom handler
+            // Fallback: Close the onboarding window if no custom handler
             if let window = NSApp.windows.first(where: { $0.identifier?.rawValue == "onboarding" }) {
                 window.close()
             }

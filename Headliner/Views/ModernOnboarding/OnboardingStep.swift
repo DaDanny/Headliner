@@ -30,7 +30,7 @@ enum OnboardingStep: Int, CaseIterable, Identifiable {
     // Left-panel friendly title (H2 style)
     var explainerTitle: String {
         switch self {
-        case .welcome: return "Let's Get Started"
+        case .welcome: return "Welcome to Headliner"
         case .install: return "Enable Virtual Camera"
         case .personalize: return "Make It Yours"
         case .preview: return "See It Live"
@@ -41,7 +41,7 @@ enum OnboardingStep: Int, CaseIterable, Identifiable {
     // Left-panel subtitle (one sentence, secondary)
     var explainerSubtitle: String {
         switch self {
-        case .welcome: return "A quick setup to get your virtual camera looking sharp."
+        case .welcome: return "Up and running in 2 minutes. Look sharp in every meeting."
         case .install: return "We'll set up the Headliner camera extension."
         case .personalize: return "Add your name and title, then choose a style."
         case .preview: return "Check how everything looks before you join a call."
@@ -68,7 +68,7 @@ enum OnboardingStep: Int, CaseIterable, Identifiable {
             return [
                 .init(symbol: "textformat", title: "Display name", detail: "Shown in your overlay."),
                 .init(symbol: "camera.fill", title: "Select camera", detail: "Choose your input camera for the live preview."),
-                .init(symbol: "rectangle.roundedtop", title: "Style", detail: "Rounded or Square to match your vibe.")
+                .init(symbol: "rectangle.roundedtop", title: "Location Services", detail: "Enable to show your city and local weather in overlays.")
             ]
         case .preview:
             return [
@@ -88,7 +88,7 @@ enum OnboardingStep: Int, CaseIterable, Identifiable {
     // Time estimate for the step
     var timeEstimate: String {
         switch self {
-        case .welcome: return "~1 min"
+        case .welcome: return "~2 min"
         case .install: return "~30 sec"
         case .personalize: return "~20 sec"
         case .preview: return "~10 sec"

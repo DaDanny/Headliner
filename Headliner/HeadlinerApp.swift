@@ -29,13 +29,18 @@ struct HeadlinerApp: App {
       ModernOnboardingView {
         hasCompletedOnboarding = true
         
-        // Close the onboarding window
+        // Close the onboarding window and activate menubar
         DispatchQueue.main.async {
-          NSApp.keyWindow?.close()
+          // Close the onboarding window
+          if let onboardingWindow = NSApp.windows.first(where: { 
+            $0.identifier?.rawValue == "onboarding" || $0.title == "Headliner" 
+          }) {
+            onboardingWindow.close()
+          }
+          
+          // Switch back to accessory so the app behaves like a menu-bar app
+          NSApp.setActivationPolicy(.accessory)
         }
-        
-        // Switch back to accessory so the app behaves like a menu-bar app
-        NSApp.setActivationPolicy(.accessory)
       }
       .withAppCoordinator(appCoordinator)
       .frame(width: 900, height: 600)

@@ -7,6 +7,7 @@
 
 import SwiftUI
 import AVFoundation
+import CoreLocation
 
 // MARK: - Welcome Media
 
@@ -139,12 +140,17 @@ struct PersonalizeMedia: View {
     @Binding var displayName: String
     @Binding var displayTitle: String
     @Binding var selectedCameraID: String
-    @Binding var style: ModernOnboardingViewModel.StyleShape
+    let onCameraSelect: ((String) -> Void)?
     
     @EnvironmentObject private var cameraService: CameraService
     
+    // Preview detection
+    private var isInPreviewMode: Bool {
+        ProcessInfo.processInfo.environment["XCODE_RUNNING_FOR_PREVIEWS"] == "1"
+    }
+    
     var body: some View {
-        VStack(spacing: 16) {
+        VStack(spacing: 12) {
             // Your Info Section
             PersonalizeSection(
                 icon: "person.text.rectangle",
@@ -171,11 +177,35 @@ struct PersonalizeMedia: View {
                 title: "Camera"
             ) {
                 VStack(alignment: .leading, spacing: 12) {
-                    Text("Choose your input camera. This will be used in the live preview.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
                     
-                    if cameraService.hasCameraPermission {
+                    if isInPreviewMode {
+                        // Mock camera selector for previews
+                        VStack(alignment: .leading, spacing: 8) {
+                            HStack {
+                                Image(systemName: "camera.fill")
+                                    .font(.system(size: 14))
+                                    .foregroundStyle(.secondary)
+                                
+                                Text("Built-in Camera (Preview Mode)")
+                                    .font(.callout)
+                                    .foregroundStyle(.primary)
+                                
+                                Spacer()
+                                
+                                Image(systemName: "chevron.up.chevron.down")
+                                    .font(.system(size: 12))
+                                    .foregroundStyle(.tertiary)
+                            }
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 8)
+                            .background(Color.secondary.opacity(0.08))
+                            .clipShape(RoundedRectangle(cornerRadius: 8))
+                            
+                            Text("Preview mode - camera access disabled")
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                        }
+                    } else if cameraService.hasCameraPermission {
                         LoomStyleSelector(
                             title: "Camera",
                             items: cameraService.availableCameras,
@@ -183,9 +213,7 @@ struct PersonalizeMedia: View {
                             onSelectionChange: { camera in
                                 if let camera = camera {
                                     selectedCameraID = camera.id
-                                    Task {
-                                        await cameraService.selectCamera(camera)
-                                    }
+                                    onCameraSelect?(camera.id)
                                 }
                             },
                             itemIcon: { _ in "camera.fill" },
@@ -214,24 +242,13 @@ struct PersonalizeMedia: View {
                 }
             }
             
-            // Overlay Style Section
+            // Location Services Section
             PersonalizeSection(
-                icon: "rectangle.roundedtop",
-                title: "Overlay Style"
+                icon: "location.fill",
+                title: "Location Services"
             ) {
-                VStack(spacing: 12) {
-                    HStack {
-                        ForEach(ModernOnboardingViewModel.StyleShape.allCases, id: \.self) { shape in
-                            StyleSegment(
-                                title: shape.rawValue,
-                                isSelected: style == shape,
-                                shape: shape
-                            ) {
-                                style = shape
-                            }
-                        }
-                    }
-                    .frame(maxWidth: .infinity)
+                VStack(alignment: .leading, spacing: 12) {
+                    LocationPermissionView()
                 }
             }
         }
@@ -239,7 +256,8 @@ struct PersonalizeMedia: View {
         .frame(maxWidth: 480)
         .onAppear {
             // Set initial camera selection if not already set
-            if selectedCameraID.isEmpty,
+            if !isInPreviewMode,
+               selectedCameraID.isEmpty,
                let firstCamera = cameraService.availableCameras.first {
                 selectedCameraID = firstCamera.id
             }
@@ -252,93 +270,112 @@ struct PersonalizeMedia: View {
 struct PreviewMedia: View {
     let name: String
     let title: String
-    let style: ModernOnboardingViewModel.StyleShape
+    @Binding var style: ModernOnboardingViewModel.StyleShape
+    let availablePresets: [SwiftUIPresetInfo]
+    @Binding var selectedPresetID: String?
+    let onPresetSelect: (SwiftUIPresetInfo) -> Void
     
     @EnvironmentObject private var cameraService: CameraService
+    @EnvironmentObject private var overlayService: OverlayService
     @State private var hasStartedPreview = false
     
+    // Preview detection
+    private var isInPreviewMode: Bool {
+        ProcessInfo.processInfo.environment["XCODE_RUNNING_FOR_PREVIEWS"] == "1"
+    }
+    
     var body: some View {
-        VStack(spacing: 16) {
-            Text("Live Preview")
-                .font(.headline)
-            
-            ZStack {
-                RoundedRectangle(cornerRadius: style == .rounded ? 16 : 4)
-                    .fill(Color.black.opacity(0.05))
-                    .strokeBorder(Color.secondary.opacity(0.3), lineWidth: 1)
-                    .frame(width: 480, height: 360)
+        HStack(spacing: 16) {
+            // Left: Preset Rail with Style Selector
+            VStack(spacing: 0) {
+                PresetRail(
+                    presets: availablePresets,
+                    selectedID: $selectedPresetID,
+                    onSelect: onPresetSelect
+                )
+                .frame(height: 280) // Reduced height
                 
-                if let frame = cameraService.currentPreviewFrame {
-                    Image(frame, scale: 1.0, label: Text("Camera preview"))
-                        .resizable()
-                        .aspectRatio(contentMode: .fit)
-                        .frame(width: 480, height: 360)
-                        .clipShape(RoundedRectangle(cornerRadius: style == .rounded ? 16 : 4))
-                        .overlay(
-                            previewOverlay
-                                .allowsHitTesting(false),
-                            alignment: .bottomLeading
-                        )
-                } else if hasStartedPreview {
-                    VStack(spacing: 12) {
-                        ProgressView()
-                            .scaleEffect(1.5)
-                        Text("Starting camera preview...")
-                            .font(.body)
-                            .foregroundStyle(.secondary)
-                    }
-                } else {
-                    VStack(spacing: 12) {
-                        Image(systemName: "camera.viewfinder")
-                            .font(.system(size: 48))
-                            .foregroundStyle(.secondary)
-                        
-                        Text("Camera preview will appear here")
-                            .font(.body)
-                            .foregroundStyle(.secondary)
-                    }
-                }
+                Spacer(minLength: 8)
+                
+                // Style Selector at bottom
+                StyleSelectorView(
+                    selectedStyle: $style
+                )
             }
             
-            Text("This is how you'll appear in video calls")
-                .font(.caption)
-                .foregroundStyle(.secondary)
+            // Center: Live Preview with Real Overlay
+            LivePreviewPane(
+                title: "Live Preview",
+                targetAspect: 16.0/9.0
+            ) {
+                ZStack {
+                    // Camera feed or mock preview for Xcode previews
+                    if isInPreviewMode {
+                        // Mock camera feed for previews
+                        RoundedRectangle(cornerRadius: 8)
+                            .fill(LinearGradient(
+                                colors: [.blue.opacity(0.3), .purple.opacity(0.3)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            ))
+                            .overlay(
+                                VStack(spacing: 8) {
+                                    Image(systemName: "camera.fill")
+                                        .font(.system(size: 32))
+                                        .foregroundStyle(.white.opacity(0.8))
+                                    
+                                    Text("Mock Camera Preview")
+                                        .font(.callout.weight(.medium))
+                                        .foregroundStyle(.white.opacity(0.9))
+                                    
+                                    Text("(Xcode Preview Mode)")
+                                        .font(.caption)
+                                        .foregroundStyle(.white.opacity(0.7))
+                                }
+                            )
+                    } else if let frame = cameraService.currentPreviewFrame {
+                        Image(frame, scale: 1.0, label: Text("Camera preview"))
+                            .resizable()
+                            .aspectRatio(contentMode: .fill)
+                    } else if hasStartedPreview {
+                        VStack(spacing: 12) {
+                            ProgressView()
+                                .scaleEffect(1.2)
+                            Text("Starting camera preview...")
+                                .font(.callout)
+                                .foregroundStyle(.secondary)
+                        }
+                    } else {
+                        VStack(spacing: 16) {
+                            Image(systemName: "camera.viewfinder")
+                                .font(.system(size: 42))
+                                .foregroundStyle(.secondary)
+                            
+                            Text("Camera preview will appear here")
+                                .font(.callout)
+                                .foregroundStyle(.secondary)
+                                .multilineTextAlignment(.center)
+                        }
+                    }
+                }
+                .background(Color.black)
+            }
+            .frame(maxWidth: .infinity)
         }
+        .padding()
         .onAppear {
-            Task {
-                hasStartedPreview = true
-                await cameraService.startOnboardingPreview()
+            if !isInPreviewMode {
+                Task {
+                    hasStartedPreview = true
+                    await cameraService.startOnboardingPreview()
+                }
             }
         }
         .onDisappear {
-            cameraService.stopOnboardingPreview()
-        }
-    }
-    
-    @ViewBuilder
-    private var previewOverlay: some View {
-        HStack {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(name.isEmpty ? "Your Name" : name)
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(.white)
-                
-                if !title.isEmpty {
-                    Text(title)
-                        .font(.system(size: 12))
-                        .foregroundStyle(.white.opacity(0.9))
-                }
+            if !isInPreviewMode {
+                cameraService.stopOnboardingPreview()
             }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 8)
-            .background(
-                RoundedRectangle(cornerRadius: style == .rounded ? 8 : 2)
-                    .fill(Color.black.opacity(0.7))
-            )
-            
-            Spacer()
         }
-        .padding(16)
     }
 }
 
@@ -420,7 +457,7 @@ struct StyleSegment: View {
     
     var body: some View {
         Button(action: action) {
-            HStack(spacing: 8) {
+            HStack(spacing: 6) {
                 // Mini thumbnail showing the style
                 RoundedRectangle(cornerRadius: shape == .rounded ? 4 : 1)
                     .fill(Color.secondary.opacity(0.3))
@@ -433,7 +470,7 @@ struct StyleSegment: View {
                 Text(title)
                     .font(.system(size: 13, weight: .medium))
             }
-            .padding(.horizontal, 16)
+            .padding(.horizontal, 12)
             .padding(.vertical, 8)
             .background(
                 RoundedRectangle(cornerRadius: 8, style: .continuous)
@@ -443,6 +480,132 @@ struct StyleSegment: View {
         }
         .buttonStyle(.plain)
         .animation(.easeInOut(duration: 0.2), value: isSelected)
+    }
+}
+
+// MARK: - Supporting Components for Location and Style
+
+struct LocationPermissionView: View {
+    @EnvironmentObject private var locationManager: LocationPermissionManager
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 10) {
+                Image(systemName: locationStatusIcon)
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundStyle(locationStatusColor)
+                    .frame(width: 16)
+                
+                Text(locationStatusText)
+                    .font(.system(size: 14))
+                    .foregroundStyle(.primary)
+                
+                Spacer()
+                
+                if locationManager.authorizationStatus == .notDetermined {
+                    Button("Enable") {
+                        locationManager.requestLocationPermission()
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.small)
+                }
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
+            .background(Color.secondary.opacity(0.08))
+            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .stroke(Color.secondary.opacity(0.15), lineWidth: 1)
+            )
+            
+            if locationManager.authorizationStatus == .denied {
+                Text("You can enable location services in System Settings > Privacy & Security > Location Services.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
+    }
+    
+    private var locationStatusIcon: String {
+        switch locationManager.authorizationStatus {
+        case .authorizedAlways, .authorizedWhenInUse:
+            return "location.fill"
+        case .denied, .restricted:
+            return "location.slash.fill"
+        default:
+            return "location"
+        }
+    }
+    
+    private var locationStatusColor: Color {
+        switch locationManager.authorizationStatus {
+        case .authorizedAlways, .authorizedWhenInUse:
+            return .green
+        case .denied, .restricted:
+            return .orange
+        default:
+            return .secondary
+        }
+    }
+    
+    private var locationStatusText: String {
+        switch locationManager.authorizationStatus {
+        case .authorizedAlways, .authorizedWhenInUse:
+            return "Location services enabled"
+        case .denied:
+            return "Location access denied"
+        case .restricted:
+            return "Location access restricted"
+        default:
+            return "Enable location for city and weather"
+        }
+    }
+}
+
+struct StyleSelectorView: View {
+    @Binding var selectedStyle: ModernOnboardingViewModel.StyleShape
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 8) {
+                Image(systemName: "rectangle.roundedtop")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(Color.accentColor)
+                    .frame(width: 16)
+                
+                Text("Style")
+                    .font(.headline)
+                    .foregroundStyle(.primary)
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            
+            VStack(spacing: 6) {
+                HStack(spacing: 4) {
+                    ForEach(ModernOnboardingViewModel.StyleShape.allCases, id: \.self) { shape in
+                        StyleSegment(
+                            title: shape.rawValue,
+                            isSelected: selectedStyle == shape,
+                            shape: shape
+                        ) {
+                            selectedStyle = shape
+                        }
+                    }
+                }
+                .frame(maxWidth: .infinity)
+            }
+            .padding(.horizontal, 12)
+            .padding(.bottom, 8)
+        }
+        .frame(width: 220)
+        .background(.regularMaterial)
+        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .stroke(.quaternary, lineWidth: 1)
+        )
+        .shadow(color: .black.opacity(0.04), radius: 2, y: 1)
     }
 }
 

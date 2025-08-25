@@ -44,7 +44,20 @@ final class ModernOnboardingViewModel: ObservableObject {
         case square = "Square"
     }
     
-    @Published var styleShape: StyleShape = .rounded
+    @Published var styleShape: StyleShape = .rounded {
+        didSet { updateSurfaceStyle() }
+    }
+    
+    // MARK: - Preview Step Support
+    
+    @Published var availablePresets: [SwiftUIPresetInfo] = []
+    @Published var selectedPresetID: String? {
+        didSet {
+            if let presetID = selectedPresetID {
+                overlayService?.selectPreset(presetID)
+            }
+        }
+    }
     
     // MARK: - Service References
     
@@ -86,6 +99,11 @@ final class ModernOnboardingViewModel: ObservableObject {
         self.overlayService = overlayService
         
         setupBindings()
+        loadAvailablePresets()
+        
+        // Apply initial settings immediately
+        updateOverlayTokens()
+        updateSurfaceStyle()
     }
     
     // MARK: - Navigation
@@ -109,14 +127,10 @@ final class ModernOnboardingViewModel: ObservableObject {
     }
     
     func complete() {
-        // Save personalization data
-        if let appGroupDefaults = UserDefaults(suiteName: Identifiers.appGroup) {
-            appGroupDefaults.set(displayName, forKey: "HL.displayName")
-            appGroupDefaults.set(displayTitle, forKey: "HL.tagline")
-            appGroupDefaults.synchronize()
-        }
+        // Save personalization data (already done in real-time, but ensure it's persisted)
+        savePersonalizationData()
         
-        // Update overlay tokens
+        // Update overlay tokens via coordinator (in addition to service updates)
         let tokens = OverlayTokens(
             displayName: displayName.isEmpty ? "Your Name" : displayName,
             tagline: displayTitle.isEmpty ? "Your Title" : displayTitle
@@ -153,7 +167,71 @@ final class ModernOnboardingViewModel: ObservableObject {
         cameraService?.stopOnboardingPreview()
     }
     
+    func selectPreset(_ preset: SwiftUIPresetInfo) {
+        selectedPresetID = preset.id
+    }
+    
+    func selectCamera(_ cameraID: String) {
+        selectedCameraID = cameraID
+        if let camera = cameraService?.availableCameras.first(where: { $0.id == cameraID }) {
+            Task { @MainActor in
+                await cameraService?.selectCamera(camera)
+            }
+        }
+    }
+    
     // MARK: - Private Methods
+    
+    private func updateOverlayTokens() {
+        let tokens = OverlayTokens(
+            displayName: displayName.isEmpty ? "Your Name" : displayName,
+            tagline: displayTitle.isEmpty ? "Your Title" : displayTitle
+        )
+        overlayService?.updateTokens(tokens)
+    }
+    
+    private func updateSurfaceStyle() {
+        let surfaceStyle = convertToSurfaceStyle(styleShape)
+        overlayService?.selectSurfaceStyle(surfaceStyle)
+    }
+    
+    private func convertToSurfaceStyle(_ styleShape: StyleShape) -> SurfaceStyle {
+        switch styleShape {
+        case .rounded:
+            return .rounded
+        case .square:
+            return .square
+        }
+    }
+    
+    
+    private func savePersonalizationData() {
+        guard let appGroupDefaults = UserDefaults(suiteName: Identifiers.appGroup) else { return }
+        appGroupDefaults.set(displayName, forKey: "HL.displayName")
+        appGroupDefaults.set(displayTitle, forKey: "HL.tagline")
+        appGroupDefaults.synchronize()
+    }
+    
+    private func loadAvailablePresets() {
+        guard let overlayService = overlayService else { return }
+        
+        let curatedIds = [
+            "swiftui.identity.strip",
+            "swiftui.modern.personal",
+            "swiftui.clean",
+            "swiftui.modern.company.branded",
+            "swiftui.info.corner"
+        ]
+        
+        availablePresets = overlayService.availablePresets.filter {
+            curatedIds.contains($0.id)
+        }
+        
+        // Set initial selection to first preset
+        if selectedPresetID == nil, let firstPreset = availablePresets.first {
+            selectedPresetID = firstPreset.id
+        }
+    }
     
     private func setupBindings() {
         // Monitor extension status and map to install state
@@ -164,12 +242,28 @@ final class ModernOnboardingViewModel: ObservableObject {
             }
             .store(in: &cancellables)
         
-        // Monitor camera selection
-        cameraService?.$selectedCamera
-            .compactMap { $0 }
-            .receive(on: DispatchQueue.main)
-            .sink { [weak self] camera in
-                self?.selectedCameraID = camera.id
+        // Debounced display name updates
+        $displayName
+            .debounce(for: .milliseconds(500), scheduler: DispatchQueue.main)
+            .sink { [weak self] _ in
+                self?.updateOverlayTokens()
+                self?.savePersonalizationData()
+            }
+            .store(in: &cancellables)
+        
+        // Debounced display title updates
+        $displayTitle
+            .debounce(for: .milliseconds(500), scheduler: DispatchQueue.main)
+            .sink { [weak self] _ in
+                self?.updateOverlayTokens()
+                self?.savePersonalizationData()
+            }
+            .store(in: &cancellables)
+        
+        // Style changes
+        $styleShape
+            .sink { [weak self] _ in
+                self?.updateSurfaceStyle()
             }
             .store(in: &cancellables)
     }
