@@ -9,12 +9,17 @@
 //  Re-enable after migration complete by removing #if false wrapper.
 //
 
-// Re-enabled for updated architecture integration
+//  🚨 LEGACY ONBOARDING - REFERENCE ONLY 🚨
+//  This file contains the original onboarding implementation.
+//  It has been replaced by ModernOnboardingView in Views/ModernOnboarding/
+//  Wrapped in #if false to prevent compilation conflicts.
+
+#if false // LEGACY CODE - DO NOT COMPILE
 
 import SwiftUI
 import CoreLocation
 
-enum OnboardingStep: Int, CaseIterable {
+enum LegacyOnboardingStep: Int, CaseIterable {
   case welcome = 1
   case installExtension = 2
   case personalization = 3
@@ -39,7 +44,7 @@ struct OnboardingView: View {
   @EnvironmentObject private var overlayService: OverlayService
   @EnvironmentObject private var locationManager: LocationPermissionManager
   
-  @State private var currentStep: OnboardingStep = .welcome
+  @State private var currentStep: LegacyOnboardingStep = .welcome
   @State private var hasInitialized = false
   @State private var selectedCameraID: String = ""
   @State private var selectedPresetId: String = "professional"
@@ -53,7 +58,7 @@ struct OnboardingView: View {
     VStack(spacing: 0) {
       // Progress Bar
       if currentStep != .welcome {
-        OnboardingProgressBar(currentStep: currentStep.rawValue, totalSteps: 4)
+        LegacyOnboardingProgressBar(currentStep: currentStep.rawValue, totalSteps: 4)
           .padding(.top, 20)
       }
       
@@ -98,7 +103,7 @@ struct OnboardingView: View {
   // MARK: - Actions
   
   private func nextStep() {
-    if let nextStep = OnboardingStep(rawValue: currentStep.rawValue + 1) {
+    if let nextStep = LegacyOnboardingStep(rawValue: currentStep.rawValue + 1) {
       withAnimation(.easeInOut(duration: 0.3)) {
         currentStep = nextStep
       }
@@ -132,7 +137,7 @@ struct OnboardingView: View {
 
 // MARK: - Progress Bar
 
-struct OnboardingProgressBar: View {
+struct LegacyOnboardingProgressBar: View {
   let currentStep: Int
   let totalSteps: Int
   
@@ -1773,3 +1778,5 @@ private struct SwiftUIPresetCard: View {
 
 // End OnboardingView implementation
 }
+
+#endif // LEGACY CODE - DO NOT COMPILE

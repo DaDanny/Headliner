@@ -11,6 +11,7 @@ import SwiftUI
 @MainActor
 final class OnboardingWindowManager: ObservableObject {
   private var window: NSWindow?
+  private var windowDelegate: OnboardingWindowDelegate?
   private let logger = HeadlinerLogger.logger(for: .application)
   
   /// Shows the onboarding window
@@ -27,7 +28,7 @@ final class OnboardingWindowManager: ObservableObject {
     // Create new window if none exists or existing one is closed
     logger.debug("🚀 Creating onboarding window...")
     
-    let onboardingView = OnboardingView(appCoordinator: appCoordinator)
+    let onboardingView = ModernOnboardingView()
       .withAppCoordinator(appCoordinator)
     
     let hostingController = NSHostingController(rootView: onboardingView)
@@ -49,9 +50,11 @@ final class OnboardingWindowManager: ObservableObject {
     window?.isReleasedWhenClosed = false
     
     // Handle window closing
-    window?.delegate = OnboardingWindowDelegate { [weak self] in
+    windowDelegate = OnboardingWindowDelegate { [weak self] in
       self?.window = nil
+      self?.windowDelegate = nil
     }
+    window?.delegate = windowDelegate
     
     // Bring app to foreground and show window prominently
     NSApplication.shared.activate(ignoringOtherApps: true)

@@ -18,17 +18,16 @@ struct HeadlinerApp: App {
   @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
   
   init() {
-    if !AppLifecycleManager.enforcesSingleInstance() {
-      fatalError("Another instance is already running")
-    }
+//    if !AppLifecycleManager.enforcesSingleInstance() {
+//      fatalError("Another instance is already running")
+//    }
   }
   
   var body: some Scene {
     // 1) Onboarding scene (only opened programmatically)
     WindowGroup(id: "onboarding") {
-      OnboardingView(appCoordinator: appCoordinator) {
+      ModernOnboardingView {
         hasCompletedOnboarding = true
-        appCoordinator.completeOnboarding()
         
         // Close the onboarding window
         DispatchQueue.main.async {
@@ -39,14 +38,14 @@ struct HeadlinerApp: App {
         NSApp.setActivationPolicy(.accessory)
       }
       .withAppCoordinator(appCoordinator)
-      .frame(minWidth: 1000, idealWidth: 1100, minHeight: 700, idealHeight: 800)
+      .frame(width: 900, height: 600)
       .onAppear {
         // Ensure the onboarding window is visible and focused on first show
         NSApp.setActivationPolicy(.regular)               // show Dock during onboarding
         NSApp.activate(ignoringOtherApps: true)
       }
     }
-    .defaultSize(width: 1100, height: 800)
+    .defaultSize(width: 900, height: 600)
     .windowResizability(.contentSize)
     .windowStyle(.hiddenTitleBar)
     .windowToolbarStyle(.unifiedCompact)

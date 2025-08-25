@@ -14,11 +14,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     logger.debug("🚀 App launched")
     
     // Enforce single instance
-    if !AppLifecycleManager.enforcesSingleInstance() {
-      logger.error("Multiple instances detected - terminating")
-      NSApplication.shared.terminate(nil)
-      return
-    }
+    // if !AppLifecycleManager.enforcesSingleInstance() {
+    //   logger.error("Multiple instances detected - terminating")
+    //   NSApplication.shared.terminate(nil)
+    //   return
+    // }
     
     // Check for zombie processes
     AppLifecycleManager.checkForZombieProcesses()
