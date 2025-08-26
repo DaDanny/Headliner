@@ -199,12 +199,17 @@ final class CameraService: NSObject, ObservableObject {
       logger.debug("📊 Camera switch completed in \(String(format: "%.2f", duration))s")
     }
     
-    // Restart camera if currently running to apply device change
+    // Apply device change immediately
     if cameraStatus == .running {
       logger.debug("🔄 Restarting camera to apply device change")
       stopCamera()
       try? await Task.sleep(nanoseconds: 2_000_000_000)
       try? await startCamera()
+    } else {
+      // Even if main app camera is stopped, notify extension to apply the device change
+      logger.debug("🔄 Camera stopped - but notifying extension to apply device change for preview")
+      // Extension should restart its capture session with new device
+      // The extension will handle this through the setCameraDevice notification already sent
     }
   }
   

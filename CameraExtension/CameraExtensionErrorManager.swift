@@ -61,7 +61,7 @@ final class CameraExtensionErrorManager {
 	
 	// MARK: - Properties
 	
-	private let logger = Logger(subsystem: "com.dannyfrancken.Headliner", category: "Extension")
+	private let logger = Logger(subsystem: "com.dannyfrancken.Headliner", category: "ExtensionErrorManager")
 	weak var delegate: CameraExtensionErrorManagerDelegate?
 	
 	// Error tracking

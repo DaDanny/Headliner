@@ -30,6 +30,7 @@ public struct HeadlinerLogger {
         case overlays = "Overlays"
         case analytics = "Analytics"
         case performance = "Performance"
+        case diagnostics = "Diagnostics"
         // Focused notification logging categories
         case internalNotifications = "notifications.internal"
         case crossAppNotifications = "notifications.crossapp"
