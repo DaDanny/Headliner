@@ -135,6 +135,32 @@ Details about the location and weather features:
 - Try restarting the app after extension installation
 - Check System Preferences > Privacy & Security for any pending approvals
 
+### Debugging & Log Filtering
+
+Headliner includes comprehensive logging for debugging issues. Use Console.app with these filters:
+
+**For camera issues:**
+```
+subsystem:com.dannyfrancken.headliner category:CaptureSession OR category:Extension
+```
+
+**For notification/communication issues:**
+```
+subsystem:com.dannyfrancken.headliner category:notifications.crossapp
+```
+
+**To hide diagnostic noise:**
+```
+subsystem:com.dannyfrancken.headliner AND NOT category:Diagnostics
+```
+
+**All Headliner logs:**
+```
+subsystem:com.dannyfrancken.headliner
+```
+
+See `LOG_FILTERING.md` for complete filtering guide.
+
 ## Development
 
 ### Building from Source
@@ -201,7 +227,8 @@ For detailed component descriptions, see the [technical documentation](docs/CAME
 
 - **SwiftUI**: Modern declarative UI framework with real-time overlay rendering via `ImageRenderer`
 - **App Groups**: Inter-process communication for sharing rendered overlays and camera dimensions
-- **Darwin Notifications**: Lightweight IPC for real-time overlay updates
+- **Unified Notifications**: Clean MVP notification system with Internal and CrossApp namespaces for reliable IPC
+- **Darwin Notifications**: Lightweight IPC for real-time overlay updates between app and extension
 - **CoreImage**: GPU-accelerated image processing and compositing pipeline
 - **Dimension Synchronization**: Automatic caching of actual camera pixel buffer size (1920x1080) for perfect overlay scaling
 - **CoreMediaIO**: Camera extension APIs for virtual camera integration
@@ -239,6 +266,8 @@ Weather data is fetched from either Apple's WeatherKit service or the open-sourc
 - **NEW**: Auto-save settings for seamless UX
 - **NEW**: Comprehensive location services component
 - **NEW**: Visual overlay preset selection
+- **NEW**: Unified notification system with proper log filtering
+- **NEW**: Reliable camera switching and automatic stop when external apps disconnect
 
 🚧 **Known Limitations**:
 

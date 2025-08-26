@@ -7,6 +7,7 @@
 
 import AppKit
 import AVFoundation
+import Foundation
 
 @MainActor
 final class AppLifecycleManager {
@@ -69,7 +70,7 @@ final class AppLifecycleManager {
     removeMenuBarIcon()
     
     // 5. Post shutdown notification to extension
-    NotificationManager.postNotification(named: .stopStream)
+    Notifications.CrossApp.post(.stopStream)
     
     // 6. Force synchronize UserDefaults
     UserDefaults.standard.synchronize()

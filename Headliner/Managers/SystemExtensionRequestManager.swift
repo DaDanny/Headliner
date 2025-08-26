@@ -24,19 +24,13 @@ class SystemExtensionRequestManager: NSObject, ObservableObject {
   @Published var phase: ExtensionInstallPhase = .idle
 
   @discardableResult
-  func postNotification(named notificationName: NotificationName) -> Bool {
+  func postNotification(named notificationName: CrossAppNotificationName) -> Bool {
     logger
       .debug(
         "Posting notification \(notificationName.rawValue) from container app"
       )
 
-    CFNotificationCenterPostNotification(
-      CFNotificationCenterGetDarwinNotifyCenter(),
-      CFNotificationName(notificationName.rawValue as NSString),
-      nil,
-      nil,
-      true
-    )
+    Notifications.CrossApp.post(notificationName)
     return true
   }
 

@@ -69,6 +69,8 @@ final class ExtensionService: ObservableObject {
     healthMonitorTimer?.invalidate()
   }
   
+  // MARK: - Darwin bridge removed - now centralized in AppCoordinator
+  
   // MARK: - Public Methods
   
   func install() {
@@ -159,16 +161,13 @@ final class ExtensionService: ObservableObject {
       }
       .store(in: &cancellables)
     
-    // Phase 3.2: Monitor extension runtime status changes (replaces log parsing)
-    // TODO: Re-enable once notification system is stabilized
-    /*
-    NotificationCenter.default.publisher(for: NotificationName.statusChanged.nsNotificationName)
+    // Phase 3.2: Monitor extension runtime status changes (now using InternalNotifications)
+    Notifications.Internal.publisher(for: .extensionStatusChanged)
       .receive(on: DispatchQueue.main)
       .sink { [weak self] _ in
         self?.handleExtensionStatusChange()
       }
       .store(in: &cancellables)
-    */
     
     // Recheck on app activation (but don't reset if already installed)
     NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)

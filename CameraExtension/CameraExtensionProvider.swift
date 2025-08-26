@@ -18,6 +18,13 @@ import OSLog
 
 
 private let extensionLogger = Logger(subsystem: "com.dannyfrancken.Headliner", category: "Extension")
+private let diagnosticsLogger = Logger(subsystem: "com.dannyfrancken.Headliner", category: "Diagnostics")
+
+// MARK: - Notification System (Uses HeadlinerShared definitions)
+// CameraExtension now has access to HeadlinerShared files including:
+// - CrossAppNotificationName (from Notifications.swift)
+// - ExtensionStatusKeys (from AppStateTypes.swift)  
+// - Identifiers (from Identifiers.swift)
 
 // Phase 4.2: Import dedicated managers for better separation of concerns
 // Error types and performance types are now defined in their respective manager files
@@ -91,17 +98,19 @@ class CameraExtensionDeviceSource: NSObject, CMIOExtensionDeviceSource, AVCaptur
 		super.init()
 		
 		// Phase 4.1: Add capture session interruption notifications
+		// NOTE: These are AVFoundation SYSTEM notifications, NOT custom app notifications
+		// DO NOT migrate these to CrossAppExtensionNotifications - they handle camera hardware interruptions
 		NotificationCenter.default.addObserver(
 			self,
 			selector: #selector(captureSessionWasInterrupted(_:)),
-			name: AVCaptureSession.wasInterruptedNotification,
+			name: AVCaptureSession.wasInterruptedNotification, // System notification from AVFoundation
 			object: nil
 		)
 		
 		NotificationCenter.default.addObserver(
 			self,
 			selector: #selector(captureSessionInterruptionEnded(_:)),
-			name: AVCaptureSession.interruptionEndedNotification,
+			name: AVCaptureSession.interruptionEndedNotification, // System notification from AVFoundation
 			object: nil
 		)
 		let deviceID = UUID() // replace this with your device UUID
@@ -373,9 +382,13 @@ class CameraExtensionDeviceSource: NSObject, CMIOExtensionDeviceSource, AVCaptur
 			// 
 			// OLD BROKEN CODE: _isAppControlledStreaming = false
 			
-			// Only stop camera if app explicitly wants it stopped
+			// Stop camera if no external apps are connected AND (app hasn't requested streaming OR auto-start is disabled)
 			_streamStateLock.lock()
-			let shouldStopCamera = !_isAppControlledStreaming
+			let noExternalApps = _streamingCounter == 0
+			let appNotRequestingStream = !_isAppControlledStreaming
+			let autoStartDisabled = !ExtensionStatusManager.getAutoStartEnabled()
+			// Stop camera when no external apps AND either app didn't request OR auto-start is off
+			let shouldStopCamera = noExternalApps && (appNotRequestingStream || autoStartDisabled)
 			_streamStateLock.unlock()
 			
 			if shouldStopCamera {
@@ -386,7 +399,13 @@ class CameraExtensionDeviceSource: NSObject, CMIOExtensionDeviceSource, AVCaptur
 				ExtensionStatusManager.writeStatus(.idle)
 				extensionLogger.debug("Stopped camera capture - app not streaming")
 			} else {
-				extensionLogger.debug("Keeping camera active - app still wants streaming (including auto-start)")
+				if !noExternalApps {
+					extensionLogger.debug("Keeping camera active - external apps still connected (streaming counter: \(_streamingCounter))")
+				} else if _isAppControlledStreaming && !autoStartDisabled {
+					extensionLogger.debug("Keeping camera active - main app requested streaming and auto-start enabled")
+				} else {
+					extensionLogger.debug("Keeping camera active - unexpected condition")
+				}
 			}
 		}
 	}
@@ -885,8 +904,20 @@ class CameraExtensionDeviceSource: NSObject, CMIOExtensionDeviceSource, AVCaptur
 					ExtensionStatusManager.writeStatus(.error, error: "Failed to switch camera device")
 				}
 			} else {
-				// Camera not running - device change will take effect on next start
-				extensionLogger.debug("Camera not active - device change will apply on next start")
+				// Camera not running - start preview mode for immediate device switching
+				extensionLogger.debug("Camera not active - starting preview mode to apply device change immediately")
+				
+				// Check if we should start streaming (external app requesting or auto-start enabled)
+				_streamStateLock.lock()
+				let shouldStartPreview = _streamingCounter > 0 || ExtensionStatusManager.getAutoStartEnabled()
+				_streamStateLock.unlock()
+				
+				if shouldStartPreview {
+					extensionLogger.debug("🚀 Starting camera capture to apply device change")
+					startCameraCapture()
+				} else {
+					extensionLogger.debug("💤 Device change queued - will apply when streaming starts")
+				}
 			}
 		} else {
 			extensionLogger.debug("No capture session manager - device change will apply on camera initialization")
@@ -1023,6 +1054,8 @@ class CameraExtensionDeviceSource: NSObject, CMIOExtensionDeviceSource, AVCaptur
 		// Phase 2.4: Cleanup heartbeat timer
 		stopHeartbeatTimer()
 		
+		// NOTE: This removes AVFoundation system notification observers (capture session interruptions)
+		// This is NOT related to our custom notification migration - it's for system hardware events
 		NotificationCenter.default.removeObserver(self)
 		extensionLogger.debug("🧼 Cleaned up CameraExtensionDeviceSource resources")
 	}
@@ -1113,15 +1146,15 @@ extension CameraExtensionDeviceSource: CameraExtensionDiagnosticsDelegate {
 	
 	func diagnostics(_ manager: CameraExtensionDiagnostics, didUpdateMetrics metrics: DiagnosticMetrics) {
 		// Log periodic metrics updates for monitoring
-		extensionLogger.debug("📊 Metrics Update: FPS=\(String(format: "%.1f", metrics.frameRate)), Memory=\(String(format: "%.1f", metrics.memoryUsageMB))MB, Health=\(metrics.systemHealth.emoji)\(metrics.systemHealth.rawValue)")
+		diagnosticsLogger.debug("📊 Metrics Update: FPS=\(String(format: "%.1f", metrics.frameRate)), Memory=\(String(format: "%.1f", metrics.memoryUsageMB))MB, Health=\(metrics.systemHealth.emoji)\(metrics.systemHealth.rawValue)")
 	}
 	
 	func diagnostics(_ manager: CameraExtensionDiagnostics, didDetectIssue issue: String, severity: OSLogType) {
 		switch severity {
 		case .error:
-			extensionLogger.error("🚨 Diagnostic Issue: \(issue, privacy: .public)")
+			diagnosticsLogger.error("🚨 Diagnostic Issue: \(issue, privacy: .public)")
 		default:
-			extensionLogger.warning("⚠️ Diagnostic Issue: \(issue, privacy: .public)")
+			diagnosticsLogger.warning("⚠️ Diagnostic Issue: \(issue, privacy: .public)")
 		}
 	}
 }
@@ -1215,7 +1248,6 @@ class CameraExtensionProviderSource: NSObject, CMIOExtensionProviderSource {
 	
 	private var deviceSource: CameraExtensionDeviceSource!
     
-    private let notificationCenter = CFNotificationCenterGetDarwinNotifyCenter()
     private var notificationListenerStarted = false
 
 	
@@ -1287,7 +1319,7 @@ class CameraExtensionProviderSource: NSObject, CMIOExtensionProviderSource {
     private func notificationReceived(notificationName: String) {
         extensionLogger.debug("📡 Received notification: \(notificationName)")
         
-        guard let name = NotificationName(rawValue: notificationName) else {
+        guard let name = CrossAppNotificationName(rawValue: notificationName) else {
             extensionLogger.debug("❌ Unknown notification name: \(notificationName)")
             return
         }
@@ -1323,27 +1355,36 @@ class CameraExtensionProviderSource: NSObject, CMIOExtensionProviderSource {
     }
 
     private func startNotificationListeners() {
-        for notificationName in NotificationName.allCases {
+        for notificationName in CrossAppNotificationName.allCases {
             let observer = UnsafeRawPointer(Unmanaged.passUnretained(self).toOpaque())
 
-            CFNotificationCenterAddObserver(CFNotificationCenterGetDarwinNotifyCenter(), observer, { _, observer, name, _, _ in
-                if let observer = observer, let name = name {
-                    let extensionProviderSourceSelf = Unmanaged<CameraExtensionProviderSource>.fromOpaque(observer).takeUnretainedValue()
-                    extensionProviderSourceSelf.notificationReceived(notificationName: name.rawValue as String)
-                }
-            },
-            notificationName.rawValue as CFString, nil, .deliverImmediately)
+            // Use raw CFNotificationCenter calls in extension - it runs in separate process
+            CFNotificationCenterAddObserver(
+                CFNotificationCenterGetDarwinNotifyCenter(),
+                observer,
+                { _, observer, name, _, _ in
+                    if let observer = observer, let name = name {
+                        let extensionProviderSourceSelf = Unmanaged<CameraExtensionProviderSource>.fromOpaque(observer).takeUnretainedValue()
+                        extensionProviderSourceSelf.notificationReceived(notificationName: name.rawValue as String)
+                    }
+                },
+                notificationName.rawValue as CFString,
+                nil,
+                .deliverImmediately
+            )
         }
         
         notificationListenerStarted = true
-        extensionLogger.debug("✅ Started notification listeners for \(NotificationName.allCases.count) notifications")
+        extensionLogger.debug("✅ Started notification listeners for \(CrossAppNotificationName.allCases.count) notifications")
     }
 
     private func stopNotificationListeners() {
         if notificationListenerStarted {
-            CFNotificationCenterRemoveEveryObserver(notificationCenter,
-                                                    Unmanaged.passRetained(self)
-                                                        .toOpaque())
+            let observer = UnsafeRawPointer(Unmanaged.passUnretained(self).toOpaque())
+            CFNotificationCenterRemoveEveryObserver(
+                CFNotificationCenterGetDarwinNotifyCenter(),
+                observer
+            )
             notificationListenerStarted = false
         }
     }

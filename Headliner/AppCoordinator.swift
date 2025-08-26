@@ -38,6 +38,9 @@ final class AppCoordinator: NSObject, SPUUpdaterDelegate {
   private let logger = HeadlinerLogger.logger(for: .application)
   private let analytics = AnalyticsManager.shared
   
+  // MARK: - Notification Bridge
+  private var bridgeToken: NSObjectProtocol?
+  
   // MARK: - Initialization
   
   override init() {
@@ -63,6 +66,13 @@ final class AppCoordinator: NSObject, SPUUpdaterDelegate {
     self.updater = UpdaterService(updaterDelegate: self)
     
     setupBindings()
+  }
+  
+  deinit {
+    // Clean up notification bridge
+    if let token = bridgeToken {
+      Notifications.Internal.removeObserver(token)
+    }
   }
   
   // MARK: - App Lifecycle
@@ -214,6 +224,12 @@ final class AppCoordinator: NSObject, SPUUpdaterDelegate {
   // MARK: - Private Methods
   
   private func setupBindings() {
+    // Setup single notification bridge (MVP pattern)
+    bridgeToken = Notifications.CrossApp.bridgeToInternal(
+      crossApp: .statusChanged,
+      internalNote: .extensionStatusChanged
+    )
+    
     // Coordinate between services
     
     // When extension installs, refresh cameras
@@ -228,7 +244,7 @@ final class AppCoordinator: NSObject, SPUUpdaterDelegate {
       .store(in: &cancellables)
     
     // When location permission granted, start personal info
-    NotificationCenter.default.publisher(for: .locationPermissionGranted)
+    Notifications.Internal.publisher(for: .locationPermissionGranted)
       .receive(on: DispatchQueue.main)
       .sink { [weak self] _ in
         self?.personalInfo.start()

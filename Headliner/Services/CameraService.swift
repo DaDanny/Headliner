@@ -42,7 +42,7 @@ final class CameraService: NSObject, ObservableObject {
   private var selfPreviewCaptureSession: AVCaptureSession?
   private var selfPreviewOutput: AVCaptureVideoDataOutput?
   private let selfPreviewQueue = DispatchQueue(label: "com.headliner.selfpreview", qos: .userInitiated)
-  private let notificationManager = NotificationManager.self
+  // Removed: private let notificationManager = NotificationManager.self
   private let logger = HeadlinerLogger.logger(for: .captureSession)
   
   // Direct frame handling (replaces OutputImageManager)
@@ -89,7 +89,7 @@ final class CameraService: NSObject, ObservableObject {
     statusMessage = "Starting camera..."
     
     // Notify extension to start capturing from physical camera
-    notificationManager.postNotification(named: .startStream)
+    Notifications.CrossApp.post(.startStream)
     
     // Start self-preview from virtual camera (shows exactly what Google Meet sees)
     setupSelfPreviewFromVirtualCamera()
@@ -111,7 +111,7 @@ final class CameraService: NSObject, ObservableObject {
     logger.debug("Starting onboarding preview...")
     
     // Notify extension to start capturing from physical camera
-    notificationManager.postNotification(named: .startStream)
+    Notifications.CrossApp.post(.startStream)
     
     // Start self-preview from virtual camera to show user what they'll look like
     setupSelfPreviewFromVirtualCamera()
@@ -126,7 +126,7 @@ final class CameraService: NSObject, ObservableObject {
     logger.debug("Stopping onboarding preview...")
     
     // Stop extension camera capture
-    notificationManager.postNotification(named: .stopStream)
+    Notifications.CrossApp.post(.stopStream)
     
     // Stop self-preview capture session
     selfPreviewCaptureSession?.stopRunning()
@@ -146,7 +146,7 @@ final class CameraService: NSObject, ObservableObject {
     statusMessage = "Stopping camera..."
     
     // Stop extension camera capture
-    notificationManager.postNotification(named: .stopStream)
+    Notifications.CrossApp.post(.stopStream)
     
     // Stop self-preview capture session
     selfPreviewCaptureSession?.stopRunning()
@@ -185,7 +185,7 @@ final class CameraService: NSObject, ObservableObject {
       }
       
       // Notify extension of camera device change
-      notificationManager.postNotification(named: .setCameraDevice)
+      Notifications.CrossApp.post(.setCameraDevice)
       logger.debug("📡 Sent setCameraDevice notification to extension")
     } else {
       logger.error("❌ Failed to access app group UserDefaults")
@@ -199,12 +199,17 @@ final class CameraService: NSObject, ObservableObject {
       logger.debug("📊 Camera switch completed in \(String(format: "%.2f", duration))s")
     }
     
-    // Restart camera if currently running to apply device change
+    // Apply device change immediately
     if cameraStatus == .running {
       logger.debug("🔄 Restarting camera to apply device change")
       stopCamera()
       try? await Task.sleep(nanoseconds: 2_000_000_000)
       try? await startCamera()
+    } else {
+      // Even if main app camera is stopped, notify extension to apply the device change
+      logger.debug("🔄 Camera stopped - but notifying extension to apply device change for preview")
+      // Extension should restart its capture session with new device
+      // The extension will handle this through the setCameraDevice notification already sent
     }
   }
   
