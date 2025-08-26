@@ -552,8 +552,10 @@ private struct OverlayRow: View {
       return .blue
     case .branded:
       return .purple
+    case .debug:
+        return .orange
     case .creative:
-      return .orange
+      return .green
     }
   }
 }

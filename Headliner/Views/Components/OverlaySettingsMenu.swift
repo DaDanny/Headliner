@@ -83,6 +83,12 @@ struct OverlaySettingsMenu: View {
             Divider()
                 .padding(.horizontal, 12)
             
+            // Debug toggle section
+            debugToggleSection
+            
+            Divider()
+                .padding(.horizontal, 12)
+            
             // Overlay list with section headers
             overlayListSection
         }
@@ -143,6 +149,25 @@ struct OverlaySettingsMenu: View {
             .padding(.vertical, 6)
     }
     
+    
+    // MARK: - Debug Toggle Section
+    
+    private var debugToggleSection: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("Debug")
+                .font(.system(size: 12, weight: .medium))
+                .foregroundColor(.secondary)
+            
+            Toggle("Show Debug Overlays", isOn: $overlayService.showDebugOverlays)
+                .font(.system(size: 13))
+                .controlSize(.small)
+                .onChange(of: overlayService.showDebugOverlays) { _, _ in
+                    overlayService.saveShowDebugSetting()
+                }
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 6)
+    }
     
     // MARK: - Overlay List Section
     

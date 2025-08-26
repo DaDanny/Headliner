@@ -31,6 +31,7 @@ final class OverlayService: ObservableObject {
   
   @Published private(set) var settings = OverlaySettings()
   @Published private(set) var currentPreset: SwiftUIPresetInfo?
+  @Published var showDebugOverlays: Bool = false
   
   // MARK: - Dependencies
   
@@ -47,6 +48,7 @@ final class OverlayService: ObservableObject {
   
   init() {
     loadSettings()
+    loadShowDebugSetting()
     updateCurrentPreset()
   }
   
@@ -120,6 +122,16 @@ final class OverlayService: ObservableObject {
     
     settings = decoded
     logger.debug("Loaded overlay settings: enabled=\(self.settings.isEnabled)")
+  }
+  
+  private func loadShowDebugSetting() {
+    guard let appGroupDefaults = UserDefaults(suiteName: Identifiers.appGroup) else { return }
+    showDebugOverlays = appGroupDefaults.bool(forKey: "overlay.showDebugOverlays")
+  }
+  
+  func saveShowDebugSetting() {
+    guard let appGroupDefaults = UserDefaults(suiteName: Identifiers.appGroup) else { return }
+    appGroupDefaults.set(showDebugOverlays, forKey: "overlay.showDebugOverlays")
   }
   
   private func saveSettings() {
@@ -236,7 +248,12 @@ final class OverlayService: ObservableObject {
   // MARK: - Computed Properties
   
   var availablePresets: [SwiftUIPresetInfo] {
-    SwiftUIPresetRegistry.allPresets
+    let allPresets = SwiftUIPresetRegistry.allPresets
+    if showDebugOverlays {
+      return allPresets
+    } else {
+      return allPresets.filter { $0.category != .debug }
+    }
   }
   
   var currentPresetId: String {
