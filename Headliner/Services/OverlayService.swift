@@ -35,7 +35,7 @@ final class OverlayService: ObservableObject {
   
   // MARK: - Dependencies
   
-  private let notificationManager = NotificationManager.self
+  // Removed: private let notificationManager = NotificationManager.self
   private let logger = HeadlinerLogger.logger(for: .overlays)
   
   // MARK: - Private Properties
@@ -160,10 +160,7 @@ final class OverlayService: ObservableObject {
   }
   
   private func notifyExtension() {
-    notificationManager.postNotification(
-      named: .updateOverlaySettings,
-      overlaySettings: settings
-    )
+    CrossAppExtensionNotifications.post(.updateOverlaySettings, overlaySettings: settings)
   }
   
   private func triggerRendering() {

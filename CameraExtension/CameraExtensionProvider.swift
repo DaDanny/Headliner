@@ -91,17 +91,19 @@ class CameraExtensionDeviceSource: NSObject, CMIOExtensionDeviceSource, AVCaptur
 		super.init()
 		
 		// Phase 4.1: Add capture session interruption notifications
+		// NOTE: These are AVFoundation SYSTEM notifications, NOT custom app notifications
+		// DO NOT migrate these to CrossAppExtensionNotifications - they handle camera hardware interruptions
 		NotificationCenter.default.addObserver(
 			self,
 			selector: #selector(captureSessionWasInterrupted(_:)),
-			name: AVCaptureSession.wasInterruptedNotification,
+			name: AVCaptureSession.wasInterruptedNotification, // System notification from AVFoundation
 			object: nil
 		)
 		
 		NotificationCenter.default.addObserver(
 			self,
 			selector: #selector(captureSessionInterruptionEnded(_:)),
-			name: AVCaptureSession.interruptionEndedNotification,
+			name: AVCaptureSession.interruptionEndedNotification, // System notification from AVFoundation
 			object: nil
 		)
 		let deviceID = UUID() // replace this with your device UUID
@@ -1023,6 +1025,8 @@ class CameraExtensionDeviceSource: NSObject, CMIOExtensionDeviceSource, AVCaptur
 		// Phase 2.4: Cleanup heartbeat timer
 		stopHeartbeatTimer()
 		
+		// NOTE: This removes AVFoundation system notification observers (capture session interruptions)
+		// This is NOT related to our custom notification migration - it's for system hardware events
 		NotificationCenter.default.removeObserver(self)
 		extensionLogger.debug("🧼 Cleaned up CameraExtensionDeviceSource resources")
 	}
@@ -1215,7 +1219,6 @@ class CameraExtensionProviderSource: NSObject, CMIOExtensionProviderSource {
 	
 	private var deviceSource: CameraExtensionDeviceSource!
     
-    private let notificationCenter = CFNotificationCenterGetDarwinNotifyCenter()
     private var notificationListenerStarted = false
 
 	
@@ -1287,7 +1290,7 @@ class CameraExtensionProviderSource: NSObject, CMIOExtensionProviderSource {
     private func notificationReceived(notificationName: String) {
         extensionLogger.debug("📡 Received notification: \(notificationName)")
         
-        guard let name = NotificationName(rawValue: notificationName) else {
+        guard let name = CrossAppNotificationName(rawValue: notificationName) else {
             extensionLogger.debug("❌ Unknown notification name: \(notificationName)")
             return
         }
@@ -1323,27 +1326,29 @@ class CameraExtensionProviderSource: NSObject, CMIOExtensionProviderSource {
     }
 
     private func startNotificationListeners() {
-        for notificationName in NotificationName.allCases {
+        for notificationName in CrossAppNotificationName.allCases {
             let observer = UnsafeRawPointer(Unmanaged.passUnretained(self).toOpaque())
 
-            CFNotificationCenterAddObserver(CFNotificationCenterGetDarwinNotifyCenter(), observer, { _, observer, name, _, _ in
-                if let observer = observer, let name = name {
-                    let extensionProviderSourceSelf = Unmanaged<CameraExtensionProviderSource>.fromOpaque(observer).takeUnretainedValue()
-                    extensionProviderSourceSelf.notificationReceived(notificationName: name.rawValue as String)
-                }
-            },
-            notificationName.rawValue as CFString, nil, .deliverImmediately)
+            CrossAppExtensionNotifications.addObserver(
+                observer: observer,
+                callback: { _, observer, name, _, _ in
+                    if let observer = observer, let name = name {
+                        let extensionProviderSourceSelf = Unmanaged<CameraExtensionProviderSource>.fromOpaque(observer).takeUnretainedValue()
+                        extensionProviderSourceSelf.notificationReceived(notificationName: name.rawValue as String)
+                    }
+                },
+                name: notificationName
+            )
         }
         
         notificationListenerStarted = true
-        extensionLogger.debug("✅ Started notification listeners for \(NotificationName.allCases.count) notifications")
+        extensionLogger.debug("✅ Started notification listeners for \(CrossAppNotificationName.allCases.count) notifications")
     }
 
     private func stopNotificationListeners() {
         if notificationListenerStarted {
-            CFNotificationCenterRemoveEveryObserver(notificationCenter,
-                                                    Unmanaged.passRetained(self)
-                                                        .toOpaque())
+            let observer = UnsafeRawPointer(Unmanaged.passUnretained(self).toOpaque())
+            CrossAppExtensionNotifications.removeAllObservers(observer: observer)
             notificationListenerStarted = false
         }
     }

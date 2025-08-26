@@ -122,7 +122,7 @@ final class LocationPermissionManager: NSObject, ObservableObject, CLLocationMan
             if isLocationAvailable {
                 logger.info("🔴 LocationPermissionManager: Location is now available, posting notification")
                 // Notify AppState to refresh personal info
-                NotificationCenter.default.post(name: .locationPermissionGranted, object: nil)
+                InternalNotifications.post(.locationPermissionGranted)
             } else {
                 logger.info("🔴 LocationPermissionManager: Location not available with status: \(self.authorizationStatus.rawValue)")
             }
@@ -130,8 +130,6 @@ final class LocationPermissionManager: NSObject, ObservableObject, CLLocationMan
     }
 }
 
-// MARK: - Notification Names
+// MARK: - Notification Names (Migrated to InternalNotifications)
 
-extension Notification.Name {
-    static let locationPermissionGranted = Notification.Name("LocationPermissionGranted")
-}
+// Removed: extension Notification.Name - now using InternalNotifications.post(.locationPermissionGranted)

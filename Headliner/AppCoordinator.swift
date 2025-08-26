@@ -228,7 +228,7 @@ final class AppCoordinator: NSObject, SPUUpdaterDelegate {
       .store(in: &cancellables)
     
     // When location permission granted, start personal info
-    NotificationCenter.default.publisher(for: .locationPermissionGranted)
+    InternalNotifications.publisher(for: .locationPermissionGranted)
       .receive(on: DispatchQueue.main)
       .sink { [weak self] _ in
         self?.personalInfo.start()
