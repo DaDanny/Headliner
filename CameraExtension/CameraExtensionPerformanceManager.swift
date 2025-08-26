@@ -37,7 +37,7 @@ final class CameraExtensionPerformanceManager {
 	
 	// MARK: - Properties
 	
-	private let logger = Logger(subsystem: "com.dannyfrancken.Headliner", category: "Extension")
+	private let logger = Logger(subsystem: "com.dannyfrancken.Headliner", category: "Performance")
 	weak var delegate: CameraExtensionPerformanceManagerDelegate?
 	
 	// Memory pressure monitoring

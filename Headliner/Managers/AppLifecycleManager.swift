@@ -70,7 +70,7 @@ final class AppLifecycleManager {
     removeMenuBarIcon()
     
     // 5. Post shutdown notification to extension
-    CrossAppExtensionNotifications.post(.stopStream)
+    Notifications.CrossApp.post(.stopStream)
     
     // 6. Force synchronize UserDefaults
     UserDefaults.standard.synchronize()

@@ -48,7 +48,7 @@ public final class OverlayRenderBroker {
         logger.debug("🎯 [OverlayBroker] Got CGImage from SwiftUIRenderer (\(cg.width)x\(cg.height)), writing to App Group...")
         do {
             try SharedOverlayStore.writeOverlay(cg)
-            CrossAppExtensionNotifications.post(.overlayUpdated)
+            Notifications.CrossApp.post(.overlayUpdated)
             logger.debug("✅ [OverlayBroker] Updated overlay (\(Int(pixelSize.width))x\(Int(pixelSize.height))) and notified extension")
         } catch {
             logger.debug("❌ [OverlayBroker] Write failed: \(error)")
@@ -69,7 +69,7 @@ public final class OverlayRenderBroker {
     /// Clear the current overlay
     public func clearOverlay() {
         SharedOverlayStore.clearOverlay()
-        CrossAppExtensionNotifications.post(.overlayUpdated)
+        Notifications.CrossApp.post(.overlayUpdated)
         logger.info("🗑️ [OverlayBroker] Cleared overlay and notified extension")
     }
 }

@@ -62,50 +62,14 @@ final class ExtensionService: ObservableObject {
     self.requestManager = requestManager
     
     setupBindings()
-    setupDarwinNotificationListener()
     checkStatus()
   }
   
   deinit {
     healthMonitorTimer?.invalidate()
-    
-    // Remove Darwin notification observer
-    CFNotificationCenterRemoveEveryObserver(
-      CFNotificationCenterGetDarwinNotifyCenter(),
-      UnsafeRawPointer(Unmanaged.passUnretained(self).toOpaque())
-    )
   }
   
-  // MARK: - Darwin Notification Bridge
-  
-  private func setupDarwinNotificationListener() {
-    // IMPORTANT: This Darwin bridge is REQUIRED architecture, do not remove!
-    // The CameraExtension runs in a separate process and can only communicate via Darwin notifications
-    // This method converts cross-process Darwin notifications to in-process internal notifications
-    // Flow: Extension (Darwin) → ExtensionService (bridge) → App components (Internal)
-    let observer = UnsafeRawPointer(Unmanaged.passUnretained(self).toOpaque())
-    
-    CFNotificationCenterAddObserver(
-      CFNotificationCenterGetDarwinNotifyCenter(),
-      observer,
-      { _, observer, name, _, _ in
-        if let observer = observer, let name = name {
-          let extensionService = Unmanaged<ExtensionService>.fromOpaque(observer).takeUnretainedValue()
-          let notificationName = name.rawValue as String
-          
-          if notificationName == CrossAppNotificationName.statusChanged.rawValue {
-            Task { @MainActor in
-              // Convert Darwin notification to internal notification
-              InternalNotifications.post(.extensionStatusChanged)
-            }
-          }
-        }
-      },
-      CrossAppNotificationName.statusChanged.rawValue as CFString,
-      nil,
-      .deliverImmediately
-    )
-  }
+  // MARK: - Darwin bridge removed - now centralized in AppCoordinator
   
   // MARK: - Public Methods
   
@@ -198,7 +162,7 @@ final class ExtensionService: ObservableObject {
       .store(in: &cancellables)
     
     // Phase 3.2: Monitor extension runtime status changes (now using InternalNotifications)
-    InternalNotifications.publisher(for: .extensionStatusChanged)
+    Notifications.Internal.publisher(for: .extensionStatusChanged)
       .receive(on: DispatchQueue.main)
       .sink { [weak self] _ in
         self?.handleExtensionStatusChange()

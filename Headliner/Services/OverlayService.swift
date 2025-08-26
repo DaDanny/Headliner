@@ -160,7 +160,7 @@ final class OverlayService: ObservableObject {
   }
   
   private func notifyExtension() {
-    CrossAppExtensionNotifications.post(.updateOverlaySettings, overlaySettings: settings)
+    Notifications.CrossApp.post(.updateOverlaySettings, overlaySettings: settings)
   }
   
   private func triggerRendering() {

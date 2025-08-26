@@ -122,7 +122,7 @@ final class LocationPermissionManager: NSObject, ObservableObject, CLLocationMan
             if isLocationAvailable {
                 logger.info("🔴 LocationPermissionManager: Location is now available, posting notification")
                 // Notify AppState to refresh personal info
-                InternalNotifications.post(.locationPermissionGranted)
+                Notifications.Internal.post(.locationPermissionGranted)
             } else {
                 logger.info("🔴 LocationPermissionManager: Location not available with status: \(self.authorizationStatus.rawValue)")
             }

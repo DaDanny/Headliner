@@ -1,15 +1,23 @@
 # Notification Manager Migration Plan - Clean Architecture (Focused)
 
-## ✅ STATUS: COMPLETED
+## ✅ STATUS: COMPLETED (Phase 1 & Phase 2)
 
-**Implementation Date**: August 26, 2025  
-**All migration phases completed successfully. Build passes with no errors.**
+**Phase 1 Implementation Date**: August 26, 2025  
+**Phase 1**: Two-class architecture completed successfully. Build passes with no errors.
+**Phase 2 Implementation Date**: August 26, 2025  
+**Phase 2**: Single-file MVP architecture completed successfully. All migration goals achieved.
 
 ## Overview
 
-This document provided a step-by-step plan to fix the notification system inconsistencies in Headliner by creating **two dedicated classes** with clear separation of concerns and focused safety improvements.
+This document tracks the evolution of the notification system in Headliner:
 
-**✅ COMPLETED**: All phases of migration have been implemented and tested.
+**✅ PHASE 1 COMPLETED**: Fixed immediate issues with two dedicated classes
+**✅ PHASE 2 COMPLETED**: Refactored to single-file MVP architecture for better maintainability
+
+## Current Status Summary
+
+**Phase 1** successfully fixed the broken notification system but introduced some complexity.
+**Phase 2** successfully simplified to a single-file, MVP-focused approach based on excellent code review feedback.
 
 ## Strategy: Two-Class Architecture
 
@@ -505,3 +513,113 @@ log show --predicate 'category BEGINSWITH "notifications."' --style compact --la
 2. **Performance**: Optimized for each use case
 3. **Debugging**: Centralized logging and monitoring
 4. **Documentation**: Self-documenting notification domains
+
+---
+
+# 🔄 PHASE 2: MVP REFACTOR PLAN
+
+## Code Review Feedback Summary
+
+**Problem with Phase 1**: Two separate files create complexity and maintenance burden
+**Solution**: Single-file, MVP-focused architecture with consistent API
+
+## New Single-File Architecture
+
+### 🎯 MVP Principles
+- **One file owns everything**: `HeadlinerShared/Notifications.swift`
+- **One bridge, set up once** at app startup in AppCoordinator
+- **Consistent API**: `Notifications.Internal.post()` and `Notifications.CrossApp.post()`
+- **Zero snowflake handlers** scattered across classes
+
+### New API Structure
+
+```swift
+// Single consistent API
+Notifications.Internal.post(.extensionStatusChanged)
+Notifications.CrossApp.post(.startStream)
+
+// Simple bridge setup once at startup
+bridgeToken = Notifications.CrossApp.bridgeToInternal(
+  crossApp: .statusChanged,
+  internalNote: .extensionStatusChanged
+)
+```
+
+### Benefits of New Architecture
+- ✅ **Single source of truth**: All notification logic in one file
+- ✅ **Easy debugging**: Put logging in one place, see entire flow
+- ✅ **Consistent APIs**: Same pattern for internal and cross-app
+- ✅ **Eliminates complexity**: No per-class Darwin bridges
+- ✅ **MVP-focused**: No over-engineering, just what's needed
+
+## Phase 2 Migration Plan
+
+### Step 1: Create `HeadlinerShared/Notifications.swift`
+- Single file with `Notifications.Internal` and `Notifications.CrossApp` namespaces
+- Simple `bridgeToInternal()` method for one-time setup
+- Consistent API across both notification domains
+
+### Step 2: Update AppCoordinator
+- Setup single bridge at app startup
+- Remove complex Darwin bridge from ExtensionService.swift
+- Clean lifecycle management in deinit
+
+### Step 3: Replace All Call Sites
+- `InternalNotifications.post()` → `Notifications.Internal.post()`
+- `CrossAppExtensionNotifications.post()` → `Notifications.CrossApp.post()`
+- Remove custom Darwin listeners from individual classes
+
+### Step 4: Clean Up
+- Delete `InternalNotifications.swift`
+- Delete `CrossAppExtensionNotifications.swift` 
+- Remove Darwin bridge complexity from ExtensionService.swift
+
+### Step 5: Verification
+- All camera controls work (app → extension)
+- All status updates work (extension → app)
+- No CFNotificationCenter code outside Notifications.swift
+- No NotificationCenter.default posts outside Notifications.swift (except system notifications)
+
+## Success Criteria for Phase 2
+
+1. **✅ Single file**: All notification logic in `HeadlinerShared/Notifications.swift`
+2. **✅ Simple bridge**: One bridge setup in AppCoordinator, not per-class
+3. **✅ Consistent API**: Same pattern for `Internal` and `CrossApp`
+4. **✅ Easy debugging**: Centralized logging shows entire notification flow
+5. **✅ MVP-clean**: No over-engineering or unnecessary complexity
+
+This Phase 2 refactor addresses the code review feedback and creates a much more maintainable, debuggable notification system.
+
+---
+
+# ✅ PHASE 2: IMPLEMENTATION RESULTS
+
+## Phase 2 Completed Successfully - August 26, 2025
+
+### 🎯 **MVP Goals Achieved**
+
+1. **✅ Single source of truth**: All notification logic consolidated in `HeadlinerShared/Notifications.swift`
+2. **✅ Consistent API**: Unified `Notifications.Internal.post()` and `Notifications.CrossApp.post()` patterns  
+3. **✅ Centralized bridge**: Single bridge setup in AppCoordinator instead of per-class bridges
+4. **✅ Eliminated complexity**: Removed scattered Darwin bridges from ExtensionService.swift
+5. **✅ MVP-focused**: Simple, practical architecture without over-engineering
+
+### 🔧 **Technical Improvements**
+
+- **Unified System**: Created single `Notifications.swift` with `Internal` and `CrossApp` namespaces
+- **API Migration**: Successfully migrated 12+ files from old notification system to new unified API
+- **Bridge Simplification**: Removed complex Darwin bridge from ExtensionService, centralized in AppCoordinator
+- **Clean Architecture**: Deprecated legacy notification files while maintaining backward compatibility for CameraExtension
+- **Type Safety**: Maintained enum-based notification names with consistent naming patterns
+
+### 📁 **Files Updated**
+
+- **Main App**: CameraService, OverlayService, ExtensionService, LocationPermissionManager, AppCoordinator, AppLifecycleManager, OverlayRenderBroker
+- **Shared Code**: ExtensionStatusManager, unified Notifications.swift  
+- **Legacy Cleanup**: Removed InternalNotifications.swift, created compatibility stub for CrossAppExtensionNotifications.swift
+
+### 🏆 **Final Result**
+
+The notification system is now clean, maintainable, and follows the MVP principle of "just what's needed" while providing excellent debugging capabilities and preventing the consistency issues that originally motivated this refactor.
+
+**Status**: ✅ **COMPLETE** - All MVP objectives achieved successfully.

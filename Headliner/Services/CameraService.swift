@@ -89,7 +89,7 @@ final class CameraService: NSObject, ObservableObject {
     statusMessage = "Starting camera..."
     
     // Notify extension to start capturing from physical camera
-    CrossAppExtensionNotifications.post(.startStream)
+    Notifications.CrossApp.post(.startStream)
     
     // Start self-preview from virtual camera (shows exactly what Google Meet sees)
     setupSelfPreviewFromVirtualCamera()
@@ -111,7 +111,7 @@ final class CameraService: NSObject, ObservableObject {
     logger.debug("Starting onboarding preview...")
     
     // Notify extension to start capturing from physical camera
-    CrossAppExtensionNotifications.post(.startStream)
+    Notifications.CrossApp.post(.startStream)
     
     // Start self-preview from virtual camera to show user what they'll look like
     setupSelfPreviewFromVirtualCamera()
@@ -126,7 +126,7 @@ final class CameraService: NSObject, ObservableObject {
     logger.debug("Stopping onboarding preview...")
     
     // Stop extension camera capture
-    CrossAppExtensionNotifications.post(.stopStream)
+    Notifications.CrossApp.post(.stopStream)
     
     // Stop self-preview capture session
     selfPreviewCaptureSession?.stopRunning()
@@ -146,7 +146,7 @@ final class CameraService: NSObject, ObservableObject {
     statusMessage = "Stopping camera..."
     
     // Stop extension camera capture
-    CrossAppExtensionNotifications.post(.stopStream)
+    Notifications.CrossApp.post(.stopStream)
     
     // Stop self-preview capture session
     selfPreviewCaptureSession?.stopRunning()
@@ -185,7 +185,7 @@ final class CameraService: NSObject, ObservableObject {
       }
       
       // Notify extension of camera device change
-      CrossAppExtensionNotifications.post(.setCameraDevice)
+      Notifications.CrossApp.post(.setCameraDevice)
       logger.debug("📡 Sent setCameraDevice notification to extension")
     } else {
       logger.error("❌ Failed to access app group UserDefaults")

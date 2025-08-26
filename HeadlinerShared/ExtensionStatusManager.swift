@@ -39,7 +39,7 @@ final class ExtensionStatusManager {
     sharedDefaults.synchronize()
     
     // Notify app of status change via Darwin notifications
-    CrossAppExtensionNotifications.post(.statusChanged)
+    Notifications.CrossApp.post(.statusChanged)
     
     logger.debug("Extension status updated: \(status.displayText)")
   }

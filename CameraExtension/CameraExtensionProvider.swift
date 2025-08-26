@@ -19,6 +19,12 @@ import OSLog
 
 private let extensionLogger = Logger(subsystem: "com.dannyfrancken.Headliner", category: "Extension")
 
+// MARK: - Notification System (Uses HeadlinerShared definitions)
+// CameraExtension now has access to HeadlinerShared files including:
+// - CrossAppNotificationName (from Notifications.swift)
+// - ExtensionStatusKeys (from AppStateTypes.swift)  
+// - Identifiers (from Identifiers.swift)
+
 // Phase 4.2: Import dedicated managers for better separation of concerns
 // Error types and performance types are now defined in their respective manager files
 
@@ -1329,15 +1335,19 @@ class CameraExtensionProviderSource: NSObject, CMIOExtensionProviderSource {
         for notificationName in CrossAppNotificationName.allCases {
             let observer = UnsafeRawPointer(Unmanaged.passUnretained(self).toOpaque())
 
-            CrossAppExtensionNotifications.addObserver(
-                observer: observer,
-                callback: { _, observer, name, _, _ in
+            // Use raw CFNotificationCenter calls in extension - it runs in separate process
+            CFNotificationCenterAddObserver(
+                CFNotificationCenterGetDarwinNotifyCenter(),
+                observer,
+                { _, observer, name, _, _ in
                     if let observer = observer, let name = name {
                         let extensionProviderSourceSelf = Unmanaged<CameraExtensionProviderSource>.fromOpaque(observer).takeUnretainedValue()
                         extensionProviderSourceSelf.notificationReceived(notificationName: name.rawValue as String)
                     }
                 },
-                name: notificationName
+                notificationName.rawValue as CFString,
+                nil,
+                .deliverImmediately
             )
         }
         
@@ -1348,7 +1358,10 @@ class CameraExtensionProviderSource: NSObject, CMIOExtensionProviderSource {
     private func stopNotificationListeners() {
         if notificationListenerStarted {
             let observer = UnsafeRawPointer(Unmanaged.passUnretained(self).toOpaque())
-            CrossAppExtensionNotifications.removeAllObservers(observer: observer)
+            CFNotificationCenterRemoveEveryObserver(
+                CFNotificationCenterGetDarwinNotifyCenter(),
+                observer
+            )
             notificationListenerStarted = false
         }
     }
