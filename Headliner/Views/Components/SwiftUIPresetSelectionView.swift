@@ -73,6 +73,8 @@ struct SwiftUIPresetSelectionView: View {
             return "Company branding with logos and accent elements"
         case .creative:
             return "Dynamic displays with animations and unique layouts"
+        case .debug:
+            return "Debug overlays for testing and development"
         case .minimal:
             return "Clean, minimal designs with subtle styling"
         }

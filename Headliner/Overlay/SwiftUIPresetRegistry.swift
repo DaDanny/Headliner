@@ -36,6 +36,7 @@ public enum SwiftUIPresetCategory: String, CaseIterable {
     case branded = "Branded"
     case creative = "Creative"
     case minimal = "Minimal"
+    case debug = "Debug"
     
     var icon: String {
         switch self {
@@ -43,6 +44,7 @@ public enum SwiftUIPresetCategory: String, CaseIterable {
             case .branded: return "building.2.fill"
             case .creative: return "paintbrush.fill"
             case .minimal: return "minus"
+            case .debug: return "ladybug.fill"
         }
     }
     
@@ -52,6 +54,7 @@ public enum SwiftUIPresetCategory: String, CaseIterable {
             case .branded: return .green
             case .creative: return .purple
             case .minimal: return .gray
+            case .debug: return .orange
         }
     }
 }
@@ -82,7 +85,7 @@ public enum SwiftUIPresetRegistry {
             id: "swiftui.aspectratio.test",
             name: "Aspect Ratio Test",
             description: "Aspect Ratio Test",
-            category: .branded,
+            category: .debug,
             provider: AspectRatioTest()
         ),
         
@@ -90,7 +93,7 @@ public enum SwiftUIPresetRegistry {
             id: "swiftui.aspectratio.test-v2",
             name: "Aspect Ratio Test V2",
             description: "Aspect Ratio Test V2",
-            category: .branded,
+            category: .debug,
             provider: AspectRatioTestV2()
         ),
         
@@ -106,7 +109,7 @@ public enum SwiftUIPresetRegistry {
             id: "swiftui.safearea.validation",
             name: "Safe Area Validation",
             description: "Validation overlay showing safe area boundaries vs AspectRatioTestV2",
-            category: .standard,
+            category: .debug,
             provider: SafeAreaValidation()
         ),
         
@@ -114,7 +117,7 @@ public enum SwiftUIPresetRegistry {
             id: "swiftui.safearea.test",
             name: "Safe Area Test",
             description: "Simple test showing SafeAreaCalculator result vs AspectRatioTestV2",
-            category: .standard,
+            category: .debug,
             provider: SafeAreaTest()
         ),
         
@@ -122,7 +125,7 @@ public enum SwiftUIPresetRegistry {
             id: "swiftui.safearea.live",
             name: "Safe Area Live",
             description: "Live safe area testing with actual camera dimensions and selected mode",
-            category: .standard,
+            category: .debug,
             provider: SafeAreaLive()
         ),
         SwiftUIPresetInfo(
