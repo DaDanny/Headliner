@@ -9,8 +9,8 @@ ARCHIVE_NAME="${APP_PRODUCT_NAME}.zip"                # Sparkle likes .zip
 SPARKLE_BIN="/usr/local/bin"                          # folder containing sign_update
 MIN_SYSTEM_VERSION="13.0"                             # optional for feed
 # Repo → used to build your public feed base URL:
-GITHUB_USER="<YOUR_GH_USERNAME>"
-GITHUB_REPO="<YOUR_REPO_NAME>"
+GITHUB_USER="DaDanny"
+GITHUB_REPO="Headliner"
 FEED_BASE_URL="https://${GITHUB_USER}.github.io/${GITHUB_REPO}"
 FEED_URL="${FEED_BASE_URL}/updates/appcast.xml"
 ENCLOSURE_URL="${FEED_BASE_URL}/updates/${ARCHIVE_NAME}"

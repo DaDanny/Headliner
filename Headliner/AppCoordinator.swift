@@ -9,11 +9,12 @@ import SwiftUI
 import Combine
 import AVFoundation
 import CoreLocation
+import Sparkle
 
 /// Service coordinator - THIN orchestration layer only
 /// NOT ObservableObject - views observe services directly
 @MainActor
-final class AppCoordinator {
+final class AppCoordinator: NSObject, SPUUpdaterDelegate {
   // MARK: - Services
   
   let camera: CameraService
@@ -21,6 +22,7 @@ final class AppCoordinator {
   let overlay: OverlayService
   let location: LocationPermissionManager
   let personalInfo: PersonalInfoPump
+  private(set) var updater: UpdaterService
   
   // MARK: - Services (for view injection)
   // Views observe these directly, not the coordinator
@@ -38,7 +40,7 @@ final class AppCoordinator {
   
   // MARK: - Initialization
   
-  init() {
+  override init() {
     let extensionRequestManager = SystemExtensionRequestManager(logText: "")
     
     // Initialize services with simplified architecture
@@ -51,6 +53,14 @@ final class AppCoordinator {
     self.overlay = OverlayService()
     self.location = LocationPermissionManager() 
     self.personalInfo = PersonalInfoPump()
+    
+    // Initialize updater without delegate first (to avoid self reference before super.init)
+    self.updater = UpdaterService(updaterDelegate: nil)
+    
+    super.init()
+    
+    // Now recreate updater with self as delegate
+    self.updater = UpdaterService(updaterDelegate: self)
     
     setupBindings()
   }
@@ -259,6 +269,7 @@ extension View {
       .environmentObject(coordinator.overlay)          // Views observe OverlayService
       .environmentObject(coordinator.location)         // Views observe LocationPermissionManager
       .environmentObject(coordinator.themeManager)     // Views observe ThemeManager
+      .environmentObject(coordinator.updater)          // Views observe UpdaterService
       // Coordinator itself available via environment for delegation
       .environment(\.appCoordinator, coordinator)
   }
