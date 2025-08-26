@@ -75,7 +75,7 @@ cat > "$APPCAST" <<XML
         length="${BYTES}"
         type="application/octet-stream" />
       <pubDate>$(LC_ALL=C date -u +"%a, %d %b %Y %T %z")</pubDate>
-      <sparkle:releaseNotesLink>${FEED_BASE_URL}/updates/release-notes-${SHORT_VER}.html</sparkle:releaseNotesLink>
+      <sparkle:releaseNotesLink>${FEED_BASE_URL}/updates/release-notes.html</sparkle:releaseNotesLink>
     </item>
   </channel>
 </rss>
