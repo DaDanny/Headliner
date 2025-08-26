@@ -715,9 +715,12 @@ struct SettingsMenuView: View {
   let appCoordinator: AppCoordinator
   let onBack: () -> Void
   
+  @State private var displayName: String = ""
+  @State private var tagline: String = ""
+  
   var body: some View {
     VStack(alignment: .leading, spacing: 0) {
-      // Header with back button
+      // Compact header with back button
       HStack {
         Button(action: onBack) {
           HStack(spacing: 4) {
@@ -733,16 +736,18 @@ struct SettingsMenuView: View {
         Spacer()
         
         Text("Settings")
-          .font(.system(size: 14, weight: .semibold))
+          .font(.system(size: 13, weight: .semibold))
           .foregroundColor(.primary)
         
         Spacer()
         
-        // Placeholder for balance
-        Color.clear.frame(width: 40)
+        // Balance the layout
+        HStack {
+          Color.clear.frame(width: 32)
+        }
       }
+      .frame(height: 36)
       .padding(.horizontal, 12)
-      .padding(.vertical, 4)
       
       Divider()
         .padding(.horizontal, 12)
@@ -750,7 +755,104 @@ struct SettingsMenuView: View {
       // Settings content
       ScrollView {
         VStack(alignment: .leading, spacing: 16) {
-          // Launch at login setting
+          // Personal Info Section
+          VStack(alignment: .leading, spacing: 8) {
+            Text("Personal Information")
+              .font(.system(size: 12, weight: .medium))
+              .foregroundColor(.secondary)
+            
+            VStack(spacing: 8) {
+              // Display Name Field
+              VStack(alignment: .leading, spacing: 4) {
+                Text("Display Name")
+                  .font(.system(size: 11, weight: .medium))
+                  .foregroundColor(.secondary)
+                
+                TextField("Your Name", text: $displayName)
+                  .textFieldStyle(.plain)
+                  .font(.system(size: 13))
+                  .padding(.horizontal, 8)
+                  .padding(.vertical, 6)
+                  .background(Color(.textBackgroundColor))
+                  .cornerRadius(4)
+                  .overlay(
+                    RoundedRectangle(cornerRadius: 4)
+                      .stroke(Color.secondary.opacity(0.3), lineWidth: 1)
+                  )
+                  .onChange(of: displayName) { _, newValue in
+                    updateDisplayName(newValue)
+                  }
+              }
+              
+              // Tagline Field
+              VStack(alignment: .leading, spacing: 4) {
+                Text("Tagline")
+                  .font(.system(size: 11, weight: .medium))
+                  .foregroundColor(.secondary)
+                
+                TextField("Your Title", text: $tagline)
+                  .textFieldStyle(.plain)
+                  .font(.system(size: 13))
+                  .padding(.horizontal, 8)
+                  .padding(.vertical, 6)
+                  .background(Color(.textBackgroundColor))
+                  .cornerRadius(4)
+                  .overlay(
+                    RoundedRectangle(cornerRadius: 4)
+                      .stroke(Color.secondary.opacity(0.3), lineWidth: 1)
+                  )
+                  .onChange(of: tagline) { _, newValue in
+                    updateTagline(newValue)
+                  }
+              }
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .background(Color(.controlBackgroundColor).opacity(0.5))
+            .cornerRadius(6)
+          }
+          
+          // Location Services Section
+          VStack(alignment: .leading, spacing: 8) {
+            Text("Location Services")
+              .font(.system(size: 12, weight: .medium))
+              .foregroundColor(.secondary)
+            
+            VStack(spacing: 8) {
+              HStack {
+                Image(systemName: "location")
+                  .font(.system(size: 14))
+                  .foregroundColor(locationStatusColor)
+                
+                VStack(alignment: .leading, spacing: 2) {
+                  Text("Location Access")
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundColor(.primary)
+                  
+                  Text(locationStatusText)
+                    .font(.system(size: 11))
+                    .foregroundColor(.secondary)
+                }
+                
+                Spacer()
+                
+                if appCoordinator.location.authorizationStatus == .notDetermined || 
+                   appCoordinator.location.authorizationStatus == .denied {
+                  Button("Enable") {
+                    appCoordinator.location.requestLocationPermission()
+                  }
+                  .buttonStyle(.borderedProminent)
+                  .controlSize(.small)
+                }
+              }
+              .padding(.horizontal, 12)
+              .padding(.vertical, 8)
+              .background(Color(.controlBackgroundColor).opacity(0.5))
+              .cornerRadius(6)
+            }
+          }
+          
+          // General Settings
           VStack(alignment: .leading, spacing: 8) {
             Text("General")
               .font(.system(size: 12, weight: .medium))
@@ -767,8 +869,7 @@ struct SettingsMenuView: View {
                 Spacer()
                 
                 // Toggle indicator
-                // TODO: Get launch at login status from proper service
-                if false {  // appCoordinator.launchAtLogin replaced with false for now
+                if appCoordinator.launchAtLogin {
                   Image(systemName: "checkmark")
                     .font(.system(size: 12, weight: .medium))
                     .foregroundColor(.accentColor)
@@ -782,27 +883,7 @@ struct SettingsMenuView: View {
             .buttonStyle(PlainButtonStyle())
           }
           
-          // App info section
-          VStack(alignment: .leading, spacing: 8) {
-            Text("About")
-              .font(.system(size: 12, weight: .medium))
-              .foregroundColor(.secondary)
-            
-            VStack(alignment: .leading, spacing: 4) {
-              Text("Headliner")
-                .font(.system(size: 14, weight: .medium))
-                .foregroundColor(.primary)
-              Text("Professional virtual camera for macOS")
-                .font(.system(size: 12))
-                .foregroundColor(.secondary)
-            }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 8)
-            .background(Color(.controlBackgroundColor).opacity(0.5))
-            .cornerRadius(6)
-          }
-          
-          // Danger zone
+          // Actions Section
           VStack(alignment: .leading, spacing: 8) {
             Text("Actions")
               .font(.system(size: 12, weight: .medium))
@@ -831,6 +912,73 @@ struct SettingsMenuView: View {
       }
     }
     .background(Color(.controlBackgroundColor))
+    .onAppear {
+      // Load current values
+      loadCurrentValues()
+    }
+  }
+  
+  // MARK: - Helper Properties
+  
+  private var locationStatusColor: Color {
+    switch appCoordinator.location.authorizationStatus {
+    case .authorizedWhenInUse, .authorizedAlways:
+      return .green
+    case .denied, .restricted:
+      return .red
+    case .notDetermined:
+      return .orange
+    @unknown default:
+      return .gray
+    }
+  }
+  
+  private var locationStatusText: String {
+    switch appCoordinator.location.authorizationStatus {
+    case .authorizedWhenInUse, .authorizedAlways:
+      return "Enabled - Weather and time zone data available"
+    case .denied:
+      return "Denied - Enable in System Preferences"
+    case .restricted:
+      return "Restricted by system policy"
+    case .notDetermined:
+      return "Not requested - Tap Enable to allow"
+    @unknown default:
+      return "Unknown status"
+    }
+  }
+  
+  // MARK: - Helper Methods
+  
+  private func loadCurrentValues() {
+    // Load from overlay tokens in settings
+    if let tokens = appCoordinator.overlay.settings.overlayTokens {
+      displayName = tokens.displayName
+      tagline = tokens.tagline ?? ""
+    } else {
+      displayName = ""
+      tagline = ""
+    }
+  }
+  
+  private func updateDisplayName(_ newName: String) {
+    let currentTokens = appCoordinator.overlay.settings.overlayTokens ?? OverlayTokens(displayName: "", tagline: nil)
+    let updatedTokens = OverlayTokens(
+      displayName: newName,
+      tagline: currentTokens.tagline
+    )
+    appCoordinator.overlay.updateTokens(updatedTokens)
+    appCoordinator.updateOverlayTokens(updatedTokens)
+  }
+  
+  private func updateTagline(_ newTagline: String) {
+    let currentTokens = appCoordinator.overlay.settings.overlayTokens ?? OverlayTokens(displayName: "", tagline: nil)
+    let updatedTokens = OverlayTokens(
+      displayName: currentTokens.displayName,
+      tagline: newTagline.isEmpty ? nil : newTagline
+    )
+    appCoordinator.overlay.updateTokens(updatedTokens)
+    appCoordinator.updateOverlayTokens(updatedTokens)
   }
 }
 

@@ -87,6 +87,10 @@ struct OverlaySettingsMenu: View {
             overlayListSection
         }
         .background(Color(.controlBackgroundColor))
+        .onAppear {
+            // Initialize style from current overlay settings
+            overlayStyle = convertSurfaceStyleToOverlayStyle(overlayService.settings.selectedSurfaceStyle)
+        }
     }
     
     // MARK: - Header Section
@@ -129,6 +133,11 @@ struct OverlaySettingsMenu: View {
                     height: 32,                 // make it taller here (e.g., 36–40)
                     cornerRadius: 9
                 )
+                .onChange(of: overlayStyle) { oldValue, newValue in
+                    // Convert OverlayStyle to SurfaceStyle and save it
+                    let surfaceStyle = convertOverlayStyleToSurfaceStyle(newValue)
+                    overlayService.selectSurfaceStyle(surfaceStyle)
+                }
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 6)
@@ -158,7 +167,7 @@ struct OverlaySettingsMenu: View {
                                 style: overlayStyle
                             ) {
                                 overlayService.selectPreset(overlay.id)
-                                onBack()
+                                // Don't close the menu when selecting preset - let user choose multiple
                             }
                             .onHover { isHovering in
                                 hoveredOverlayID = isHovering ? overlay.id : nil
@@ -178,6 +187,28 @@ struct OverlaySettingsMenu: View {
     
     private func overlaysForCategory(_ category: SwiftUIPresetCategory) -> [SwiftUIPresetInfo] {
         overlayService.availablePresets.filter { $0.category == category }
+    }
+    
+    // MARK: - Style Conversion Helpers
+    
+    private func convertOverlayStyleToSurfaceStyle(_ overlayStyle: OverlayStyle) -> SurfaceStyle {
+        switch overlayStyle {
+        case .rounded:
+            return .rounded
+        case .square:
+            return .square
+        }
+    }
+    
+    private func convertSurfaceStyleToOverlayStyle(_ surfaceStyleString: String) -> OverlayStyle {
+        switch surfaceStyleString.lowercased() {
+        case "rounded":
+            return .rounded
+        case "square":
+            return .square
+        default:
+            return .rounded // fallback
+        }
     }
 }
 
