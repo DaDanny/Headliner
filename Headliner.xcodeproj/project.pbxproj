@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		C90175252E5D430900B9CE42 /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = C90175242E5D430900B9CE42 /* Sparkle */; };
 		C916EC9B2E52CC9B0038F657 /* PersonalInfoModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = C916EC9A2E52CC9B0038F657 /* PersonalInfoModels.swift */; };
 		C916EC9C2E52CC9B0038F657 /* PersonalInfoModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = C916EC9A2E52CC9B0038F657 /* PersonalInfoModels.swift */; };
 		C916EE722E52D1F60038F657 /* PersonalInfoReader.swift in Sources */ = {isa = PBXBuildFile; fileRef = C916EE712E52D1F60038F657 /* PersonalInfoReader.swift */; };
@@ -158,6 +159,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				C90175252E5D430900B9CE42 /* Sparkle in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -296,6 +298,7 @@
 			);
 			name = Headliner;
 			packageProductDependencies = (
+				C90175242E5D430900B9CE42 /* Sparkle */,
 			);
 			productName = Headliner;
 			productReference = C9F9CC422E3E873F00A24466 /* Headliner.app */;
@@ -379,6 +382,9 @@
 			);
 			mainGroup = C9F9CC392E3E873F00A24466;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				C90175232E5D430900B9CE42 /* XCRemoteSwiftPackageReference "Sparkle" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = C9F9CC432E3E873F00A24466 /* Products */;
 			projectDirPath = "";
@@ -542,7 +548,7 @@
 			buildSettings = {
 				CODE_SIGN_ENTITLEMENTS = CameraExtension/CameraExtension.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 164;
+				CURRENT_PROJECT_VERSION = 165;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = 378NGS49HA;
 				ENABLE_HARDENED_RUNTIME = YES;
@@ -574,7 +580,7 @@
 			buildSettings = {
 				CODE_SIGN_ENTITLEMENTS = CameraExtension/CameraExtension.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 164;
+				CURRENT_PROJECT_VERSION = 165;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = 378NGS49HA;
 				ENABLE_HARDENED_RUNTIME = YES;
@@ -609,7 +615,7 @@
 				CODE_SIGN_ENTITLEMENTS = HeadlinerEndToEnd/HeadlinerEndToEnd.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 164;
+				CURRENT_PROJECT_VERSION = 165;
 				DEVELOPMENT_TEAM = 378NGS49HA;
 				ENABLE_HARDENED_RUNTIME = NO;
 				ENABLE_PREVIEWS = YES;
@@ -642,7 +648,7 @@
 				CODE_SIGN_ENTITLEMENTS = HeadlinerEndToEnd/HeadlinerEndToEnd.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 164;
+				CURRENT_PROJECT_VERSION = 165;
 				DEVELOPMENT_TEAM = 378NGS49HA;
 				ENABLE_HARDENED_RUNTIME = NO;
 				ENABLE_PREVIEWS = YES;
@@ -798,7 +804,7 @@
 				CODE_SIGN_ENTITLEMENTS = Headliner/Headliner.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 164;
+				CURRENT_PROJECT_VERSION = 165;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = 378NGS49HA;
 				ENABLE_HARDENED_RUNTIME = YES;
@@ -817,7 +823,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				MARKETING_VERSION = 1.0;
+				MARKETING_VERSION = 1.1;
 				PRODUCT_BUNDLE_IDENTIFIER = com.dannyfrancken.Headliner;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;
@@ -836,7 +842,7 @@
 				CODE_SIGN_ENTITLEMENTS = Headliner/Headliner.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 164;
+				CURRENT_PROJECT_VERSION = 165;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = 378NGS49HA;
 				ENABLE_HARDENED_RUNTIME = YES;
@@ -855,7 +861,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				MARKETING_VERSION = 1.0;
+				MARKETING_VERSION = 1.1;
 				PRODUCT_BUNDLE_IDENTIFIER = com.dannyfrancken.Headliner;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;
@@ -870,7 +876,7 @@
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 164;
+				CURRENT_PROJECT_VERSION = 165;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = 378NGS49HA;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -889,7 +895,7 @@
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 164;
+				CURRENT_PROJECT_VERSION = 165;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = 378NGS49HA;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -907,7 +913,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 164;
+				CURRENT_PROJECT_VERSION = 165;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = 378NGS49HA;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -924,7 +930,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 164;
+				CURRENT_PROJECT_VERSION = 165;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = 378NGS49HA;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -995,6 +1001,25 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		C90175232E5D430900B9CE42 /* XCRemoteSwiftPackageReference "Sparkle" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/sparkle-project/Sparkle";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 2.7.1;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		C90175242E5D430900B9CE42 /* Sparkle */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = C90175232E5D430900B9CE42 /* XCRemoteSwiftPackageReference "Sparkle" */;
+			productName = Sparkle;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = C9F9CC3A2E3E873F00A24466 /* Project object */;
 }

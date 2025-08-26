@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import Sparkle
 
 @main
 struct HeadlinerApp: App {
@@ -24,6 +25,21 @@ struct HeadlinerApp: App {
   }
   
   var body: some Scene {
+    // Settings window - commented out for debugging
+    // TODO: Debug why this opens on launch and can't be reopened
+//    #if os(macOS)
+//    Window("Settings", id: "settings") {
+//      SettingsContentView()
+//        .environmentObject(appCoordinator.updater)
+//        .environmentObject(appCoordinator.camera)
+//        .environmentObject(appCoordinator.overlay)
+//        .environmentObject(appCoordinator.extensionService)
+//    }
+//    .windowStyle(.hiddenTitleBar)
+//    .windowResizability(.contentSize)
+//    .defaultSize(width: 600, height: 500)
+//    #endif
+    
     // 1) Onboarding scene (only opened programmatically)
     WindowGroup(id: "onboarding") {
       ModernOnboardingView {
@@ -75,6 +91,23 @@ struct HeadlinerApp: App {
         .withAppCoordinator(appCoordinator)
     }
     .menuBarExtraStyle(.window)
+    .commands {
+      // Replace the default app menu commands
+      CommandGroup(replacing: .appInfo) {
+        Button("About Headliner") {
+          NSApplication.shared.orderFrontStandardAboutPanel(nil)
+        }
+        .keyboardShortcut("a", modifiers: .command)
+        
+        Divider()
+        
+        Button("Check for Updates…") {
+          appCoordinator.updater.checkForUpdates()
+        }
+        .disabled(!appCoordinator.updater.canCheckForUpdates)
+      }
+      
+    }
   }
 }
 

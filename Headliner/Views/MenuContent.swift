@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import Sparkle
 
 /// Navigation destination for menu bar views
 enum MenuDestination {
@@ -89,6 +90,7 @@ struct MainMenuView: View {
   @EnvironmentObject private var cameraService: CameraService
   @EnvironmentObject private var extensionService: ExtensionService
   @EnvironmentObject private var overlayService: OverlayService
+  @EnvironmentObject private var updaterService: UpdaterService
   @Environment(\.openURL) private var openURL
   @Environment(\.openWindow) private var openWindow
   @Binding var showingPreview: Bool
@@ -366,6 +368,14 @@ struct MainMenuView: View {
       
       Divider()
       #endif
+      
+      // Check for Updates button
+      InteractiveMenuButton(
+        icon: "arrow.down.circle",
+        title: "Check for Updates…",
+        action: { updaterService.checkForUpdates() }
+      )
+      .disabled(!updaterService.canCheckForUpdates)
       
       // Quit button
       InteractiveMenuButton(
@@ -717,6 +727,7 @@ struct SettingsMenuView: View {
   
   @State private var displayName: String = ""
   @State private var tagline: String = ""
+  @EnvironmentObject private var updaterService: UpdaterService
   
   var body: some View {
     VStack(alignment: .leading, spacing: 0) {
@@ -845,6 +856,54 @@ struct SettingsMenuView: View {
                   .controlSize(.small)
                 }
               }
+              .padding(.horizontal, 12)
+              .padding(.vertical, 8)
+              .background(Color(.controlBackgroundColor).opacity(0.5))
+              .cornerRadius(6)
+            }
+          }
+          
+          // Updates Settings
+          VStack(alignment: .leading, spacing: 8) {
+            Text("Updates")
+              .font(.system(size: 12, weight: .medium))
+              .foregroundColor(.secondary)
+            
+            VStack(spacing: 8) {
+              // Check for Updates button
+              Button(action: { updaterService.checkForUpdates() }) {
+                HStack {
+                  Image(systemName: "arrow.down.circle")
+                    .font(.system(size: 14))
+                    .foregroundColor(.secondary)
+                  Text("Check for Updates…")
+                    .font(.system(size: 14))
+                    .foregroundColor(.primary)
+                  Spacer()
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .background(Color(.controlBackgroundColor).opacity(0.5))
+                .cornerRadius(6)
+              }
+              .buttonStyle(PlainButtonStyle())
+              .disabled(!updaterService.canCheckForUpdates)
+              
+              // Automatic update check toggle
+              Toggle(isOn: Binding<Bool>(
+                get: { updaterService.controller.updater.automaticallyChecksForUpdates },
+                set: { updaterService.controller.updater.automaticallyChecksForUpdates = $0 }
+              )) {
+                HStack {
+                  Image(systemName: "arrow.triangle.2.circlepath.circle")
+                    .font(.system(size: 14))
+                    .foregroundColor(.secondary)
+                  Text("Automatically Check for Updates")
+                    .font(.system(size: 14))
+                    .foregroundColor(.primary)
+                }
+              }
+              .toggleStyle(.checkbox)
               .padding(.horizontal, 12)
               .padding(.vertical, 8)
               .background(Color(.controlBackgroundColor).opacity(0.5))
