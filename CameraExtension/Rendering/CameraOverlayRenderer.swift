@@ -51,6 +51,10 @@ final class CameraOverlayRenderer: OverlayRenderer {
     private var crossfadeStart: CFTimeInterval?
     private let crossfadeDuration: CFTimeInterval = 0.25
 
+    private let overlayHostLayer = CALayer()
+    private var layerCGCtx: CGContext?
+    private var lastLayerSize: CGSize = .zero
+    
     // Caches & state (unchanged below)...
     
     // MARK: - Properties
@@ -119,6 +123,17 @@ final class CameraOverlayRenderer: OverlayRenderer {
     
     /// Previous SwiftUI overlay for crossfade transitions
     private var previousSwiftUIOverlay: CIImage?
+    
+    /// Core Animation host layer for animations
+    
+    /// Timer for repeating animation bursts
+    private var pocTimer: Timer?
+    
+    /// Counter for limiting bursts
+    private var pocBurstCount = 0
+    
+    /// Flag to track if POC has started
+    private var pocStarted = false
 
     // MARK: - Initialization
     
@@ -160,6 +175,10 @@ final class CameraOverlayRenderer: OverlayRenderer {
         }
     }
     
+    deinit {
+        stopPOC()
+    }
+    
     // MARK: - Public Methods
     
     func render(pixelBuffer: CVPixelBuffer,
@@ -173,7 +192,11 @@ final class CameraOverlayRenderer: OverlayRenderer {
                 // Check for pre-rendered SwiftUI overlay first (optimized with caching)
                 if let overlayCG = getCachedSwiftUIOverlay() {
                     let baseSize = base.extent.size
+                    layoutOverlayHost(to: baseSize)
+                    // Trigger animation POC on first render
+                    maybeRunAnimationPOC()
                     logger.info("📐 [SwiftUIOverlay] Actual stream: \(Int(baseSize.width))x\(Int(baseSize.height)), Overlay: \(overlayCG.width)x\(overlayCG.height)")
+                    logger.info("Maybe made POC \(self.pocStarted)")
                     
                     // Fast path: reuse cached scaled overlay if size hasn't changed
                     if let cached = cachedScaledSwiftUIOverlay,
@@ -187,6 +210,7 @@ final class CameraOverlayRenderer: OverlayRenderer {
                         scaleX: baseSize.width / overlayCI.extent.width,
                         y: baseSize.height / overlayCI.extent.height
                     ))
+                    
                     
                     // Check for crossfade transition
                     if let prev = previousSwiftUIOverlay,
@@ -206,7 +230,16 @@ final class CameraOverlayRenderer: OverlayRenderer {
                                     cachedOverlaySize = baseSize
                                 }
                                 previousSwiftUIOverlay = scaledOverlay
-                                return blended.cropped(to: base.extent).composited(over: base)
+                                if let animatedCI = renderAnimatedLayersCI(size: baseSize) {
+                                    // Put it over whatever you were about to return (overlay-over-base)
+                                    // If your last variable is called `finalOverlayOverBase`, use that.
+                                    let final = scaledOverlay.composited(over: base)
+                                    return animatedCI.cropped(to: base.extent).composited(over: final)
+                                } else {
+                                    // No animated layers? return your existing result
+                                    return blended.cropped(to: base.extent).composited(over: base)
+                                }
+                                //return blended.cropped(to: base.extent).composited(over: base)
                             }
                         } else {
                             crossfadeStart = nil
@@ -247,6 +280,10 @@ final class CameraOverlayRenderer: OverlayRenderer {
 
                 let size = CGSize(width: CGFloat(CVPixelBufferGetWidth(pixelBuffer)),
                                   height: CGFloat(CVPixelBufferGetHeight(pixelBuffer)))
+                
+                layoutOverlayHost(to: size)
+                // Trigger animation POC on first render
+                maybeRunAnimationPOC()
 
                 let signature = "\(enrichedTokens.displayName)|\(enrichedTokens.tagline ?? "")|\(enrichedTokens.accentColorHex)|\(enrichedTokens.city ?? "")|\(enrichedTokens.localTime ?? "")|\(enrichedTokens.weatherEmoji ?? "")|\(enrichedTokens.weatherText ?? "")"
 
@@ -290,7 +327,16 @@ final class CameraOverlayRenderer: OverlayRenderer {
                         if let blended = dissolve.outputImage {
                             if t >= 1.0 { crossfadeStart = nil }
                             previousOverlay = lightweightCopy(overlayCropped)
-                            return blended.cropped(to: base.extent).composited(over: base)
+                            if let animatedCI = renderAnimatedLayersCI(size: size) {
+                                // Put it over whatever you were about to return (overlay-over-base)
+                                // If your last variable is called `finalOverlayOverBase`, use that.
+                                let final = overlayCropped.composited(over: base)
+                                return animatedCI.cropped(to: base.extent).composited(over: final)
+                            } else {
+                                // No animated layers? return your existing result
+                                blended.cropped(to: base.extent).composited(over: base)
+                            }
+                            //return blended.cropped(to: base.extent).composited(over: base)
                         }
                     } else {
                         crossfadeStart = nil
@@ -298,7 +344,16 @@ final class CameraOverlayRenderer: OverlayRenderer {
                 }
 
                 previousOverlay = lightweightCopy(overlayCropped)
-                return overlayCropped.composited(over: base)
+                if let animatedCI = renderAnimatedLayersCI(size: size) {
+                    // Put it over whatever you were about to return (overlay-over-base)
+                    // If your last variable is called `finalOverlayOverBase`, use that.
+                    let final = overlayCropped.composited(over: base)
+                    return animatedCI.cropped(to: base.extent).composited(over: final)
+                } else {
+                    // No animated layers? return your existing result
+                    return overlayCropped.composited(over: base)
+                }
+                
             }
         }
     }
@@ -765,6 +820,178 @@ final class CameraOverlayRenderer: OverlayRenderer {
           .premultiplyingAlpha()
     }
     
+    // MARK: - Animation POC
+    
+    
+    private func layoutOverlayHost(to size: CGSize) {
+      overlayHostLayer.bounds = CGRect(origin: .zero, size: size)
+      overlayHostLayer.position = CGPoint(x: size.width/2, y: size.height/2)
+      overlayHostLayer.isGeometryFlipped = true
+      overlayHostLayer.contentsScale = 2.0
+    }
+
+    private func ensureLayerContext(size: CGSize) -> CGContext? {
+      guard lastLayerSize != size || layerCGCtx == nil else { return layerCGCtx }
+      lastLayerSize = size
+
+      let w = Int(size.width), h = Int(size.height)
+      let bytesPerRow = w * 4
+      let colorSpace = CGColorSpaceCreateDeviceRGB()
+      layerCGCtx = CGContext(data: nil,
+                             width: w,
+                             height: h,
+                             bitsPerComponent: 8,
+                             bytesPerRow: bytesPerRow,
+                             space: colorSpace,
+                             bitmapInfo: CGImageAlphaInfo.premultipliedFirst.rawValue)
+      return layerCGCtx
+    }
+
+    private func renderAnimatedLayersCI(size: CGSize) -> CIImage? {
+      guard let ctx = ensureLayerContext(size: size) else { return nil }
+      // clear
+      ctx.saveGState()
+      ctx.setBlendMode(.clear)
+      ctx.fill(CGRect(origin: .zero, size: size))
+      ctx.restoreGState()
+
+      // draw the *presentation* tree so animations show mid-flight
+      (overlayHostLayer.presentation() ?? overlayHostLayer).render(in: ctx)
+      guard let cg = ctx.makeImage() else { return nil }
+      return CIImage(cgImage: cg)
+    }
+    
+    /// Start continuous animation bursts while streaming
+    func maybeRunAnimationPOC() {
+        guard !pocStarted else { return }
+        pocStarted = true
+        
+        // Start with immediate burst
+        DispatchQueue.main.async { [weak self] in
+            self?.runAnimationPOC()
+            self?.startPOCLoopingBursts()
+        }
+    }
+    
+    /// Start looping animation bursts
+    private func startPOCLoopingBursts() {
+        stopPOC()
+        pocBurstCount = 0
+        
+        // Create timer that fires every 3 seconds
+        pocTimer = Timer.scheduledTimer(withTimeInterval: 3.0, repeats: true) { [weak self] timer in
+            guard let self = self else {
+                timer.invalidate()
+                return
+            }
+            
+            self.runAnimationPOC()
+            self.pocBurstCount += 1
+            
+            // Stop after 10 bursts (30 seconds total)
+            if self.pocBurstCount >= 10 {
+                timer.invalidate()
+                self.pocTimer = nil
+            }
+        }
+    }
+    
+    /// Stop POC animations
+    func stopPOC() {
+        pocTimer?.invalidate()
+        pocTimer = nil
+        pocBurstCount = 0
+    }
+    
+    /// Run star burst animation for POC testing
+    private func runAnimationPOC() {
+        let emitter = CAEmitterLayer()
+        emitter.frame = overlayHostLayer.bounds
+        emitter.emitterShape = .line
+        emitter.emitterPosition = CGPoint(x: overlayHostLayer.bounds.midX,
+                                          y: overlayHostLayer.bounds.minY - 10)
+        emitter.emitterSize = CGSize(width: overlayHostLayer.bounds.width, height: 1)
+
+        let cell = CAEmitterCell()
+        cell.contents = StarImage.make(size: 28, points: 5)
+        cell.birthRate = 80
+        cell.lifetime = 1.5
+        cell.velocity = 240
+        cell.velocityRange = 120
+        cell.emissionLongitude = .pi / 2
+        cell.emissionRange = .pi / 6
+        cell.spin = 1.5
+        cell.spinRange = 2.0
+        cell.scale = 0.5
+        cell.scaleRange = 0.3
+        cell.alphaSpeed = -0.9
+        cell.yAcceleration = 220
+
+        emitter.emitterCells = [cell]
+        overlayHostLayer.addSublayer(emitter)
+
+        // Remove after ~2s so it doesn't linger
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
+            emitter.birthRate = 0
+        }
+
+        // remove the whole emitter after cells have died out
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+            emitter.removeFromSuperlayer()
+        }
+    }
+    
+    
+}
+
+// MARK: - StarImage Helper
+
+/// Helper enum to create star shapes for animation POC
+private enum StarImage {
+    static func make(size: CGFloat, points: Int) -> CGImage? {
+        let width = Int(size)
+        let height = Int(size)
+        let colorSpace = CGColorSpaceCreateDeviceRGB()
+        
+        guard let context = CGContext(
+            data: nil,
+            width: width,
+            height: height,
+            bitsPerComponent: 8,
+            bytesPerRow: 0,
+            space: colorSpace,
+            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+        ) else {
+            return nil
+        }
+        
+        // Clear background
+        context.clear(CGRect(x: 0, y: 0, width: width, height: height))
+        
+        // Create star path
+        let path = CGMutablePath()
+        let c = CGPoint(x: size/2, y: size/2)
+        let R = size/2, r = R * 0.5
+        
+        for i in 0..<(points * 2) {
+            let a = CGFloat(i) * .pi / CGFloat(points)
+            let rad = (i % 2 == 0) ? R : r
+            let p = CGPoint(x: c.x + rad * sin(a), y: c.y + rad * cos(a))
+            if i == 0 {
+                path.move(to: p)
+            } else {
+                path.addLine(to: p)
+            }
+        }
+        path.closeSubpath()
+        
+        // Fill star with white
+        context.setFillColor(CGColor.white)
+        context.addPath(path)
+        context.fillPath()
+        
+        return context.makeImage()
+    }
 }
 
 // MARK: - LRU Cache
