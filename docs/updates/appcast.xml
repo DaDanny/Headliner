@@ -13,11 +13,11 @@
       <enclosure
         url="https://DaDanny.github.io/Headliner/updates/Headliner.zip"
         sparkle:shortVersionString="1.1"
-        sparkle:version="166"
-        sparkle:edSignature="qPEOHi8xseGny8IzTq610QoMiheeRR8sQXEQ39v2dV2FN5SGApu3tYZWty6Cd1IbizAeUfhqsprY8DI0gvWFCg=="
-        length="4613194"
+        sparkle:version="227"
+        sparkle:edSignature="nK9yDwp0riIIB4e9hKzpJ4cfq0Mh4aMJSPreKi9LdsQrif2ImJm5n6uYXfntJEtJaMYmIQKobbz2SirZzYqDBw=="
+        length="4606201"
         type="application/octet-stream" />
-      <pubDate>Tue, 26 Aug 2025 03:55:43 +0000</pubDate>
+      <pubDate>Wed, 27 Aug 2025 16:01:15 +0000</pubDate>
       <sparkle:releaseNotesLink>https://DaDanny.github.io/Headliner/updates/release-notes.html</sparkle:releaseNotesLink>
     </item>
   </channel>
