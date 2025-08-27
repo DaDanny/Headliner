@@ -2,7 +2,7 @@
 //  LivePreviewPane.swift
 //  Headliner
 //
-//  Aspect-fit preview container with letterboxing for modern onboarding
+//  Aspect-fit preview container with letterboxing for video previews
 //
 
 import SwiftUI
@@ -32,11 +32,6 @@ struct LivePreviewPane<Content: View>: View {
             
             GeometryReader { geo in
                 ZStack {
-                    
-                    // Checkerboard pattern for transparency indication
-//                    CheckerboardPattern()
-//                        .opacity(0.05)
-                    
                     // Aspect-fit content with letterboxing
                     AspectFitBox(
                         containerSize: geo.size,
@@ -89,34 +84,6 @@ private struct AspectFitBox<C: View>: View {
             .frame(width: fittedSize.width, height: fittedSize.height)
             .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
             .animation(.easeInOut(duration: 0.2), value: fittedSize)
-    }
-}
-
-private struct CheckerboardPattern: View {
-    var body: some View {
-        Canvas { context, size in
-            let squareSize: CGFloat = 20
-            let rows = Int(size.height / squareSize) + 1
-            let cols = Int(size.width / squareSize) + 1
-            
-            for row in 0..<rows {
-                for col in 0..<cols {
-                    let isEven = (row + col) % 2 == 0
-                    if !isEven {
-                        let rect = CGRect(
-                            x: CGFloat(col) * squareSize,
-                            y: CGFloat(row) * squareSize,
-                            width: squareSize,
-                            height: squareSize
-                        )
-                        context.fill(
-                            Path(rect),
-                            with: .color(.primary.opacity(0.1))
-                        )
-                    }
-                }
-            }
-        }
     }
 }
 

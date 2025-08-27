@@ -60,28 +60,12 @@ extension CameraExtensionDeviceSource {
 		// Phase 4.2: Reset error tracking when streaming starts
 		errorManager?.recordSuccess()
 		
-		// Phase 2.2: Auto-start camera feature for seamless Google Meet integration
-		_streamStateLock.lock()
-		let currentAppControlledStreaming = _isAppControlledStreaming
+		// Phase 1.1: Pure client-based auto-start - camera always starts when external apps connect
+		extensionLogger.debug("External app connected - automatically starting camera capture")
 		
-		// Check if auto-start is enabled and we're not already streaming
-		if !currentAppControlledStreaming && ExtensionStatusManager.getAutoStartEnabled() {
-			extensionLogger.debug("Auto-start enabled - automatically starting camera capture for external app")
-			_isAppControlledStreaming = true
-			_streamStateLock.unlock()
-			
-			// Report auto-start status
-			ExtensionStatusManager.writeStatus(.starting, error: nil)
-			startCameraCapture()
-		} else {
-			_streamStateLock.unlock()
-			
-			if currentAppControlledStreaming {
-				startCameraCapture()
-			} else {
-				extensionLogger.debug("Auto-start disabled - showing splash screen until app enables streaming")
-			}
-		}
+		// Report auto-start status
+		ExtensionStatusManager.writeStatus(.starting, error: nil)
+		startCameraCapture()
 	}
 	
 	func stopStreaming() {
@@ -108,59 +92,24 @@ extension CameraExtensionDeviceSource {
 			
 			// Phase 4.2: Frame generation monitoring is now handled by error manager
 			
-			// ❌ CRITICAL FIX: Don't reset app state when external apps stop
-			// This was causing Google Meet toggle issues - when Meet stops/starts video,
-			// it would reset _isAppControlledStreaming = false, causing splash screen
-			// 
-			// OLD BROKEN CODE: _isAppControlledStreaming = false
-			
-			// Stop camera if no external apps are connected AND (app hasn't requested streaming OR auto-start is disabled)
+			// Phase 1.1: Pure client-based logic - stop camera when no external apps are connected
 			_streamStateLock.lock()
 			let noExternalApps = _streamingCounter == 0
-			let appNotRequestingStream = !_isAppControlledStreaming
-			let autoStartDisabled = !ExtensionStatusManager.getAutoStartEnabled()
-			// Stop camera when no external apps AND either app didn't request OR auto-start is off
-			let shouldStopCamera = noExternalApps && (appNotRequestingStream || autoStartDisabled)
 			_streamStateLock.unlock()
 			
-			if shouldStopCamera {
+			if noExternalApps {
 				// Phase 2.2: Report stopping status
 				ExtensionStatusManager.writeStatus(.stopping)
 				stopCameraCapture()
 				// Phase 2.2: Report idle status after stopping
 				ExtensionStatusManager.writeStatus(.idle)
-				extensionLogger.debug("Stopped camera capture - app not streaming")
+				extensionLogger.debug("Stopped camera capture - no external apps connected")
 			} else {
-				if !noExternalApps {
-					extensionLogger.debug("Keeping camera active - external apps still connected (streaming counter: \(self._streamingCounter))")
-				} else if _isAppControlledStreaming && !autoStartDisabled {
-					extensionLogger.debug("Keeping camera active - main app requested streaming and auto-start enabled")
-				} else {
-					extensionLogger.debug("Keeping camera active - unexpected condition")
-				}
+				extensionLogger.debug("Keeping camera active - external apps still connected (streaming counter: \(self._streamingCounter))")
 			}
 		}
 	}
 	
-	func startAppControlledStreaming() {
-		extensionLogger.debug("App requesting camera stream start")
-		
-		_streamStateLock.lock()
-		_isAppControlledStreaming = true
-		_streamStateLock.unlock()
-		
-		startCameraCapture()
-	}
-	
-	func stopAppControlledStreaming() {
-		extensionLogger.debug("App requesting camera stream stop")
-		
-		_streamStateLock.lock()
-		_isAppControlledStreaming = false
-		_streamStateLock.unlock()
-		
-		stopCameraCapture()
-	}
 	
 	// MARK: Camera Capture Management
 	
@@ -254,9 +203,9 @@ extension CameraExtensionDeviceSource {
 		_heartbeatTimer!.setEventHandler { [weak self] in
 			guard let self = self else { return }
 			
-			// Only send heartbeat if extension is actively doing something
+			// Only send heartbeat if extension is actively streaming
 			_streamStateLock.lock()
-			let isActivelyStreaming = _streamingCounter > 0 || _isAppControlledStreaming
+			let isActivelyStreaming = _streamingCounter > 0
 			_streamStateLock.unlock()
 			
 			if isActivelyStreaming {
@@ -378,9 +327,9 @@ extension CameraExtensionDeviceSource {
 				// Camera not running - start preview mode for immediate device switching
 				extensionLogger.debug("Camera not active - starting preview mode to apply device change immediately")
 				
-				// Check if we should start streaming (external app requesting or auto-start enabled)
+				// Check if we should start streaming (external app requesting)
 				_streamStateLock.lock()
-				let shouldStartPreview = _streamingCounter > 0 || ExtensionStatusManager.getAutoStartEnabled()
+				let shouldStartPreview = _streamingCounter > 0
 				_streamStateLock.unlock()
 				
 				if shouldStartPreview {
@@ -433,9 +382,9 @@ extension CameraExtensionDeviceSource {
 		// Phase 4.2: Reset error tracking through error manager
 		errorManager?.recordSuccess()
 		
-		// Ensure session is running if we should be streaming
+		// Ensure session is running if external apps are connected
 		_streamStateLock.lock()
-		let shouldBeStreaming = _isAppControlledStreaming || (_streamingCounter > 0 && ExtensionStatusManager.getAutoStartEnabled())
+		let shouldBeStreaming = _streamingCounter > 0
 		_streamStateLock.unlock()
 		
 		if shouldBeStreaming {

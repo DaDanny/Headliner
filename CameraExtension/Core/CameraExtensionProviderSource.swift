@@ -99,11 +99,9 @@ class CameraExtensionProviderSource: NSObject, CMIOExtensionProviderSource {
 
         switch name {
         case .startStream:
-            extensionLogger.debug("App requesting camera stream start")
-            deviceSource.startAppControlledStreaming()
+            extensionLogger.debug("📡 startStream notification ignored - using pure client-based streaming")
         case .stopStream:
-            extensionLogger.debug("App requesting camera stream stop")
-            deviceSource.stopAppControlledStreaming()
+            extensionLogger.debug("📡 stopStream notification ignored - using pure client-based streaming")
         case .setCameraDevice:
             extensionLogger.debug("📡 Camera device selection changed - processing notification")
             handleCameraDeviceChange()
@@ -114,16 +112,23 @@ class CameraExtensionProviderSource: NSObject, CMIOExtensionProviderSource {
             extensionLogger.debug("📡 Pre-rendered overlay updated - will be refreshed on next frame")
         // Phase 2: New enhanced notifications
         case .requestStart:
-            extensionLogger.debug("📡 Request start - same as startStream")
-            deviceSource.startAppControlledStreaming()
+            extensionLogger.debug("📡 requestStart notification ignored - using pure client-based streaming")
         case .requestStop:
-            extensionLogger.debug("📡 Request stop - same as stopStream")
-            deviceSource.stopAppControlledStreaming()
+            extensionLogger.debug("📡 requestStop notification ignored - using pure client-based streaming")
         case .requestSwitchDevice:
             extensionLogger.debug("📡 Request switch device - same as setCameraDevice")
             handleCameraDeviceChange()
         case .statusChanged:
             extensionLogger.debug("📡 Status changed notification - no action needed (app-side notification)")
+        // Phase 1.2: New typed notifications for auto-start
+        case .appConnected:
+            extensionLogger.debug("📡 App connected notification - no action needed in extension")
+        case .appDisconnected:
+            extensionLogger.debug("📡 App disconnected notification - no action needed in extension")
+        case .cameraActivated:
+            extensionLogger.debug("📡 Camera activated notification - no action needed in extension")
+        case .cameraDeactivated:
+            extensionLogger.debug("📡 Camera deactivated notification - no action needed in extension")
         }
     }
 

@@ -164,7 +164,12 @@ extension AVCaptureDevice.DeviceType {
 
 /// Keys for reliable status communication via App Group UserDefaults
 enum ExtensionStatusKeys {
+    // Legacy key - now used for installation status if needed
     static let status = "HL.ext.status"
+    
+    // New separate key for runtime status (streaming/idle/starting/etc)
+    static let runtimeStatus = "HL.ext.runtimeStatus"
+    
     static let lastHeartbeat = "HL.ext.lastHeartbeat"
     static let selectedDeviceID = "HL.selectedDeviceID"
     static let autoStartCamera = "HL.autoStartCamera"

@@ -169,10 +169,7 @@ extension CameraExtensionDeviceSource {
 		NSGraphicsContext.saveGraphicsState()
 		NSGraphicsContext.current = graphicsContext
 		
-		// Check if app-controlled streaming is active
-		_streamStateLock.lock()
-		let isAppStreaming = _isAppControlledStreaming
-		_streamStateLock.unlock()
+		// Phase 1.1: Pure client-based streaming - no app-controlled checks needed
 		
 		// Draw main title
 		let titleText = "Headliner"
@@ -196,10 +193,10 @@ extension CameraExtensionDeviceSource {
 		)
 		titleText.draw(in: titleRect, withAttributes: titleAttributes)
 		
-		// Draw status message
-		let statusText = isAppStreaming ? "Starting Camera..." : "Camera Stopped"
+		// Draw status message - Phase 1.1: Pure client-based streaming always ready
+		let statusText = "Ready for Video Calls"
 		let statusFont = NSFont.systemFont(ofSize: min(CGFloat(width)/20, 36), weight: .medium)
-		let statusColor = isAppStreaming ? NSColor.systemGreen : NSColor.systemGray  // green or gray
+		let statusColor = NSColor.systemBlue
 		let statusAttributes: [NSAttributedString.Key: Any] = [
 			.font: statusFont,
 			.foregroundColor: statusColor,

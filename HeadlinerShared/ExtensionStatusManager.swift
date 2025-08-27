@@ -12,17 +12,17 @@ import Foundation
 final class ExtensionStatusManager {
   private static let logger = HeadlinerLogger.logger(for: .application)
   
-  // MARK: - Status Writing (Extension Side)
+  // MARK: - Runtime Status Writing (Extension Side)
   
-  /// Write status to App Group UserDefaults (called from extension)
-  static func writeStatus(_ status: ExtensionRuntimeStatus, deviceName: String? = nil, error: String? = nil) {
+  /// Write runtime status to App Group UserDefaults (called from extension)
+  static func writeRuntimeStatus(_ status: ExtensionRuntimeStatus, deviceName: String? = nil, error: String? = nil) {
     guard let sharedDefaults = UserDefaults(suiteName: Identifiers.appGroup) else {
-      logger.error("Failed to access app group UserDefaults for status writing")
+      logger.error("Failed to access app group UserDefaults for runtime status writing")
       return
     }
     
-    // Write status and timestamp
-    sharedDefaults.set(status.rawValue, forKey: ExtensionStatusKeys.status)
+    // Write runtime status and timestamp
+    sharedDefaults.set(status.rawValue, forKey: ExtensionStatusKeys.runtimeStatus)
     sharedDefaults.set(Date().timeIntervalSince1970, forKey: ExtensionStatusKeys.lastHeartbeat)
     
     // Optional additional info
@@ -38,10 +38,15 @@ final class ExtensionStatusManager {
     
     sharedDefaults.synchronize()
     
-    // Notify app of status change via Darwin notifications
+    // Notify app of runtime status change via Darwin notifications
     Notifications.CrossApp.post(.statusChanged)
     
-    logger.debug("Extension status updated: \(status.displayText)")
+    logger.debug("Extension runtime status updated: \(status.displayText)")
+  }
+  
+  /// Legacy method - redirects to writeRuntimeStatus for backward compatibility
+  static func writeStatus(_ status: ExtensionRuntimeStatus, deviceName: String? = nil, error: String? = nil) {
+    writeRuntimeStatus(status, deviceName: deviceName, error: error)
   }
   
   /// Update heartbeat (called periodically from extension while active)
@@ -52,16 +57,21 @@ final class ExtensionStatusManager {
     sharedDefaults.synchronize()
   }
   
-  // MARK: - Status Reading (App Side)
+  // MARK: - Runtime Status Reading (App Side)
   
-  /// Read current extension status (called from main app)
-  static func readStatus() -> ExtensionRuntimeStatus {
+  /// Read current extension runtime status (called from main app)
+  static func readRuntimeStatus() -> ExtensionRuntimeStatus {
     guard let sharedDefaults = UserDefaults(suiteName: Identifiers.appGroup),
-          let statusString = sharedDefaults.string(forKey: ExtensionStatusKeys.status),
+          let statusString = sharedDefaults.string(forKey: ExtensionStatusKeys.runtimeStatus),
           let status = ExtensionRuntimeStatus(rawValue: statusString) else {
       return .idle // Default status
     }
     return status
+  }
+  
+  /// Legacy method - redirects to readRuntimeStatus for backward compatibility
+  static func readStatus() -> ExtensionRuntimeStatus {
+    return readRuntimeStatus()
   }
   
   /// Check if extension is healthy (recent heartbeat)

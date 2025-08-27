@@ -14,6 +14,7 @@ struct CameraPreviewCard: View {
   let overlayService: OverlayService?  // Optional for overlay preview
   
   @State private var overlayPreviewImage: CGImage?
+  @State private var renderTask: Task<Void, Never>?  // Track rendering task
 
   var body: some View {
     ZStack {
@@ -23,13 +24,14 @@ struct CameraPreviewCard: View {
 
       if let previewImage {
         ZStack {
-          // Base camera preview
+          // Base camera preview - optimized rendering
           Image(previewImage, scale: 1.0, label: Text("Camera Preview"))
             .resizable()
             .aspectRatio(contentMode: .fill)
             .frame(height: 300)
             .clipped()
             .cornerRadius(20)
+            .id(previewImage)  // Force refresh when image changes
           
           // Overlay preview (if available)
           if let overlayImage = overlayPreviewImage {
@@ -40,6 +42,7 @@ struct CameraPreviewCard: View {
               .clipped()
               .cornerRadius(20)
               .allowsHitTesting(false)  // Don't interfere with camera preview interactions
+              .id(overlayImage)  // Force refresh when overlay changes
           } 
           
           // DEBUG: Visual indicator when overlay should be active
@@ -118,11 +121,18 @@ struct CameraPreviewCard: View {
     .onChange(of: overlayService?.settings.selectedSurfaceStyle) { _ in
       updateOverlayPreview()
     }
+    .onDisappear {
+      // Cancel any pending render task when view disappears
+      renderTask?.cancel()
+    }
   }
   
   // MARK: - Private Methods
   
   private func updateOverlayPreview() {
+    // Cancel any existing rendering task
+    renderTask?.cancel()
+    
     guard let overlayService = overlayService else {
       overlayPreviewImage = nil
       return
@@ -144,7 +154,8 @@ struct CameraPreviewCard: View {
       ? cameraDimensions 
       : CGSize(width: 640, height: 360) // Fallback for small cameras
     
-    Task {
+    // Create new rendering task
+    renderTask = Task {
       await renderOverlayPreview(tokens: tokens, presetId: overlayService.settings.selectedPresetId, size: previewSize)
     }
   }

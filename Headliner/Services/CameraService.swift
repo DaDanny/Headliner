@@ -63,7 +63,7 @@ final class CameraService: NSObject, ObservableObject {
   // MARK: - Constants
   
   private enum Keys {
-    static let selectedCameraID = ExtensionStatusKeys.selectedDeviceID // Use consistent key from ExtensionStatusKeys
+    static let selectedDeviceID = ExtensionStatusKeys.selectedDeviceID // Use consistent key from ExtensionStatusKeys
   }
   
   // MARK: - Initialization
@@ -88,14 +88,12 @@ final class CameraService: NSObject, ObservableObject {
     cameraStatus = .starting
     statusMessage = "Starting camera..."
     
-    // Notify extension to start capturing from physical camera
-    Notifications.CrossApp.post(.startStream)
-    
-    // Start self-preview from virtual camera (shows exactly what Google Meet sees)
+    // Phase 1.1: No more Darwin notifications - just connect via AVFoundation
+    // This will automatically trigger the extension's startStreaming() method
     setupSelfPreviewFromVirtualCamera()
     
-    // Wait for extension to start and virtual camera to be available
-    try await Task.sleep(nanoseconds: 2_000_000_000) // 2 seconds for extension startup
+    // Wait for virtual camera connection to establish
+    try await Task.sleep(nanoseconds: 1_500_000_000) // 1.5 seconds for connection
     cameraStatus = .running
     statusMessage = "Camera is running"
     logger.debug("Camera and self-preview started")
@@ -110,14 +108,12 @@ final class CameraService: NSObject, ObservableObject {
     
     logger.debug("Starting onboarding preview...")
     
-    // Notify extension to start capturing from physical camera
-    Notifications.CrossApp.post(.startStream)
-    
-    // Start self-preview from virtual camera to show user what they'll look like
+    // Phase 1.1: No more Darwin notifications - just connect via AVFoundation
+    // This will automatically trigger the extension's startStreaming() method
     setupSelfPreviewFromVirtualCamera()
     
-    // Wait for extension to start
-    try? await Task.sleep(nanoseconds: 1_500_000_000) // 1.5 seconds for extension startup
+    // Wait for virtual camera connection to establish
+    try? await Task.sleep(nanoseconds: 1_500_000_000) // 1.5 seconds for connection
     logger.debug("Onboarding preview started")
   }
   
@@ -125,8 +121,8 @@ final class CameraService: NSObject, ObservableObject {
   func stopOnboardingPreview() {
     logger.debug("Stopping onboarding preview...")
     
-    // Stop extension camera capture
-    Notifications.CrossApp.post(.stopStream)
+    // Phase 1.1: No more Darwin notifications - just disconnect AVFoundation
+    // This will automatically trigger the extension's stopStreaming() method
     
     // Stop self-preview capture session
     selfPreviewCaptureSession?.stopRunning()
@@ -145,18 +141,20 @@ final class CameraService: NSObject, ObservableObject {
     cameraStatus = .stopping
     statusMessage = "Stopping camera..."
     
-    // Stop extension camera capture
-    Notifications.CrossApp.post(.stopStream)
+    // Phase 1.1: No more Darwin notifications - just disconnect AVFoundation
+    // This will automatically trigger the extension's stopStreaming() method
     
     // Stop self-preview capture session
     selfPreviewCaptureSession?.stopRunning()
+    selfPreviewCaptureSession = nil
+    selfPreviewOutput = nil
     logger.debug("Stopped self-preview capture session")
     
     // Clear current frame
     currentPreviewFrame = nil
     
     Task {
-      try? await Task.sleep(nanoseconds: 1_000_000_000)
+      try? await Task.sleep(nanoseconds: 500_000_000) // Reduced wait time
       await MainActor.run {
         cameraStatus = .stopped
         statusMessage = "Camera stopped"
@@ -171,14 +169,14 @@ final class CameraService: NSObject, ObservableObject {
     logger.debug("📷 Selecting camera: \(camera.name) (ID: \(camera.id))")
     
     // Save selection to both local and app group UserDefaults
-    userDefaults.set(camera.id, forKey: Keys.selectedCameraID)
+    userDefaults.set(camera.id, forKey: Keys.selectedDeviceID)
     if let appGroupDefaults = UserDefaults(suiteName: Identifiers.appGroup) {
-      appGroupDefaults.set(camera.id, forKey: Keys.selectedCameraID)
+      appGroupDefaults.set(camera.id, forKey: Keys.selectedDeviceID)
       appGroupDefaults.synchronize() // Ensure immediate write
       logger.debug("✅ Saved camera selection to app group: \(camera.name) (ID: \(camera.id))")
       
       // Verify the write was successful
-      if let savedID = appGroupDefaults.string(forKey: Keys.selectedCameraID) {
+      if let savedID = appGroupDefaults.string(forKey: Keys.selectedDeviceID) {
         logger.debug("✅ Verified camera selection saved: \(savedID)")
       } else {
         logger.error("❌ Failed to verify camera selection save")
@@ -262,9 +260,9 @@ final class CameraService: NSObject, ObservableObject {
       selectedCamera = first
       
       // Phase 2.3: Save default selection to UserDefaults so extension can use it
-      userDefaults.set(first.id, forKey: Keys.selectedCameraID)
+      userDefaults.set(first.id, forKey: Keys.selectedDeviceID)
       if let appGroupDefaults = UserDefaults(suiteName: Identifiers.appGroup) {
-        appGroupDefaults.set(first.id, forKey: Keys.selectedCameraID)
+        appGroupDefaults.set(first.id, forKey: Keys.selectedDeviceID)
         appGroupDefaults.synchronize() // Ensure immediate write
         logger.debug("✅ Saved default camera selection to app group: \(first.name) (ID: \(first.id))")
       }
@@ -278,7 +276,8 @@ final class CameraService: NSObject, ObservableObject {
     }
   }
   
-  // Self-preview setup: captures from virtual camera to show user exactly what Google Meet sees
+  // Phase 1.1: Self-preview setup - connects to virtual camera like any external app
+  // This connection automatically triggers extension.startStreaming() via CMIO
   private func setupSelfPreviewFromVirtualCamera() {
     guard hasCameraPermission else {
       logger.debug("No camera permission, skipping self-preview setup")
@@ -296,6 +295,7 @@ final class CameraService: NSObject, ObservableObject {
     }
     
     logger.debug("Found Headliner virtual camera: \(virtualCamera.localizedName)")
+    logger.debug("Connecting to virtual camera - this will trigger extension.startStreaming()")
     
     // Setup capture session for self-preview
     selfPreviewCaptureSession = AVCaptureSession()
@@ -313,11 +313,13 @@ final class CameraService: NSObject, ObservableObject {
         selfPreviewCaptureSession?.addOutput(selfPreviewOutput!)
       }
       
+      // Phase 1.1: This startRunning() call automatically triggers the extension!
+      // AVFoundation → CMIO → extension.startStreaming() → physical camera starts
       selfPreviewCaptureSession?.startRunning()
-      logger.debug("Self-preview capture session started from virtual camera")
+      logger.debug("Connected to virtual camera - extension should be starting physical camera")
       
     } catch {
-      logger.error("Failed to setup self-preview: \(error)")
+      logger.error("Failed to connect to virtual camera: \(error)")
       selfPreviewCaptureSession = nil
       selfPreviewOutput = nil
     }
@@ -330,12 +332,12 @@ final class CameraService: NSObject, ObservableObject {
     
     // Try app group first (more reliable for extension communication)
     if let appGroupDefaults = UserDefaults(suiteName: Identifiers.appGroup),
-       let groupSavedID = appGroupDefaults.string(forKey: Keys.selectedCameraID),
+       let groupSavedID = appGroupDefaults.string(forKey: Keys.selectedDeviceID),
        !groupSavedID.isEmpty {
       savedID = groupSavedID
     }
     // Fall back to local UserDefaults
-    else if let localSavedID = userDefaults.string(forKey: Keys.selectedCameraID),
+    else if let localSavedID = userDefaults.string(forKey: Keys.selectedDeviceID),
             !localSavedID.isEmpty {
       savedID = localSavedID
     }

@@ -57,6 +57,11 @@ enum CrossAppNotificationName: String, CaseIterable {
   case requestStop
   case requestSwitchDevice
   case statusChanged
+  // Phase 1.2: New typed notifications for auto-start
+  case appConnected
+  case appDisconnected
+  case cameraActivated
+  case cameraDeactivated
   
   var rawValue: String {
     switch self {
@@ -78,12 +83,22 @@ enum CrossAppNotificationName: String, CaseIterable {
       return "\(Identifiers.notificationPrefix).request.switchDevice.v1"
     case .statusChanged:
       return "\(Identifiers.notificationPrefix).status.changed.v1"
+    // Phase 1.2: New typed notifications
+    case .appConnected:
+      return "\(Identifiers.notificationPrefix).app.connected.v1"
+    case .appDisconnected:
+      return "\(Identifiers.notificationPrefix).app.disconnected.v1"
+    case .cameraActivated:
+      return "\(Identifiers.notificationPrefix).camera.activated.v1"
+    case .cameraDeactivated:
+      return "\(Identifiers.notificationPrefix).camera.deactivated.v1"
     }
   }
   
   static var allCases: [CrossAppNotificationName] {
     [.startStream, .stopStream, .setCameraDevice, .updateOverlaySettings, .overlayUpdated,
-     .requestStart, .requestStop, .requestSwitchDevice, .statusChanged]
+     .requestStart, .requestStop, .requestSwitchDevice, .statusChanged,
+     .appConnected, .appDisconnected, .cameraActivated, .cameraDeactivated]
   }
   
   init?(rawValue: String) {
@@ -253,6 +268,102 @@ private class BridgeCleanupToken: NSObject {
       observer
     )
     Unmanaged<NSObject>.fromOpaque(observer).release()
+  }
+}
+
+// MARK: - Phase 1.2: Notification Payload Keys
+
+struct NotificationPayloadKeys {
+  static let appName = "appName"
+  static let processID = "processID"
+  static let timestamp = "timestamp"
+  static let reason = "reason"
+  static let clientCount = "clientCount"
+}
+
+// MARK: - Phase 1.2: CrossApp Extension Notifications Helper
+
+final class CrossAppExtensionNotifications {
+  private let logger = Logger(subsystem: "com.dannyfrancken.Headliner", category: "Extension")
+  
+  func postAppConnectedNotification(appName: String? = nil, processID: Int? = nil, clientCount: Int) {
+    // Save payload to shared defaults
+    if let sharedDefaults = UserDefaults(suiteName: Identifiers.appGroup) {
+      var payload: [String: Any] = [
+        NotificationPayloadKeys.clientCount: clientCount,
+        NotificationPayloadKeys.timestamp: Date().timeIntervalSince1970
+      ]
+      
+      if let appName = appName {
+        payload[NotificationPayloadKeys.appName] = appName
+      }
+      if let processID = processID {
+        payload[NotificationPayloadKeys.processID] = processID
+      }
+      
+      sharedDefaults.set(payload, forKey: "LastAppConnected")
+      sharedDefaults.synchronize()
+    }
+    
+    // Post notification
+    Notifications.CrossApp.post(.appConnected)
+    logger.debug("Posted app connected notification - clients: \(clientCount)")
+  }
+  
+  func postAppDisconnectedNotification(appName: String? = nil, processID: Int? = nil, clientCount: Int) {
+    // Save payload to shared defaults
+    if let sharedDefaults = UserDefaults(suiteName: Identifiers.appGroup) {
+      var payload: [String: Any] = [
+        NotificationPayloadKeys.clientCount: clientCount,
+        NotificationPayloadKeys.timestamp: Date().timeIntervalSince1970
+      ]
+      
+      if let appName = appName {
+        payload[NotificationPayloadKeys.appName] = appName
+      }
+      if let processID = processID {
+        payload[NotificationPayloadKeys.processID] = processID
+      }
+      
+      sharedDefaults.set(payload, forKey: "LastAppDisconnected")
+      sharedDefaults.synchronize()
+    }
+    
+    // Post notification
+    Notifications.CrossApp.post(.appDisconnected)
+    logger.debug("Posted app disconnected notification - clients: \(clientCount)")
+  }
+  
+  func postCameraActivatedNotification(reason: String) {
+    // Save payload to shared defaults
+    if let sharedDefaults = UserDefaults(suiteName: Identifiers.appGroup) {
+      let payload: [String: Any] = [
+        NotificationPayloadKeys.reason: reason,
+        NotificationPayloadKeys.timestamp: Date().timeIntervalSince1970
+      ]
+      sharedDefaults.set(payload, forKey: "CameraActivated")
+      sharedDefaults.synchronize()
+    }
+    
+    // Post notification
+    Notifications.CrossApp.post(.cameraActivated)
+    logger.debug("Posted camera activated notification - reason: \(reason)")
+  }
+  
+  func postCameraDeactivatedNotification(reason: String) {
+    // Save payload to shared defaults
+    if let sharedDefaults = UserDefaults(suiteName: Identifiers.appGroup) {
+      let payload: [String: Any] = [
+        NotificationPayloadKeys.reason: reason,
+        NotificationPayloadKeys.timestamp: Date().timeIntervalSince1970
+      ]
+      sharedDefaults.set(payload, forKey: "CameraDeactivated")
+      sharedDefaults.synchronize()
+    }
+    
+    // Post notification
+    Notifications.CrossApp.post(.cameraDeactivated)
+    logger.debug("Posted camera deactivated notification - reason: \(reason)")
   }
 }
 

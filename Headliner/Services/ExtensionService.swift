@@ -30,6 +30,8 @@ final class ExtensionService: ObservableObject {
   
   @Published private(set) var status: ExtensionStatus = .unknown
   @Published private(set) var statusMessage: String = ""
+  @Published private(set) var runtimeStatus: ExtensionRuntimeStatus = .idle
+  @Published private(set) var isStreaming: Bool = false
   
   // MARK: - Dependencies
   
@@ -86,7 +88,12 @@ final class ExtensionService: ObservableObject {
     let providerReady = isProviderReady
     let deviceAvailable = isExtensionDeviceAvailable()
     
-    logger.debug("Status check: providerReady=\(providerReady), deviceAvailable=\(deviceAvailable)")
+    // Read runtime status from shared UserDefaults
+    let newRuntimeStatus = ExtensionStatusManager.readRuntimeStatus()
+    runtimeStatus = newRuntimeStatus
+    isStreaming = (newRuntimeStatus == .streaming)
+    
+    logger.debug("Status check: providerReady=\(providerReady), deviceAvailable=\(deviceAvailable), runtime=\(newRuntimeStatus.displayText)")
     
     // Only consider installed if BOTH provider is ready AND device is available
     if providerReady && deviceAvailable {
@@ -178,31 +185,35 @@ final class ExtensionService: ObservableObject {
       .store(in: &cancellables)
   }
   
-  // Phase 3.2: Handle extension runtime status changes (replaces log parsing)
+  // Phase 3.2: Handle extension runtime status changes
   private func handleExtensionStatusChange() {
-    let runtimeStatus = ExtensionStatusManager.readStatus()
+    let newRuntimeStatus = ExtensionStatusManager.readRuntimeStatus()
     
-    // Only update status messages based on runtime status if extension is installed
+    // Always update runtime status and streaming flag
+    runtimeStatus = newRuntimeStatus
+    isStreaming = (newRuntimeStatus == .streaming)
+    
+    // Only update status messages if extension is installed
     guard status == .installed else {
-      logger.debug("Ignoring runtime status change - extension not installed")
+      logger.debug("Runtime status updated but extension not installed: \(newRuntimeStatus.rawValue)")
       return
     }
     
-    // Update status message based on runtime status without affecting installation status
-    switch runtimeStatus {
+    // Update status message based on runtime status
+    switch newRuntimeStatus {
     case .idle:
       statusMessage = "Extension ready"
     case .starting:
       statusMessage = "Extension starting camera..."
     case .streaming:
-      statusMessage = "Extension streaming"
+      statusMessage = "Extension streaming to apps"
     case .stopping:
       statusMessage = "Extension stopping..."
     case .error:
       statusMessage = "Extension error - check logs"
     }
     
-    logger.debug("📊 Extension runtime status: \(runtimeStatus.rawValue) -> '\(self.statusMessage)'")
+    logger.debug("📊 Extension runtime status: \(newRuntimeStatus.rawValue) -> '\(self.statusMessage)' (streaming: \(self.isStreaming))")
   }
   
   private func handleInstallationPhase(_ phase: ExtensionInstallPhase) {
@@ -282,7 +293,7 @@ final class ExtensionService: ObservableObject {
     }
     
     let isHealthy = ExtensionStatusManager.isExtensionHealthy(timeoutSeconds: 15.0)
-    let currentStatus = ExtensionStatusManager.readStatus()
+    let currentStatus = ExtensionStatusManager.readRuntimeStatus()
     
     if isHealthy {
       // Extension is healthy - update status message with runtime status
