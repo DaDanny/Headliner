@@ -1,52 +1,51 @@
 # Simplify Headliner: Auto-Start On Demand, No Manual Controls
 
+## 📊 **Current Status** (Last updated: 2025-01-28)
+- ✅ **Phase 1.1 COMPLETED**: Pure client-based streaming working and tested
+- 🔄 **Phase 1.2/1.3**: Notification firing and pass-through fallback remaining
+- 🎯 **Next Priority**: Complete Phase 2 UI simplification (remove manual controls)
+- **Commit**: `f12b308` - Core extension changes committed and working
+
 ## 🎯 **Goal**: Transform Headliner from manual control to auto-start-on-demand
 
 Replace complex manual start/stop controls with Rick Rubin simplicity: **"Select Headliner Camera in Zoom/Meet - that's it."**
 
 ## 📋 **Phase 1: Extension Simplification**
 
-### **1.1 Remove App-Controlled Streaming Logic**
+### **1.1 Remove App-Controlled Streaming Logic** ✅ **COMPLETED**
 - **Files**: `CameraExtension/Core/CameraExtensionDeviceSource.swift`, `CameraExtension/DeviceFeatures/CameraExtensionDeviceSource+CaptureSession.swift`
-- Delete `_isAppControlledStreaming` variable and related methods entirely
-- Implement dual client tracking:
-  - `externalClients` (Zoom, Meet, Teams, Discord) 
-  - `internalClients` (Headliner Preview)
-  - `totalClients = external + internal`
-- Simplify streaming logic:
-  - `startStreaming()` → start physical camera when `totalClients: 0 → 1`
-  - `stopStreaming()` → stop physical camera when `totalClients: 1 → 0` (with debounce)
+- ✅ **DONE**: Deleted `_isAppControlledStreaming` variable and related methods entirely
+- ✅ **DONE**: Removed `startAppControlledStreaming()` and `stopAppControlledStreaming()` methods
+- ✅ **DONE**: Implemented pure client-based streaming logic:
+  - `startStreaming()` → always starts physical camera when external apps connect
+  - `stopStreaming()` → stops physical camera when no external apps connected
+- ✅ **DONE**: Removed all `ExtensionStatusManager.getAutoStartEnabled()` dependencies
+- ✅ **DONE**: Updated notification handling to ignore startStream/stopStream notifications
+- **Note**: Implemented simpler approach than dual client tracking - pure external client control
 
-### **1.2 Add Typed Notifications**  
+### **1.2 Add Typed Notifications** ✅ **PARTIALLY COMPLETED**
 - **File**: `HeadlinerShared/Notifications.swift`
-- Add new typed notifications (fire only on external client transitions):
+- ✅ **DONE**: Added new CrossApp notification enum cases:
   ```swift
-  // External app lifecycle (for analytics/UI)
-  static let externalAppConnected = Notification.Name("externalAppConnected")
-  static let externalAppDisconnected = Notification.Name("externalAppDisconnected")
-  
-  // Camera hardware lifecycle
-  static let cameraActivated = Notification.Name("cameraActivated") 
-  static let cameraDeactivated = Notification.Name("cameraDeactivated")
-  
-  // Notification payload keys
-  struct NotificationKeys {
-      static let appName = "appName"
-      static let processID = "processID" 
-      static let timestamp = "timestamp"
-      static let reason = "reason"
-      static let clientCount = "clientCount"
-  }
+  case .appConnected
+  case .appDisconnected  
+  case .cameraActivated
+  case .cameraDeactivated
   ```
-- **Important**: Internal preview increments don't emit external notifications (but do affect camera start/stop)
+- ✅ **DONE**: Extension now handles these notifications (currently as no-ops)
+- 🔄 **TODO**: Implement actual notification firing logic in extension for UI status updates
+- 🔄 **TODO**: Add notification payload keys for structured data
+- **Note**: Basic structure is in place, but firing logic needs implementation
 
-### **1.3 Remove Splash Screen Forever**
+### **1.3 Remove Splash Screen Forever** ✅ **PARTIALLY COMPLETED**
 - **File**: `CameraExtension/DeviceFeatures/CameraExtensionDeviceSource+FramePipeline.swift`
-- Replace splash screen with pass-through fallback:
+- ✅ **DONE**: Updated splash screen to show "Ready for Video Calls" (always-ready state)
+- ✅ **DONE**: Simplified splash screen logic to remove app-controlled state checks
+- 🔄 **TODO**: Implement pass-through fallback:
   - If overlays fail to render → show raw camera feed
-  - If warming with no frame yet → show last-good frame or minimal "initializing" placeholder
+  - If warming with no frame yet → show last-good frame or minimal placeholder
   - **Never** show black screen or logo during meetings
-- Update `drawSplashScreen()` to implement pass-through only
+- **Note**: Splash screen simplified but full pass-through fallback still needed
 
 ## 📋 **Phase 2: Main App UI Changes**
 
@@ -130,11 +129,12 @@ Replace complex manual start/stop controls with Rick Rubin simplicity: **"Select
 
 ## 🔧 **Implementation Phases & Timeline**
 
-### **Phase 1** (Core Extension Changes) - *Priority: Critical*
-- Duration: 3-4 days
-- Files: Extension core classes, notification system
-- Deliverable: Auto-start/stop working, typed notifications firing
-- Testing: Multi-app connection scenarios, preview lifecycle
+### **Phase 1** (Core Extension Changes) - *Priority: Critical* ✅ **MOSTLY COMPLETED**
+- ✅ **DONE**: Core auto-start/stop working with pure client-based streaming
+- ✅ **DONE**: Extension core classes updated and working
+- ✅ **DONE**: Basic typed notification structure added
+- 🔄 **REMAINING**: Full notification firing logic and pass-through fallback
+- **Status**: Phase 1.1 complete and tested, working reliably
 
 ### **Phase 2** (UI Simplification) - *Priority: High*  
 - Duration: 2-3 days  
