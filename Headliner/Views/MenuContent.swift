@@ -107,8 +107,8 @@ struct MainMenuView: View {
       // Main content
       ScrollView {
         VStack(alignment: .leading, spacing: 12) {
-          // Start/Stop section
-          startStopSection
+          // Status display section
+          statusDisplaySection
           
           // Main controls - pill cards
           mainControlsSection
@@ -146,10 +146,10 @@ struct MainMenuView: View {
       // Status indicator
       HStack(spacing: 6) {
         Circle()
-          .fill(cameraService.cameraStatus.isRunning ? Color.green : Color.gray)
+          .fill(streamingIndicatorColor)
           .frame(width: 8, height: 8)
         
-        Text(cameraService.cameraStatus.isRunning ? "Live" : "Idle")
+        Text(streamingStatusText)
           .font(.caption)
           .foregroundColor(.secondary)
       }
@@ -158,36 +158,73 @@ struct MainMenuView: View {
     .padding(.vertical, 12)
   }
   
-  // MARK: - Start/Stop Section
+  // MARK: - Status Display Section
   
-  private var startStopSection: some View {
+  private var statusDisplaySection: some View {
     VStack(spacing: 8) {
-      Button(action: { 
-        withAnimation(.easeInOut(duration: 0.3)) {
-          appCoordinator.toggleCamera()
-        }
-      }) {
-        HStack {
-          Image(systemName: cameraService.cameraStatus.isRunning ? "stop.circle.fill" : "play.circle.fill")
-            .font(.system(size: 18))
-            .foregroundColor(.white)
-            .animation(.easeInOut(duration: 0.2), value: cameraService.cameraStatus.isRunning)
+      // Phase 1: Clean status display - no manual controls
+      HStack {
+        // Status indicator
+        Circle()
+          .fill(statusIndicatorColor)
+          .frame(width: 12, height: 12)
+          .animation(.easeInOut(duration: 0.3), value: extensionService.status)
+        
+        Text(statusDisplayText)
+          .font(.system(size: 16, weight: .medium))
+          .foregroundColor(.primary)
+        
+        Spacer()
+        
+        // Quick action buttons
+        HStack(spacing: 8) {
+          // Toggle Overlays button
+          Button(action: {
+            // TODO: Toggle overlay functionality
+          }) {
+            Image(systemName: "slider.horizontal.3")
+              .font(.system(size: 14))
+              .foregroundColor(.secondary)
+          }
+          .buttonStyle(PlainButtonStyle())
           
-          Text(cameraService.cameraStatus.isRunning ? "Stop Virtual Camera" : "Start Virtual Camera")
-            .font(.system(size: 16, weight: .medium))
-            .foregroundColor(.white)
+          // Switch Preset button
+          Button(action: {
+            // TODO: Switch preset functionality
+          }) {
+            Image(systemName: "wand.and.rays")
+              .font(.system(size: 14))
+              .foregroundColor(.secondary)
+          }
+          .buttonStyle(PlainButtonStyle())
           
-          Spacer()
+          // Open Preview button (only show if extension is installed)
+          if extensionService.isInstalled {
+            Button(action: {
+              Task {
+                await appCoordinator.toggleCamera() // This starts preview
+              }
+            }) {
+              Image(systemName: "eye")
+                .font(.system(size: 14))
+                .foregroundColor(.secondary)
+            }
+            .buttonStyle(PlainButtonStyle())
+          }
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 12)
-        .background(
-          RoundedRectangle(cornerRadius: 8)
-            .fill(cameraService.cameraStatus.isRunning ? Color.red : Color.accentColor)
-            .animation(.easeInOut(duration: 0.3), value: cameraService.cameraStatus.isRunning)
-        )
       }
-      .buttonStyle(PlainButtonStyle())
+      .padding(.horizontal, 16)
+      .padding(.vertical, 12)
+      .background(
+        RoundedRectangle(cornerRadius: 8)
+          .fill(Color.secondary.opacity(0.1))
+      )
+      
+      // Show instruction text
+      Text("Select Headliner Camera in Zoom or Google Meet")
+        .font(.caption)
+        .foregroundColor(.secondary)
+        .padding(.horizontal, 16)
       
       // Show actionable message if extension not installed
       if extensionService.status != .installed {
@@ -322,7 +359,10 @@ struct MainMenuView: View {
         action: { showingPreview.toggle() }
       )
       .popover(isPresented: $showingPreview, arrowEdge: .trailing) {
-        PreviewPopover(appCoordinator: appCoordinator)
+        PreviewPopover(
+          appCoordinator: appCoordinator, 
+          isShowing: showingPreview
+        )
       }
       
       // Settings button
@@ -386,6 +426,89 @@ struct MainMenuView: View {
     }
   }
   
+  // MARK: - Status Display Helpers
+  
+  private var statusDisplayText: String {
+    // Show streaming status if extension is installed
+    if extensionService.isInstalled {
+      switch extensionService.runtimeStatus {
+      case .streaming:
+        return "Streaming to external app"
+      case .starting:
+        return "Starting camera..."
+      case .stopping:
+        return "Stopping..."
+      case .error:
+        return "Camera error"
+      case .idle:
+        return "Ready - Select Headliner in your video app"
+      }
+    } else {
+      // Show installation status
+      switch extensionService.status {
+      case .installing:
+        return "Installing..."
+      case .notInstalled:
+        return "Extension not installed"
+      case .unknown:
+        return "Checking status..."
+      case .error:
+        return "Installation failed"
+      case .installed:
+        return "Ready" // Fallback, shouldn't reach here
+      }
+    }
+  }
+  
+  private var statusIndicatorColor: Color {
+    // Show streaming status color if extension is installed
+    if extensionService.isInstalled {
+      switch extensionService.runtimeStatus {
+      case .streaming:
+        return .green // Active streaming
+      case .starting, .stopping:
+        return .orange // Transitioning
+      case .error:
+        return .red // Error
+      case .idle:
+        return .blue // Ready
+      }
+    } else {
+      // Show installation status color
+      switch extensionService.status {
+      case .installing:
+        return .orange
+      case .notInstalled, .unknown:
+        return .gray
+      case .error:
+        return .red
+      case .installed:
+        return .green // Fallback
+      }
+    }
+  }
+  
+  // Header streaming indicator helpers
+  private var streamingIndicatorColor: Color {
+    if extensionService.isStreaming {
+      return .blue
+    } else if extensionService.isInstalled {
+      return .green
+    } else {
+      return .gray
+    }
+  }
+  
+  private var streamingStatusText: String {
+    if extensionService.isStreaming {
+      return "Live"
+    } else if extensionService.isInstalled {
+      return "Ready"
+    } else {
+      return "Setup Needed"
+    }
+  }
+  
   // MARK: - Debug Functions
   
   // MARK: - Action Functions
@@ -439,42 +562,68 @@ struct MainMenuView: View {
 
 // MARK: - Preview Popover Component
 
-/// Preview popover using CameraPreviewCard for full functionality
+/// Preview popover that only accesses camera when actively showing
 private struct PreviewPopover: View {
   let appCoordinator: AppCoordinator
+  let isShowing: Bool
   @EnvironmentObject private var cameraService: CameraService
   @EnvironmentObject private var overlayService: OverlayService
+  @State private var hasStartedPreview = false
   
   var body: some View {
-    VStack(spacing: 6) {
+    VStack(spacing: 12) {
       Text("Camera Preview")
         .font(.system(size: 13, weight: .medium))
-        .foregroundColor(.primary)
+        .foregroundStyle(.primary)
       
-      // Use CameraPreviewCard with new self-preview architecture
-      CameraPreviewCard(
-        previewImage: cameraService.currentPreviewFrame,
-        isActive: cameraService.cameraStatus == .running,
-        overlayService: overlayService
-      )
-      .frame(height: 180) // Compact height for popover
-      .scaleEffect(0.9) // Slightly less aggressive scaling
-      .clipped() // Prevent any overflow/bleeding
-      
-      if cameraService.selectedCamera != nil && !cameraService.availableCameras.isEmpty {
-        Text("Self-preview: exactly what Google Meet sees")
-          .font(.system(size: 10))
-          .foregroundColor(.secondary)
-      } else {
-        Text("Select a camera to see preview")
-          .font(.system(size: 10))
-          .foregroundColor(.secondary)
+      // Custom aspect-fit container for the popover
+      GeometryReader { geo in
+        ZStack {
+          // Black background for letterboxing
+          Color.black
+          
+          // Video preview temporarily disabled for debugging
+          RoundedRectangle(cornerRadius: 8)
+            .fill(Color.gray.opacity(0.2))
+            .overlay(
+                VStack(spacing: 4) {
+                    Image(systemName: "video.slash")
+                        .font(.system(size: 24))
+                        .foregroundStyle(.secondary)
+                    
+                    Text("Preview Disabled")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            )
+            .aspectRatio(16.0/9.0, contentMode: .fit)
+          
+          // VideoPreviewView(
+          //   isActive: hasStartedPreview && isShowing
+          // )
+          // .aspectRatio(16.0/9.0, contentMode: .fit)
+        }
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+      }
+      .frame(height: 200) // Fixed height for popover
+    }
+    .padding(12)
+    .frame(width: 320)
+    .background(Color(.controlBackgroundColor))
+    .clipShape(RoundedRectangle(cornerRadius: 12))
+    .onAppear {
+      // Only start preview when popover is actually showing
+      if isShowing {
+        hasStartedPreview = true
       }
     }
-    .padding(8) // Reduced padding
-    .frame(width: 300) // More compact width
-    .background(Color(.controlBackgroundColor)) // Explicit background to prevent text bleeding
-    .clipShape(RoundedRectangle(cornerRadius: 12)) // Clean edges
+    .onChange(of: isShowing) { _, newValue in
+      hasStartedPreview = newValue
+    }
+    .onDisappear {
+      // Always stop preview when popover disappears
+      hasStartedPreview = false
+    }
   }
 }
 

@@ -293,7 +293,7 @@ struct PreviewMedia: View {
                     selectedID: $selectedPresetID,
                     onSelect: onPresetSelect
                 )
-                .frame(height: 280) // Reduced height
+                .frame(height: 320) // Reduced height
                 
                 Spacer(minLength: 8)
                 
@@ -303,77 +303,74 @@ struct PreviewMedia: View {
                 )
             }
             
-            // Center: Live Preview with Real Overlay
+            // Center: Live Preview with Real Overlay using CameraPreviewCard
             LivePreviewPane(
                 title: "Live Preview",
                 targetAspect: 16.0/9.0
             ) {
-                ZStack {
-                    // Camera feed or mock preview for Xcode previews
-                    if isInPreviewMode {
-                        // Mock camera feed for previews
-                        RoundedRectangle(cornerRadius: 8)
-                            .fill(LinearGradient(
-                                colors: [.blue.opacity(0.3), .purple.opacity(0.3)],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            ))
-                            .overlay(
-                                VStack(spacing: 8) {
-                                    Image(systemName: "camera.fill")
-                                        .font(.system(size: 32))
-                                        .foregroundStyle(.white.opacity(0.8))
-                                    
-                                    Text("Mock Camera Preview")
-                                        .font(.callout.weight(.medium))
-                                        .foregroundStyle(.white.opacity(0.9))
-                                    
-                                    Text("(Xcode Preview Mode)")
-                                        .font(.caption)
-                                        .foregroundStyle(.white.opacity(0.7))
-                                }
-                            )
-                    } else if let frame = cameraService.currentPreviewFrame {
-                        Image(frame, scale: 1.0, label: Text("Camera preview"))
-                            .resizable()
-                            .aspectRatio(contentMode: .fill)
-                    } else if hasStartedPreview {
-                        VStack(spacing: 12) {
-                            ProgressView()
-                                .scaleEffect(1.2)
-                            Text("Starting camera preview...")
-                                .font(.callout)
-                                .foregroundStyle(.secondary)
-                        }
-                    } else {
-                        VStack(spacing: 16) {
-                            Image(systemName: "camera.viewfinder")
-                                .font(.system(size: 42))
-                                .foregroundStyle(.secondary)
-                            
-                            Text("Camera preview will appear here")
-                                .font(.callout)
-                                .foregroundStyle(.secondary)
-                                .multilineTextAlignment(.center)
-                        }
-                    }
+                if isInPreviewMode {
+                    // Mock preview for Xcode previews
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(LinearGradient(
+                            colors: [.blue.opacity(0.3), .purple.opacity(0.3)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        ))
+                        .overlay(
+                            VStack(spacing: 8) {
+                                Image(systemName: "camera.fill")
+                                    .font(.system(size: 32))
+                                    .foregroundStyle(.white.opacity(0.8))
+                                
+                                Text("Mock Camera Preview")
+                                    .font(.callout.weight(.medium))
+                                    .foregroundStyle(.white.opacity(0.9))
+                                
+                                Text("(Xcode Preview Mode)")
+                                    .font(.caption)
+                                    .foregroundStyle(.white.opacity(0.7))
+                            }
+                        )
+                        .background(Color.black)
+                } else {
+                    // Temporarily disabled live preview to debug extension issues
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(Color.gray.opacity(0.3))
+                        .overlay(
+                            VStack(spacing: 8) {
+                                Image(systemName: "video.slash")
+                                    .font(.system(size: 32))
+                                    .foregroundStyle(.secondary)
+                                
+                                Text("Live Preview Disabled")
+                                    .font(.callout.weight(.medium))
+                                    .foregroundStyle(.secondary)
+                                
+                                Text("(Debugging Mode)")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                        )
+                        .frame(height: 300)
+                    
+                    // Use direct video preview of the Headliner virtual camera
+                    // VideoPreviewView(
+                    //     isActive: hasStartedPreview
+                    // )
+                    // .frame(height: 300)
                 }
-                .background(Color.black)
             }
             .frame(maxWidth: .infinity)
         }
         .padding()
         .onAppear {
             if !isInPreviewMode {
-                Task {
-                    hasStartedPreview = true
-                    await cameraService.startOnboardingPreview()
-                }
+                // hasStartedPreview = true // Disabled for debugging
             }
         }
         .onDisappear {
             if !isInPreviewMode {
-                cameraService.stopOnboardingPreview()
+                // hasStartedPreview = false // Disabled for debugging
             }
         }
     }

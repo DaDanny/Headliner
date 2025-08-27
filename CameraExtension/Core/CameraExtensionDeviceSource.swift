@@ -61,8 +61,7 @@ class CameraExtensionDeviceSource: NSObject, CMIOExtensionDeviceSource, AVCaptur
 	// UNUSED: Legacy frame counting for overlay sizing - can be removed
 	internal var _frameCount = 0
 	
-	// Streaming state management
-	internal var _isAppControlledStreaming = false
+	// Simple client tracking - no app-controlled streaming
 	internal let _streamStateLock = NSLock()
 	
 	// Camera capture components - using shared CaptureSessionManager
