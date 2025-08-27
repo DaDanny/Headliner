@@ -8,16 +8,16 @@
     <description>Latest updates for Headliner</description>
 
     <item>
-      <title>v1.1</title>
+      <title>v1.2</title>
       <sparkle:minimumSystemVersion>13.0</sparkle:minimumSystemVersion>
       <enclosure
         url="https://DaDanny.github.io/Headliner/updates/Headliner.zip"
-        sparkle:shortVersionString="1.1"
-        sparkle:version="227"
-        sparkle:edSignature="nK9yDwp0riIIB4e9hKzpJ4cfq0Mh4aMJSPreKi9LdsQrif2ImJm5n6uYXfntJEtJaMYmIQKobbz2SirZzYqDBw=="
-        length="4606201"
+        sparkle:shortVersionString="1.2"
+        sparkle:version="228"
+        sparkle:edSignature="2NPDdhuUlXitzdAv+89LAcaQuURdE4wW+fcROALxq813Ps2LUfJCeWpILGPRPXBwW/MXP2XQ+IzEZkTH8rcBAA=="
+        length="4600944"
         type="application/octet-stream" />
-      <pubDate>Wed, 27 Aug 2025 16:01:15 +0000</pubDate>
+      <pubDate>Wed, 27 Aug 2025 16:15:11 +0000</pubDate>
       <sparkle:releaseNotesLink>https://DaDanny.github.io/Headliner/updates/release-notes.html</sparkle:releaseNotesLink>
     </item>
   </channel>

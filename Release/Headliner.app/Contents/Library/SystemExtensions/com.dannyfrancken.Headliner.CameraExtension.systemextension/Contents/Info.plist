@@ -25,7 +25,7 @@
 		<string>MacOSX</string>
 	</array>
 	<key>CFBundleVersion</key>
-	<string>227</string>
+	<string>228</string>
 	<key>CMIOExtension</key>
 	<dict>
 		<key>CMIOExtensionMachServiceName</key>
